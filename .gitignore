@@ -1,0 +1,9 @@
+.env
+hub_comercial.db
+hub_comercial_*.db
+venv/
+uploads/
+__pycache__/
+*.pyc
+*.log
+.DS_Store

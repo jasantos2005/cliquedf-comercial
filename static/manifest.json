@@ -1,0 +1,10 @@
+{
+  "name": "Hub Comercial",
+  "short_name": "HubCom",
+  "description": "App de pré-cadastro para vendedores Cliquedf",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#07090c",
+  "theme_color": "#07090c",
+  "orientation": "portrait"
+}

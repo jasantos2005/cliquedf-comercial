@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assinatura de Contrato — Cliquedf</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,'Segoe UI',sans-serif;background:#f8f9fa;color:#1a1a2e;font-size:15px;}
+.header{background:#0d1117;color:#00d4ff;padding:16px 20px;text-align:center;}
+.header h1{font-size:18px;font-weight:700;}
+.header p{font-size:12px;color:#64748b;margin-top:4px;}
+.container{max-width:800px;margin:0 auto;padding:20px 16px 40px;}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:16px;}
+.card h2{font-size:15px;font-weight:600;margin-bottom:12px;color:#1a1a2e;}
+.info-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:14px;}
+.info-row:last-child{border-bottom:none;}
+.info-key{color:#64748b;}
+.info-val{font-weight:500;text-align:right;}
+.contrato-box{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:16px;max-height:400px;overflow-y:auto;font-size:13px;line-height:1.7;margin-bottom:12px;}
+.contrato-box table{width:100%!important;font-size:12px;}
+.aceite-row{display:flex;align-items:flex-start;gap:12px;padding:14px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;margin-bottom:16px;cursor:pointer;}
+.aceite-row input{width:20px;height:20px;flex-shrink:0;margin-top:1px;cursor:pointer;}
+.aceite-row label{font-size:13px;line-height:1.5;cursor:pointer;}
+.canvas-area{border:2px dashed #cbd5e1;border-radius:10px;background:#fff;margin-bottom:10px;overflow:hidden;touch-action:none;}
+canvas{display:block;width:100%;cursor:crosshair;}
+.canvas-btns{display:flex;gap:8px;margin-bottom:16px;}
+.btn-limpar{flex:1;padding:10px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;color:#64748b;cursor:pointer;}
+.btn-assinar{width:100%;padding:16px;background:#00d4ff;color:#000;font-size:16px;font-weight:700;border:none;border-radius:12px;cursor:pointer;}
+.btn-assinar:disabled{opacity:.4;cursor:not-allowed;}
+.msg-ok{background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:24px;text-align:center;}
+.msg-ok h2{color:#15803d;font-size:20px;margin-bottom:8px;}
+.msg-ok p{color:#166534;font-size:14px;line-height:1.6;}
+.msg-err{background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:20px;text-align:center;color:#991b1b;}
+.loading{text-align:center;padding:60px 20px;color:#64748b;}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Cliquedf Telecom</h1>
+  <p>Assinatura Digital de Contrato</p>
+</div>
+
+<div class="container">
+  <div id="loading" class="loading">Carregando contrato...</div>
+  <div id="conteudo" style="display:none;"></div>
+  <div id="sucesso" class="msg-ok" style="display:none;">
+    <h2>✅ Contrato assinado!</h2>
+    <p id="msg-sucesso"></p>
+  </div>
+  <div id="erro" class="msg-err" style="display:none;"></div>
+</div>
+
+<script>
+const token = location.pathname.split('/').pop();
+let dados = null;
+let canvas, ctx, desenhando = false, temAssinatura = false;
+
+async function carregar() {
+  try {
+    const r = await fetch(`/api/assinatura/${token}`);
+    if (!r.ok) {
+      const e = await r.json();
+      mostrarErro(e.detail || 'Link inválido ou expirado.');
+      return;
+    }
+    dados = await r.json();
+    renderizar();
+  } catch(e) {
+    mostrarErro('Erro de conexão. Verifique sua internet.');
+  }
+}
+
+function fmt(v) {
+  return Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function renderizar() {
+  document.getElementById('loading').style.display = 'none';
+  const el = document.getElementById('conteudo');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="card">
+      <h2>Dados do contrato</h2>
+      <div class="info-row"><span class="info-key">Cliente</span><span class="info-val">${dados.cliente}</span></div>
+      <div class="info-row"><span class="info-key">CPF/CNPJ</span><span class="info-val">${dados.cnpj_cpf}</span></div>
+      <div class="info-row"><span class="info-key">Plano</span><span class="info-val">${dados.plano}</span></div>
+      <div class="info-row"><span class="info-key">Valor mensal</span><span class="info-val">R$ ${fmt(dados.valor)}</span></div>
+      <div class="info-row"><span class="info-key">Taxa de instalação</span><span class="info-val">R$ ${fmt(dados.taxa)}</span></div>
+      <div class="info-row"><span class="info-key">Fidelidade</span><span class="info-val">${dados.fidelidade} meses</span></div>
+      <div class="info-row"><span class="info-key">Vencimento</span><span class="info-val">Dia ${dados.vencimento}</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Contrato completo</h2>
+      <div class="contrato-box" id="contrato-texto">${dados.html_contrato}</div>
+    </div>
+
+    <div class="aceite-row" onclick="toggleAceite()">
+      <input type="checkbox" id="aceite">
+      <label for="aceite">Li e aceito todos os termos e condições do contrato de prestação de serviços acima.</label>
+    </div>
+
+    <div class="card">
+      <h2>Sua assinatura</h2>
+      <p style="font-size:13px;color:#64748b;margin-bottom:10px;">Assine abaixo com o dedo ou mouse:</p>
+      <div class="canvas-area">
+        <canvas id="canvas-assinatura" height="160"></canvas>
+      </div>
+      <div class="canvas-btns">
+        <button class="btn-limpar" onclick="limparCanvas()">Limpar</button>
+      </div>
+      <button class="btn-assinar" id="btn-assinar" onclick="enviarAssinatura()" disabled>
+        Assinar contrato
+      </button>
+    </div>
+  `;
+
+  // Canvas setup
+  canvas = document.getElementById('canvas-assinatura');
+  canvas.width = canvas.offsetWidth || 700;
+  ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#1a1a2e';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Touch
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); iniciar(e.touches[0]); }, {passive:false});
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); desenhar(e.touches[0]); }, {passive:false});
+  canvas.addEventListener('touchend',   e => { e.preventDefault(); parar(); },               {passive:false});
+  // Mouse
+  canvas.addEventListener('mousedown', iniciar);
+  canvas.addEventListener('mousemove', desenhar);
+  canvas.addEventListener('mouseup',   parar);
+  canvas.addEventListener('mouseleave',parar);
+}
+
+function toggleAceite() {
+  const cb = document.getElementById('aceite');
+  cb.checked = !cb.checked;
+  atualizarBotao();
+}
+
+function atualizarBotao() {
+  const aceite = document.getElementById('aceite')?.checked;
+  const btn    = document.getElementById('btn-assinar');
+  if (btn) btn.disabled = !(aceite && temAssinatura);
+}
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: ((e.clientX || e.pageX) - rect.left) * scaleX,
+    y: ((e.clientY || e.pageY) - rect.top)  * scaleY
+  };
+}
+
+function iniciar(e) {
+  desenhando = true;
+  const p = getPos(e);
+  ctx.beginPath(); ctx.moveTo(p.x, p.y);
+}
+
+function desenhar(e) {
+  if (!desenhando) return;
+  const p = getPos(e);
+  ctx.lineTo(p.x, p.y); ctx.stroke();
+  temAssinatura = true;
+  atualizarBotao();
+}
+
+function parar() { desenhando = false; }
+
+function limparCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  temAssinatura = false;
+  atualizarBotao();
+}
+
+async function enviarAssinatura() {
+  const btn = document.getElementById('btn-assinar');
+  btn.textContent = 'Enviando...'; btn.disabled = true;
+
+  try {
+    const assinatura = canvas.toDataURL('image/png');
+    const r = await fetch(`/api/assinatura/${token}/assinar`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({assinatura_base64: assinatura, aceite_termos: true})
+    });
+    const d = await r.json();
+    if (!r.ok) { mostrarErro(d.detail || 'Erro ao enviar assinatura.'); return; }
+
+    document.getElementById('conteudo').style.display = 'none';
+    document.getElementById('sucesso').style.display = 'block';
+    document.getElementById('msg-sucesso').textContent =
+      `Protocolo: ${d.protocolo}. Em breve nosso técnico entrará em contato para agendar a instalação.`;
+  } catch(e) {
+    mostrarErro('Erro de conexão. Tente novamente.');
+    btn.textContent = 'Assinar contrato'; btn.disabled = false;
+  }
+}
+
+function mostrarErro(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('erro').style.display = 'block';
+  document.getElementById('erro').textContent = msg;
+}
+
+carregar();
+</script>
+</body>
+</html>
