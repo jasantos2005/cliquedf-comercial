@@ -700,3 +700,39 @@ async def ranking_ixc(
     except Exception as e:
         log.error(f"ranking-ixc: {e}")
         return {"vendedores": []}
+
+
+@router.get("/auditoria-ixc")
+async def auditoria_ixc(
+    de: str = Query("2026-01-01"),
+    ate: str = Query(""),
+    vendedor_id: str = Query(""),
+    cidade: str = Query(""),
+    nivel: str = Query(""),
+    user=Depends(requer_backoffice())
+):
+    from app.engines.auditoria_ixc_engine import auditar_contratos
+    lista = auditar_contratos(de, ate or None, vendedor_id, cidade)
+    if nivel:
+        lista = [c for c in lista if c["nivel_max"] == nivel]
+    def sv(v):
+        if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
+        if hasattr(v,'isoformat'): return str(v)
+        return v
+    return {
+        "contratos": [{k:sv(val) for k,val in c.items()} for c in lista],
+        "total": len(lista),
+        "por_nivel": {
+            "critico": sum(1 for c in lista if c["nivel_max"]=="critico"),
+            "grave":   sum(1 for c in lista if c["nivel_max"]=="grave"),
+            "alerta":  sum(1 for c in lista if c["nivel_max"]=="alerta"),
+        }
+    }
+
+@router.get("/auditoria-ixc/resumo")
+async def auditoria_ixc_resumo(
+    de: str = Query("2026-01-01"),
+    user=Depends(requer_backoffice())
+):
+    from app.engines.auditoria_ixc_engine import resumo_auditoria
+    return resumo_auditoria(de)

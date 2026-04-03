@@ -459,7 +459,8 @@ tbody tr:hover td{background:var(--surf2);}
         <svg class="ni-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       <div class="ni-sub" id="sub-auditoria">
-        <div class="nis" onclick="navTo('aud-fila')">Fila de auditoria</div>
+        <div class="nis" onclick="navTo('aud-fila')">Auditoria App</div>
+        <div class="nis" onclick="navTo('aud-ixc')">Auditoria IXC</div>
       </div>
 
       <div class="ni" id="ni-vendas" onclick="toggleSub('sub-vendas','ni-vendas')">
@@ -620,6 +621,30 @@ tbody tr:hover td{background:var(--surf2);}
           <div class="split-r" id="detalhe-aud">
             <div class="empty"><div class="ei">←</div><p>Selecione um cadastro para ver os detalhes.</p></div>
           </div>
+        </div>
+      </div>
+
+      <!-- AUDITORIA IXC -->
+      <div id="page-aud-ixc" class="page">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;" id="aud-ixc-kpis"></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="sec-hd">
+            <span class="sec-title">Por regra</span>
+            <div style="display:flex;gap:6px;">
+              <div class="ftab on" onclick="filtroAudIXC('',this)" id="ft-ixc-all">Todos</div>
+              <div class="ftab" onclick="filtroAudIXC('critico',this)"><span style="color:var(--red);">●</span> Critico</div>
+              <div class="ftab" onclick="filtroAudIXC('grave',this)"><span style="color:var(--orange);">●</span> Grave</div>
+              <div class="ftab" onclick="filtroAudIXC('alerta',this)"><span style="color:var(--amber);">●</span> Alerta</div>
+            </div>
+          </div>
+          <div id="aud-ixc-regras" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+        </div>
+        <div class="card">
+          <div class="sec-hd"><span class="sec-title" id="aud-ixc-titulo">Contratos com problemas</span><span id="aud-ixc-total" style="font-size:11px;color:var(--text3);"></span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th>Cidade</th><th>Plano</th><th>Data</th><th>Nivel</th><th>Problemas</th></tr></thead>
+            <tbody id="tbody-aud-ixc"></tbody>
+          </table></div>
         </div>
       </div>
 
@@ -1039,6 +1064,7 @@ function navTo(page) {
   const loaders = {
     dashboard: carregarDashboard,
     'aud-fila': () => carregarAuditoria(audStatusFiltro),
+    'aud-ixc': carregarAuditoriaIXC,
     'vendas-lista': () => carregarVendas('mes'),
     'vendas-hub': carregarVendasHub,
     'vendas-cidades': carregarVendasCidades,
@@ -1364,6 +1390,61 @@ async function reauditar(id) {
     toast('Reenviado para auditoria', 'ok'); carregarAuditoria(audStatusFiltro);
   } catch (e) { toast('Erro', 'err'); }
 }
+
+// -- AUDITORIA IXC --
+let audIXCNivelFiltro = '';
+async function carregarAuditoriaIXC() {
+  const de  = document.getElementById('fb-de').value  || '2026-01-01';
+  const ate = document.getElementById('fb-ate').value || '';
+  const vp  = filtros.vendedor ? '&vendedor_id='+filtros.vendedor : '';
+  const cp  = filtros.cidade   ? '&cidade='+filtros.cidade : '';
+  const np  = audIXCNivelFiltro ? '&nivel='+audIXCNivelFiltro : '';
+  const corNv = {critico:'var(--red)',grave:'var(--orange)',alerta:'var(--amber)',ok:'var(--green)'};
+  try {
+    const res = await api('/api/painel/auditoria-ixc/resumo?de='+de);
+    const nv = res.por_nivel || {};
+    document.getElementById('aud-ixc-kpis').innerHTML =
+      '<div class="kpi" style="--ac:var(--red)"><div class="kv">'+( nv.critico||0)+'</div><div class="kl">Criticos</div></div>'+
+      '<div class="kpi" style="--ac:var(--orange)"><div class="kv">'+(nv.grave||0)+'</div><div class="kl">Graves</div></div>'+
+      '<div class="kpi" style="--ac:var(--amber)"><div class="kv">'+(nv.alerta||0)+'</div><div class="kl">Alertas</div></div>'+
+      '<div class="kpi" style="--ac:var(--text3)"><div class="kv">'+(res.total_problemas||0)+'</div><div class="kl">Total com problemas</div></div>';
+    document.getElementById('aud-ixc-regras').innerHTML = (res.por_regra||[]).map(r =>
+      '<div style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;">'+
+      '<div style="font-size:10px;font-weight:700;color:'+(corNv[r.nivel]||'var(--text3)')+'">'+r.regra+'</div>'+
+      '<div style="font-size:11px;font-weight:600;margin-top:2px;">'+esc(r.legenda)+'</div>'+
+      '<div style="font-size:18px;font-weight:900;color:'+(corNv[r.nivel]||'var(--cyan)')+';margin-top:3px;">'+r.total+'</div></div>'
+    ).join('');
+  } catch(e) { console.error('resumo ixc',e); }
+  const tbody = document.getElementById('tbody-aud-ixc');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></td></tr>';
+  try {
+    const r = await api('/api/painel/auditoria-ixc?de='+de+'&ate='+ate+vp+cp+np);
+    document.getElementById('aud-ixc-total').textContent = r.total + ' contratos';
+    tbody.innerHTML = (r.contratos||[]).map(c => {
+      const probs = c.problemas.map(p =>
+        '<span class="badge" style="margin-right:3px;background:rgba(0,0,0,.2);color:'+(corNv[p.nivel]||'var(--text3)')+';">'+p.regra+': '+esc(p.detalhe||p.legenda)+'</span>'
+      ).join('');
+      return '<tr>'+
+        '<td style="color:var(--text3);font-size:11px;">#'+c.contrato_id+'</td>'+
+        '<td><div class="td-name">'+esc(c.razao||'--')+'</div><div class="td-sub">'+esc(c.cnpj_cpf||'')+'</div></td>'+
+        '<td style="color:var(--text3);">'+esc(c.vendedor_nome||'--')+'</td>'+
+        '<td style="color:var(--text3);">'+esc(c.cidade_nome||'--')+'</td>'+
+        '<td style="font-size:11px;">'+esc(c.plano_nome||'--')+'</td>'+
+        '<td style="color:var(--text3);font-size:11px;">'+fmtData(c.data_contrato)+'</td>'+
+        '<td><span class="badge" style="color:'+(corNv[c.nivel_max]||'var(--text3)')+';">'+c.nivel_max.toUpperCase()+'</span></td>'+
+        '<td style="max-width:280px;">'+probs+'</td>'+
+      '</tr>';
+    }).join('') || '<tr><td colspan="8" class="empty"><p>Nenhum problema encontrado.</p></td></tr>';
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="8" class="empty"><p>Erro ao carregar.</p></td></tr>'; }
+}
+
+function filtroAudIXC(nivel, el) {
+  audIXCNivelFiltro = nivel;
+  document.querySelectorAll('#page-aud-ixc .ftab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  carregarAuditoriaIXC();
+}
+
 
 // ── VENDAS IXC ───────────────────────────────────────────────
 async function carregarVendas(periodo = 'mes') {
