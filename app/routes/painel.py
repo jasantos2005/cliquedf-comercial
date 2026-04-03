@@ -7,7 +7,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from fastapi import APIRouter, Depends, Query
 from app.services.auth import requer_backoffice, requer_supervisor
-from app.services.ixc_db import ixc_select, ixc_select_one
+from app.services.ixc_db import ixc_select, ixc_select_one, ixc_conn
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DB_PATH  = BASE_DIR / "hub_comercial.db"
@@ -27,9 +27,24 @@ def _data_6m(): return (date.today() - timedelta(days=180)).strftime("%Y-%m-%d")
 
 # ── DASHBOARD ────────────────────────────────────────────────
 @router.get("/resumo")
-async def resumo(db=Depends(get_db), user=Depends(requer_backoffice())):
+async def resumo(
+    de: str = Query(default=None), ate: str = Query(default=None),
+    vendedor_id: str = Query(default=None), cidade: str = Query(default=None),
+    bairro: str = Query(default=None),
+    db=Depends(get_db), user=Depends(requer_backoffice())
+):
     # Totais gerais
-    totais = db.execute("""
+    # Monta filtros dinâmicos SQLite
+    _w, _p = [], []
+    _de  = de  or _mes()
+    _ate = ate or _hoje()
+    _w.append("date(criado_em) >= ?"); _p.append(_de)
+    _w.append("date(criado_em) <= ?"); _p.append(_ate)
+    if vendedor_id: _w.append("ixc_vendedor_id = ?"); _p.append(vendedor_id)
+    if cidade:      _w.append("ixc_cidade_id = ?");    _p.append(cidade)
+    if bairro:      _w.append("bairro = ?");           _p.append(bairro)
+    _where = "WHERE " + " AND ".join(_w)
+    totais = db.execute(f"""
         SELECT
             COUNT(*) AS total,
             SUM(status='enviado' OR status='em_auditoria') AS em_andamento,
@@ -39,45 +54,129 @@ async def resumo(db=Depends(get_db), user=Depends(requer_backoffice())):
             SUM(status='assinado') AS assinados,
             SUM(status='ativado') AS ativados,
             SUM(status='erro_ativacao') AS erros,
-            SUM(date(criado_em) = ?) AS hoje,
-            SUM(date(criado_em) >= ?) AS mes
-        FROM hc_precadastros
-    """, (_hoje(), _mes())).fetchone()
+            SUM(date(criado_em) = '{_hoje()}') AS hoje,
+            SUM(date(criado_em) >= '{_mes()}') AS mes
+        FROM hc_precadastros {_where}
+    """, _p).fetchone()
 
     # Alertas
-    alertas = db.execute("""
+    alertas = db.execute(f"""
         SELECT
             SUM(status='pendente' AND atualizado_em <= datetime('now','-3 hours','-24 hours')) AS pendentes_urgentes,
             SUM(status='assinatura_pendente' AND atualizado_em <= datetime('now','-3 hours','-48 hours')) AS assinatura_atrasada,
             SUM(status='erro_ativacao') AS erros_ativacao
-        FROM hc_precadastros
-    """).fetchone()
+        FROM hc_precadastros {_where}
+    """, _p).fetchone()
 
-    # Últimas atividades
-    atividades = db.execute("""
-        SELECT p.id, p.razao, p.status, p.plano_nome,
-               u.nome AS vendedor, p.atualizado_em
-        FROM hc_precadastros p
-        LEFT JOIN hc_usuarios u ON u.id = p.id_vendedor_hub
-        ORDER BY p.atualizado_em DESC LIMIT 10
-    """).fetchall()
+    # Totais IXC em tempo real
+    with ixc_conn() as _c:
+        with _c.cursor() as _cur:
+            _ixc_sql = "SELECT SUM(cc.status_internet = 'A') AS ativados_ixc, SUM(cc.status_internet = 'AA') AS aguard_ass_ixc FROM cliente_contrato cc LEFT JOIN cliente c ON c.id = cc.id_cliente WHERE cc.data >= %s AND cc.data <= %s"
+            _ixc_params = [_de, _ate]
+            if vendedor_id: _ixc_sql += " AND cc.id_vendedor_ativ = %s"; _ixc_params.append(vendedor_id)
+            if cidade:      _ixc_sql += " AND c.cidade = (SELECT id FROM cidade WHERE nome = %s LIMIT 1)"; _ixc_params.append(cidade)
+            _cur.execute(_ixc_sql, _ixc_params)
+            _ixc_totais = _cur.fetchone()
+    ativados_ixc   = int(_ixc_totais['ativados_ixc']   or 0)
+    aguard_ass_ixc = int(_ixc_totais['aguard_ass_ixc'] or 0)
+    # Totais NV/TIT/RN separado
+    with ixc_conn() as _c2:
+        with _c2.cursor() as _cur2:
+            _os_sql = ('SELECT SUM(o.id_assunto=227) AS nv,'
+                       ' SUM(o.id_assunto=110) AS tit,'
+                       ' SUM(o.id_assunto=75) AS rn'
+                       ' FROM su_oss_chamado o'
+                       ' JOIN cliente_contrato cc ON o.id_contrato_kit = cc.id'
+                       ' JOIN cliente c ON c.id = cc.id_cliente'
+                       ' WHERE o.status=%s AND cc.data >= %s AND cc.data <= %s')
+            _os_p = ['F', _de, _ate]
+            if vendedor_id: _os_sql += ' AND cc.id_vendedor_ativ = %s'; _os_p.append(vendedor_id)
+            if cidade:      _os_sql += ' AND c.cidade = %s';            _os_p.append(cidade)
+            _cur2.execute(_os_sql, _os_p)
+            _os_r = _cur2.fetchone()
+    total_nv  = int(_os_r['nv']  or 0)
+    total_tit = int(_os_r['tit'] or 0)
+    total_rn  = int(_os_r['rn']  or 0)
+    aguard_ass_hub = int(dict(totais).get('aguard_assinatura') or 0)
+    totais = dict(totais)
+    totais['ativados']          = ativados_ixc
+    totais['aguard_assinatura'] = aguard_ass_ixc
+    # Últimas atividades — direto do IXC em tempo real
+    _status_map = {
+        'A': 'ativado', 'I': 'inativo', 'P': 'pre_contrato',
+        'N': 'pendente', 'D': 'cancelado',
+    }
+    _status_internet_map = {
+        'A': 'ativado', 'D': 'cancelado', 'CM': 'migrado',
+        'CA': 'cancelado', 'CE': 'cancelado', 'FA': 'financeiro', 'AA': 'assinatura_pendente',
+    }
+    with ixc_conn() as _conn:
+        with _conn.cursor() as _cur:
+            _ativ_sql = """
+                SELECT cc.id,
+                       c.razao,
+                       cc.status            AS status_contrato,
+                       cc.status_internet   AS status_internet,
+                       cc.contrato          AS plano_nome,
+                       COALESCE(v.nome, '—') AS vendedor,
+                       cc.data              AS data_cadastro,
+                       os.data_fechamento   AS data_instalacao,
+                       DATEDIFF(os.data_fechamento, cc.data) AS sla_dias,
+                       os.id_assunto AS os_assunto
+                FROM cliente_contrato cc
+                INNER JOIN cliente c ON c.id = cc.id_cliente
+                LEFT JOIN vendedor v ON v.id = cc.id_vendedor_ativ AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
+                LEFT JOIN su_oss_chamado os ON os.id_contrato_kit = cc.id
+                    AND os.id_assunto IN (227, 110, 75) AND os.status = 'F' AND os.data_fechamento IS NOT NULL
+                WHERE cc.data >= %s AND cc.data <= %s"""
+            _ativ_params = [_de, _ate]
+            if vendedor_id: _ativ_sql += " AND cc.id_vendedor_ativ = %s"; _ativ_params.append(vendedor_id)
+            if cidade:      _ativ_sql += " AND c.cidade = %s";            _ativ_params.append(cidade)
+            if bairro:      _ativ_sql += " AND cc.bairro = %s";           _ativ_params.append(bairro)
+            _ativ_sql += " ORDER BY cc.id DESC LIMIT 20"
+            _cur.execute(_ativ_sql, _ativ_params)
+            _rows = _cur.fetchall()
+    atividades = [
+        {
+            'id':            r['id'],
+            'razao':         r['razao'],
+            'status':        _status_internet_map.get(r['status_internet'] or '', None)
+                             or _status_map.get(r['status_contrato'] or '', 'pendente'),
+            'status_contrato':  r['status_contrato'] or '',
+            'status_internet':  r['status_internet'] or '',
+            'plano_nome':    r['plano_nome'],
+            'vendedor':      r['vendedor'],
+            'data_cadastro':  str(r['data_cadastro']) if r['data_cadastro'] else '',
+            'data_instalacao': str(r['data_instalacao'])[:10] if r['data_instalacao'] else None,
+            'sla_dias':      r['sla_dias'],
+            'tipo_os':       'NV' if r.get('os_assunto') == 227 else ('TIT' if r.get('os_assunto') == 110 else ('RN' if r.get('os_assunto') == 75 else None)),
+        }
+        for r in _rows
+    ]
 
     # Funil do mês
-    funil = db.execute("""
+    funil = db.execute(f"""
         SELECT
             COUNT(*) AS leads,
             SUM(status NOT IN ('reprovado')) AS passou_auditoria,
             SUM(status IN ('assinado','ativado')) AS assinou,
             SUM(status='ativado') AS ativado
-        FROM hc_precadastros
-        WHERE date(criado_em) >= ?
-    """, (_mes(),)).fetchone()
+        FROM hc_precadastros {_where}
+    """, _p).fetchone()
+    funil = dict(funil)
+    funil['ativado'] = ativados_ixc
+    funil['nv']  = total_nv
+    funil['tit'] = total_tit
+    funil['rn']  = total_rn
+
+    def _safe(d):
+        return {k: (v if v is not None else 0) for k, v in dict(d).items()}
 
     return {
-        "totais":     dict(totais),
-        "alertas":    dict(alertas),
-        "atividades": [dict(a) for a in atividades],
-        "funil":      dict(funil),
+        "totais":     _safe(totais),
+        "alertas":    _safe(alertas),
+        "atividades": atividades,
+        "funil":      _safe(funil),
     }
 
 
@@ -241,36 +340,43 @@ async def vendas_ixc(
     }
     inicio = datas.get(periodo, "2026-01-01")
 
-    filtro_vend = f"AND c.id_vendedor = {int(vendedor)}" if vendedor else ""
-    filtro_cid  = f"AND ci.nome LIKE '%{cidade}%'" if cidade else ""
+    filtro_vend = f"AND cc.id_vendedor_ativ = {int(vendedor)}" if vendedor else ""
+    filtro_cid  = f"AND c.cidade = {int(cidade)}" if cidade and cidade.isdigit() else ""
 
     try:
-        rows = ixc_select(f"""
-            SELECT cc.id, cc.data, cc.status,
-                   c.razao, c.cnpj_cpf, c.id_vendedor,
-                   v.nome AS vendedor_nome,
-                   ci.nome AS cidade_nome,
-                   vc.nome AS plano_nome, vc.valor_contrato AS valor,
-                   o.status AS os_status,
-                   CASE WHEN o.data_fechamento IS NULL OR o.data_fechamento='0000-00-00 00:00:00' THEN 1 ELSE 0 END AS os_aberta
-            FROM ixcprovedor.cliente_contrato cc
-            JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
-            LEFT JOIN ixcprovedor.vendedor v ON v.id = c.id_vendedor
-            LEFT JOIN ixcprovedor.cidade ci ON ci.id = c.cidade
-            LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id = cc.id_vd_contrato
-            LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_cliente = c.id AND o.id_assunto = 227
-            WHERE cc.data >= %s
-              AND cc.status != 'C'
-              AND c.id_vendedor > 0
-              {filtro_vend}
-            ORDER BY cc.id DESC
-            LIMIT 500
-        """, (inicio,))
+        from app.services.ixc_db import ixc_conn
+        with ixc_conn() as _conn:
+            _cur = _conn.cursor()
+            _sql = f"""
+                SELECT cc.id, cc.data, cc.status, cc.status_internet,
+                       c.razao, c.cnpj_cpf,
+                       v.nome AS vendedor_nome,
+                       ci.nome AS cidade_nome,
+                       vc.nome AS plano_nome, vc.valor_contrato AS valor,
+                       o.status AS os_status, f.funcionario AS tecnico_nome,
+                       CASE WHEN o.data_fechamento IS NULL OR o.data_fechamento='0000-00-00 00:00:00' THEN 1 ELSE 0 END AS os_aberta
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
+                LEFT JOIN ixcprovedor.vendedor v ON v.id = cc.id_vendedor_ativ
+                LEFT JOIN ixcprovedor.cidade ci ON ci.id = c.cidade
+                LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id = cc.id_vd_contrato
+                LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit = cc.id AND o.id_assunto = 227
+                LEFT JOIN ixcprovedor.funcionarios f ON f.id = o.id_tecnico
+                WHERE cc.data >= %s AND cc.status != 'C'
+                  AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
+                  {filtro_vend} {filtro_cid}
+                ORDER BY cc.id DESC LIMIT 500
+            """
+            _cur.execute(_sql, (inicio,))
+            rows = _cur.fetchall()
 
-        return {"vendas": [
-            {**dict(r), "data": str(r["data"]) if r["data"] else None}
-            for r in rows
-        ]}
+        def _sv(v):
+            if v is None: return None
+            if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
+            if hasattr(v,'isoformat'): return str(v)
+            return v
+
+        return {"vendas": [{k:_sv(val) for k,val in dict(r).items()} for r in rows]}
     except Exception as e:
         log.error(f"vendas-ixc erro: {e}")
         return {"vendas": []}
@@ -282,9 +388,9 @@ async def filtros(user=Depends(requer_backoffice())):
     vendedores = ixc_select("""
         SELECT DISTINCT v.id, v.nome
         FROM ixcprovedor.vendedor v
-        JOIN ixcprovedor.cliente c ON c.id_vendedor = v.id
-        JOIN ixcprovedor.cliente_contrato cc ON cc.id_cliente = c.id
+        JOIN ixcprovedor.cliente_contrato cc ON cc.id_vendedor_ativ = v.id
         WHERE cc.data >= '2026-01-01' AND v.nome IS NOT NULL
+          AND v.id NOT IN (29) AND v.id > 0
         ORDER BY v.nome
     """)
     cidades = ixc_select("""
@@ -316,6 +422,8 @@ async def filtros(user=Depends(requer_backoffice())):
 async def cidades(
     periodo: str = Query("2026"),
     vendedor_id: str = Query(""),
+    de: str = Query(""),
+    ate: str = Query(""),
     user=Depends(requer_backoffice())
 ):
     datas = {
@@ -325,7 +433,8 @@ async def cidades(
         "semestre":  _data_6m(),
         "2026":      "2026-01-01",
     }
-    inicio = datas.get(periodo, "2026-01-01")
+    inicio = de if de else datas.get(periodo, "2026-01-01")
+    fim    = ate if ate else _hoje()
     filtro_vend = f"AND c.id_vendedor = {int(vendedor_id)}" if vendedor_id else ""
 
     rows = ixc_select(f"""
@@ -336,17 +445,18 @@ async def cidades(
             SUM(CASE WHEN o.status='F' THEN 1 ELSE 0 END) AS instalados,
             SUM(CASE WHEN o.status='A' THEN 1 ELSE 0 END) AS pendentes,
             SUM(CASE WHEN cc.status='C' THEN 1 ELSE 0 END) AS cancelados,
-            COUNT(DISTINCT c.id_vendedor) AS qtd_vendedores
+            COUNT(DISTINCT cc.id_vendedor_ativ) AS qtd_vendedores
         FROM ixcprovedor.cliente_contrato cc
         JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
         LEFT JOIN ixcprovedor.cidade ci ON ci.id = c.cidade
         LEFT JOIN ixcprovedor.su_oss_chamado o
-            ON o.id_cliente = c.id AND o.id_assunto = 227
-        WHERE cc.data >= %s AND c.id_vendedor > 0
+            ON o.id_contrato_kit = cc.id AND o.id_assunto = 227
+        WHERE cc.data >= %s AND cc.data <= %s
+          AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
           {filtro_vend}
         GROUP BY ci.id, ci.nome
         ORDER BY total DESC
-    """, (inicio,))
+    """, (inicio, fim))
 
     return {"cidades": [dict(r) for r in rows], "periodo": periodo}
 
@@ -501,3 +611,92 @@ async def evolucao(user=Depends(requer_backoffice())):
         "anual":        anual,
         "por_vendedor": por_vendedor,
     }
+
+
+# ── AUTOMACOES LOG ────────────────────────────────────────────
+from fastapi import Response as FastAPIResponse
+import sqlite3 as _sqlite3
+
+@router.get("/automacoes")
+async def automacoes_lista(
+    db=Depends(get_db),
+    user=Depends(requer_backoffice())
+):
+    # Ultimo log de cada motor
+    ultimos = db.execute("""
+        SELECT motor, status, resumo, duracao_s, linhas, criado_em,
+               ROW_NUMBER() OVER(PARTITION BY motor ORDER BY id DESC) as rn
+        FROM hc_automacoes_log
+    """).fetchall()
+    ultimos = [dict(r) for r in ultimos if r["rn"] == 1]
+
+    # Historico geral (ultimas 50 execucoes)
+    historico = db.execute("""
+        SELECT id, motor, status, resumo, duracao_s, linhas, criado_em
+        FROM hc_automacoes_log
+        ORDER BY id DESC LIMIT 50
+    """).fetchall()
+
+    return {
+        "motores": ultimos,
+        "historico": [dict(r) for r in historico]
+    }
+
+@router.get("/automacoes/{log_id}/texto")
+async def automacao_texto(
+    log_id: int,
+    db=Depends(get_db),
+    user=Depends(requer_backoffice())
+):
+    r = db.execute("SELECT motor, log_texto, criado_em FROM hc_automacoes_log WHERE id=?", (log_id,)).fetchone()
+    if not r: raise HTTPException(404, "Log não encontrado.")
+    return {"motor": r["motor"], "log_texto": r["log_texto"] or "", "criado_em": r["criado_em"]}
+
+
+# ── RANKING IXC (direto do IXC) ───────────────────────────────
+@router.get("/ranking-ixc")
+async def ranking_ixc(
+    de: str = Query(""),
+    ate: str = Query(""),
+    cidade: str = Query(""),
+    user=Depends(requer_backoffice())
+):
+    from datetime import date
+    _de  = de  or date.today().replace(day=1).strftime("%Y-%m-%d")
+    _ate = ate or date.today().strftime("%Y-%m-%d")
+    try:
+        from app.services.ixc_db import ixc_conn
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            sql = """
+                SELECT v.nome AS vendedor, COUNT(DISTINCT cc.id) AS total,
+                       SUM(cc.status_internet='A') AS ativos,
+                       SUM(o.status='F' AND o.id_assunto=227) AS nv,
+                       SUM(o.status='F' AND o.id_assunto=110) AS tit,
+                       SUM(o.status='F' AND o.id_assunto=75)  AS rn
+                FROM cliente_contrato cc
+                JOIN cliente c ON c.id = cc.id_cliente
+                JOIN vendedor v ON v.id = cc.id_vendedor_ativ
+                LEFT JOIN su_oss_chamado o ON o.id_contrato_kit = cc.id
+                    AND o.id_assunto IN (227,110,75) AND o.status='F'
+                WHERE cc.data >= %s AND cc.data <= %s
+                  AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
+            """
+            params = [_de, _ate]
+            if cidade:
+                sql += " AND c.cidade = %s"
+                params.append(cidade)
+            sql += " GROUP BY v.nome ORDER BY total DESC LIMIT 10"
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        return {"vendedores": [
+            {"nome": r["vendedor"], "total": r["total"],
+             "ativos": int(r["ativos"] or 0),
+             "nv": int(r["nv"] or 0),
+             "tit": int(r["tit"] or 0),
+             "rn": int(r["rn"] or 0)}
+            for r in rows
+        ]}
+    except Exception as e:
+        log.error(f"ranking-ixc: {e}")
+        return {"vendedores": []}

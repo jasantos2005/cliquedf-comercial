@@ -63,4 +63,15 @@ def processar():
             enviar_telegram(f"{'❌' if novo=='reprovado' else '⚠️'} *CADASTRO {st}*\n\nVendedor: {vendedor}\nCliente: {cliente}\nProtocolo: `{proto}`\n\n*Pendências:*\n{linhas}")
     conn.close(); log.info("Auditoria concluída.")
 
+
+def _salvar_log(status, resumo, duracao=0):
+    try:
+        import sqlite3, io
+        DB = str(Path(__file__).resolve().parent.parent.parent / "hub_comercial.db")
+        c = sqlite3.connect(DB, check_same_thread=False)
+        c.execute("INSERT INTO hc_automacoes_log(motor,status,resumo,duracao_s) VALUES(?,?,?,?)",
+                  ("Auditoria", status, resumo, round(duracao,2)))
+        c.commit(); c.close()
+    except: pass
+
 if __name__ == "__main__": processar()

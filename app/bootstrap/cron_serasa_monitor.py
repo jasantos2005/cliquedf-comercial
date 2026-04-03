@@ -98,4 +98,15 @@ def processar():
 
     conn.close(); log.info("Monitor Serasa concluído.")
 
+
+def _salvar_log(status, resumo, duracao=0):
+    try:
+        import sqlite3, io
+        DB = str(Path(__file__).resolve().parent.parent.parent / "hub_comercial.db")
+        c = sqlite3.connect(DB, check_same_thread=False)
+        c.execute("INSERT INTO hc_automacoes_log(motor,status,resumo,duracao_s) VALUES(?,?,?,?)",
+                  ("Monitor Serasa", status, resumo, round(duracao,2)))
+        c.commit(); c.close()
+    except: pass
+
 if __name__ == "__main__": processar()

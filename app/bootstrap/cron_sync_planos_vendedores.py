@@ -75,6 +75,17 @@ def sync_cidades(uf="SE"):
     conn.commit(); conn.close()
     log.info(f"[OK] {len(rows)} cidades")
 
+
+def _salvar_log(status, resumo, duracao=0):
+    try:
+        import sqlite3, io
+        DB = str(Path(__file__).resolve().parent.parent.parent / "hub_comercial.db")
+        c = sqlite3.connect(DB, check_same_thread=False)
+        c.execute("INSERT INTO hc_automacoes_log(motor,status,resumo,duracao_s) VALUES(?,?,?,?)",
+                  ("Sync Planos/Vendedores", status, resumo, round(duracao,2)))
+        c.commit(); c.close()
+    except: pass
+
 if __name__ == "__main__":
     try:
         sync_planos()

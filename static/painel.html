@@ -495,6 +495,11 @@ tbody tr:hover td{background:var(--surf2);}
         <span class="ni-label">Cancelamentos</span>
       </div>
 
+      <div class="sb-group-label">SISTEMA</div>
+      <div class="ni" id="ni-automacoes" onclick="navTo('automacoes')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07"/></svg>
+        <span class="ni-label">Automacoes</span>
+      </div>
       <div class="sb-group-label">ADMIN</div>
       <div class="ni" id="ni-usuarios" onclick="navTo('usuarios')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -789,6 +794,32 @@ tbody tr:hover td{background:var(--surf2);}
         </div>
       </div>
 
+      <!-- AUTOMACOES -->
+      <div id="page-automacoes" class="page">
+        <div style="margin-bottom:20px;">
+          <div style="font-size:16px;font-weight:700;">Logs de Automacoes</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;">Historico de execucoes dos motores do Hub Comercial</div>
+        </div>
+        <div id="aut-motores" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;"></div>
+        <div class="card">
+          <div class="sec-hd"><span class="sec-title">Historico de execucoes</span><button class="btn btn-outline" style="font-size:11px;" onclick="carregarAutomacoes()">Atualizar</button></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Motor</th><th>Status</th><th>Resumo</th><th>Duracao</th><th>Data</th><th></th></tr></thead>
+            <tbody id="tbody-aut"></tbody>
+          </table></div>
+        </div>
+        <!-- LOG VIEWER -->
+        <div id="log-viewer" style="display:none;margin-top:16px;">
+          <div class="card">
+            <div class="sec-hd">
+              <span class="sec-title" id="log-titulo">Log</span>
+              <button class="btn btn-outline" style="font-size:11px;" onclick="document.getElementById('log-viewer').style.display='none'">Fechar</button>
+            </div>
+            <div id="log-conteudo" style="background:#0a0e1a;border-radius:6px;padding:14px;font-family:'Courier New',monospace;font-size:11px;line-height:1.6;color:#94a3b8;max-height:400px;overflow-y:auto;white-space:pre-wrap;"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- USUÁRIOS -->
       <div id="page-usuarios" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -1079,7 +1110,13 @@ async function syncIXC() {
 // ── DASHBOARD ────────────────────────────────────────────────
 async function carregarDashboard() {
   try {
-    const d = await api('/api/painel/resumo');
+    const qs = new URLSearchParams();
+    if (filtros.de)       qs.append('de', filtros.de);
+    if (filtros.ate)      qs.append('ate', filtros.ate);
+    if (filtros.vendedor) qs.append('vendedor_id', filtros.vendedor);
+    if (filtros.cidade)   qs.append('cidade', filtros.cidade);
+    if (filtros.bairro)   qs.append('bairro', filtros.bairro);
+    const d = await api('/api/painel/resumo?' + qs.toString());
     const t = d.totais;
 
     // KPIs
@@ -1103,61 +1140,84 @@ async function carregarDashboard() {
     if (urg > 0) { badge.style.display = 'block'; badge.textContent = urg; } else badge.style.display = 'none';
 
     // Funil
-    const f = d.funil; const max = Math.max(f.leads, 1);
+    const f = d.funil; const max = Math.max(f.leads, f.ativado, 1);
     document.getElementById('funil-dash').innerHTML = [
-      ['Leads criados', f.leads, 'var(--text3)'],
-      ['Passaram auditoria', f.passou_auditoria, 'var(--cyan)'],
-      ['Assinaram', f.assinou, 'var(--purple)'],
-      ['Ativados IXC', f.ativado, 'var(--green)'],
-    ].map(([l, v, c]) => {
-      const w = Math.round((v || 0) / max * 100);
-      const pct = f.leads > 0 ? Math.round((v || 0) / f.leads * 100) : 0;
+      ['Leads criados',     f.leads,           'var(--text3)', false],
+      ['Passaram auditoria',f.passou_auditoria, 'var(--cyan)',  false],
+      ['Assinaram',         f.assinou,          'var(--purple)',false],
+      ['Ativados IXC',      f.ativado,          'var(--green)', false],
+      ['\u21b3 Nova instalacao', f.nv  || 0, '#00e5a0', true],
+      ['\u21b3 Titularidade',    f.tit || 0, '#ffb83f', true],
+      ['\u21b3 Reconexao',       f.rn  || 0, '#60a5fa', true],
+    ].map(([l, v, c, sub]) => {
+      const base = sub ? Math.max(f.ativado || 1, 1) : max;
+      const w    = Math.round((v || 0) / base * 100);
+      const pct  = f.leads > 0 ? Math.round((v || 0) / Math.max(f.leads, f.ativado, 1) * 100) : 0;
+      if (sub) return '<div class="funil-row" style="padding-left:14px;"><div class="funil-lbl" style="color:var(--text3);font-size:11px;">'+l+'</div><div class="funil-bar-bg" style="height:14px;"><div class="funil-bar" style="width:'+w+'%;background:'+c+';color:#000;font-size:10px;">'+( v>0?v:'' )+'</div></div><div class="funil-pct" style="color:'+c+';">'+v+'</div></div>';
       return `<div class="funil-row"><div class="funil-lbl">${l}</div><div class="funil-bar-bg"><div class="funil-bar" style="width:${w}%;background:${c};color:#000;">${v > 0 ? v : ''}</div></div><div class="funil-pct" style="color:${c};">${pct}%</div></div>`;
     }).join('');
 
     // Atividades
     document.getElementById('ativ-dash').innerHTML = `<div class="tbl-wrap"><table>
-      <thead><tr><th>Cliente</th><th>Status</th><th>Vendedor</th><th>Data</th></tr></thead>
+      <thead><tr><th>Cliente</th><th>Contrato</th><th>Internet</th><th>Vendedor</th><th>Cadastro</th><th>Instalação</th><th>SLA</th><th>Obs</th></tr></thead>
       <tbody>${(d.atividades || []).map(a => `<tr>
         <td class="td-name">${esc(a.razao || '—')}</td>
-        <td><span class="badge b-${a.status}">${statusLabel(a.status)}</span></td>
+        <td><span class="badge ${ixcContratoClass(a.status_contrato)}">${ixcContratoLabel(a.status_contrato)}</span></td>
+        <td><span class="badge ${ixcInternetClass(a.status_internet)}">${ixcInternetLabel(a.status_internet)}</span></td>
         <td style="color:var(--text3);">${esc(a.vendedor || '—')}</td>
-        <td style="color:var(--text3);font-size:11px;">${fmtData(a.atualizado_em)}</td>
+        <td style="color:var(--text3);font-size:11px;">${fmtData(a.data_cadastro)}</td>
+        <td style="color:var(--text3);font-size:11px;">${a.data_instalacao ? fmtData(a.data_instalacao) : '—'}</td>
+        <td style="font-size:11px;font-weight:700;color:${a.sla_dias===0?'var(--green)':a.sla_dias<=3?'var(--amber)':'var(--red)'};">${a.sla_dias !== null ? a.sla_dias+'d' : '—'}</td>
+        <td><span class="badge ${a.tipo_os==='NV'?'b-ativado':a.tipo_os==='TIT'?'b-cyan':'b-pend'}" style="font-size:10px;">${a.tipo_os || '—'}</span></td>
       </tr>`).join('')}</tbody>
     </table></div>`;
 
-    // Top vendedores mini
-    const rv = await api('/api/painel/ranking?periodo=mes');
-    const top3 = (rv.vendedores || []).slice(0, 5);
-    document.getElementById('top-vend-dash').innerHTML = top3.map((v, i) => `
+
+    // Top vendedores direto do IXC
+    const _de2 = document.getElementById('fb-de').value;
+    const _ate2 = document.getElementById('fb-ate').value;
+    const _vp2 = filtros.vendedor ? '&vendedor_id='+filtros.vendedor : '';
+    const _cp2 = filtros.cidade   ? '&cidade='+filtros.cidade : '';
+    const rv = await api('/api/painel/ranking-ixc?de='+_de2+'&ate='+_ate2+_cp2);
+    const top5v = (rv.vendedores||[]).slice(0,5);
+    document.getElementById('top-vend-dash').innerHTML = top5v.map((v,i) => `
       <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
         <div style="font-size:14px;width:20px;text-align:center;">${['🥇','🥈','🥉','4º','5º'][i]}</div>
-        <div style="flex:1;font-size:12px;font-weight:500;">${esc(v.nome)}</div>
-        <div style="font-size:12px;font-weight:700;color:var(--cyan);">${v.ativados}</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:600;">${esc(v.nome)}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px;">NV:${v.nv} TIT:${v.tit} RN:${v.rn}</div>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:var(--cyan);">${v.total}</div>
       </div>
-    `).join('') || '<div class="empty"><p>Sem dados</p></div>';
-
-    // OS status
+    `).join('') || '<div class="empty"><p>Sem vendas no periodo</p></div>';
+    // OS status — usando dados do funil
+    const totalGeral = (f.nv||0) + (f.tit||0) + (f.rn||0);
     document.getElementById('os-status-dash').innerHTML = `
       <div class="info-row"><span class="ir-key">Instaladas</span><span class="ir-val" style="color:var(--green);">${t.ativados}</span></div>
+      <div class="info-row"><span class="ir-key">↳ Nova instalacao</span><span class="ir-val" style="color:#00e5a0;">${f.nv||0}</span></div>
+      <div class="info-row"><span class="ir-key">↳ Titularidade</span><span class="ir-val" style="color:#ffb83f;">${f.tit||0}</span></div>
+      <div class="info-row"><span class="ir-key">↳ Reconexao</span><span class="ir-val" style="color:#60a5fa;">${f.rn||0}</span></div>
       <div class="info-row"><span class="ir-key">Aguardando assinatura</span><span class="ir-val" style="color:var(--amber);">${t.aguard_assinatura}</span></div>
       <div class="info-row"><span class="ir-key">Reprovados</span><span class="ir-val" style="color:var(--red);">${t.reprovados}</span></div>
-      <div class="info-row"><span class="ir-key">Total geral</span><span class="ir-val">${t.total}</span></div>
+      <div class="info-row" style="border-top:1px solid var(--border2);margin-top:4px;padding-top:6px;"><span class="ir-key" style="font-weight:700;">Total OS finalizadas</span><span class="ir-val" style="font-weight:700;color:var(--text);">${totalGeral}</span></div>
     `;
 
-    // Top cidades reais do IXC
+    // Top cidades do IXC com filtros
     try {
-      const rc = await api('/api/painel/cidades?periodo=mes');
+      const _de3 = document.getElementById('fb-de').value;
+      const _ate3 = document.getElementById('fb-ate').value;
+      const _vp3 = filtros.vendedor ? '&vendedor_id='+filtros.vendedor : '';
+      const rc = await api('/api/painel/cidades?periodo=2026'+_vp3+'&de='+_de3+'&ate='+_ate3);
       const top5 = (rc.cidades||[]).slice(0,5);
       document.getElementById('top-cidades-dash').innerHTML = top5.map((c,i) => `
         <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);cursor:pointer;" onclick="navTo('vendas-cidades')">
-          <div style="font-size:11px;color:var(--text3);width:20px;">${i+1}º</div>
+          <div style="font-size:11px;color:var(--text3);width:20px;">${i+1}o</div>
           <div style="flex:1;font-size:12px;font-weight:500;">${esc(c.cidade||'?')}</div>
           <div style="font-size:12px;font-weight:700;color:var(--cyan);">${c.total}</div>
           <div style="font-size:11px;color:var(--green);">${c.instalados||0}✓</div>
         </div>
       `).join('') || '<div class="empty" style="padding:20px;"><p>Sem dados</p></div>';
-    } catch(e) {}
+    } catch(e) { console.error('cidades',e); }
 
   } catch (e) { console.error(e); }
 }
@@ -1649,6 +1709,60 @@ async function carregarCancelamentos() {
 }
 
 // ── USUÁRIOS ─────────────────────────────────────────────────
+
+async function carregarAutomacoes() {
+  try {
+    const r = await api('/api/painel/automacoes');
+    const motores = r.motores || [];
+    const hist    = r.historico || [];
+
+    // Cards dos motores
+    const cores = {ok:'var(--green)', erro:'var(--red)', warning:'var(--amber)'};
+    document.getElementById('aut-motores').innerHTML = motores.map(m => `
+      <div class="kpi" style="--ac:${cores[m.status]||'var(--text3)'}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:11px;font-weight:700;color:${cores[m.status]||'var(--text3)'};">${m.status==='ok'?'OK':'ERRO'}</div>
+          <div style="font-size:10px;color:var(--text3);">${m.duracao_s||0}s</div>
+        </div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:3px;">${esc(m.motor)}</div>
+        <div style="font-size:10px;color:var(--text3);">${fmtData(m.criado_em)}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:4px;">${esc(m.resumo||'')}</div>
+      </div>
+    `).join('') || '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3);">Nenhuma execucao registrada ainda.</div>';
+
+    // Tabela historico
+    document.getElementById('tbody-aut').innerHTML = hist.map(h => `<tr>
+      <td style="font-weight:500;">${esc(h.motor)}</td>
+      <td><span class="badge ${h.status==='ok'?'b-aprovado':'b-reprovado'}">${h.status.toUpperCase()}</span></td>
+      <td style="color:var(--text3);font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(h.resumo||'')}</td>
+      <td style="color:var(--text3);">${h.duracao_s||0}s</td>
+      <td style="color:var(--text3);font-size:11px;">${fmtData(h.criado_em)}</td>
+      <td>${h.linhas>0?`<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;" onclick="verLog(${h.id},'${esc(h.motor)}')">Ver log</button>`:'--'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty"><p>Sem historico.</p></td></tr>';
+
+  } catch(e) { console.error(e); }
+}
+
+async function verLog(id, motor) {
+  document.getElementById('log-viewer').style.display = 'block';
+  document.getElementById('log-titulo').textContent = motor;
+  document.getElementById('log-conteudo').textContent = 'Carregando...';
+  document.getElementById('log-viewer').scrollIntoView({behavior:'smooth'});
+  try {
+    const r = await api(`/api/painel/automacoes/${id}/texto`);
+    const txt = r.log_texto || 'Sem conteudo.';
+    const el  = document.getElementById('log-conteudo');
+    el.innerHTML = txt.split('\n').map(l => {
+      if (l.includes('[ERROR]') || l.includes('ERRO'))  return `<span style="color:var(--red);">${esc(l)}</span>`;
+      if (l.includes('[WARNING]') || l.includes('WARN')) return `<span style="color:var(--amber);">${esc(l)}</span>`;
+      if (l.includes('[INFO]') && l.includes('concluido')) return `<span style="color:var(--green);">${esc(l)}</span>`;
+      if (l.includes('[INFO]'))  return `<span style="color:var(--text2);">${esc(l)}</span>`;
+      return `<span style="color:var(--text3);">${esc(l)}</span>`;
+    }).join('\n');
+    el.scrollTop = el.scrollHeight;
+  } catch(e) { document.getElementById('log-conteudo').textContent = 'Erro ao carregar log.'; }
+}
+
 async function carregarUsuarios() {
   try {
     const r = await api('/api/admin/usuarios');
@@ -1810,6 +1924,22 @@ async function api(path, opts = {}) {
   return r.json();
 }
 
+function ixcContratoLabel(s) {
+  const m = { A:'Ativo', I:'Inativo', P:'Pré-contrato', N:'Pendente', D:'Cancelado' };
+  return m[s] || s || '—';
+}
+function ixcContratoClass(s) {
+  const m = { A:'b-ativado', I:'b-rep', P:'b-cyan', N:'b-pend', D:'b-rep' };
+  return 'badge ' + (m[s] || 'b-pend');
+}
+function ixcInternetLabel(s) {
+  const m = { A:'Ativo', D:'Desativado', CM:'Migrado', CA:'Cancelado', CE:'Cancelado', FA:'Financeiro', AA:'Ag. Assinatura' };
+  return m[s] || s || '—';
+}
+function ixcInternetClass(s) {
+  const m = { A:'b-ativado', D:'b-rep', CM:'b-cyan', CA:'b-rep', CE:'b-rep', FA:'b-rep', AA:'b-pend' };
+  return 'badge ' + (m[s] || 'b-pend');
+}
 function statusLabel(s) {
   const m = { enviado:'Enviado',em_auditoria:'Auditoria',aprovado:'Aprovado',pendente:'Pendente',
     reprovado:'Reprovado',ativado:'Ativado',assinatura_pendente:'Assinatura',assinado:'Assinado',erro_ativacao:'Erro' };
