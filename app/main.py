@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 app = FastAPI(title="Hub Comercial", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-from app.routes import auth, vendedor, vendedor_acompanhamento, auditoria, painel, assinatura
+from app.routes import auth, vendedor, vendedor_acompanhamento, auditoria, painel, assinatura, admin
 app.include_router(auth.router,       prefix="/api/auth",       tags=["Auth"])
 app.include_router(vendedor.router,   prefix="/api/vendedor",   tags=["Vendedor"])
 app.include_router(vendedor_acompanhamento.router, prefix="/api/vendedor", tags=["Vendedor"])

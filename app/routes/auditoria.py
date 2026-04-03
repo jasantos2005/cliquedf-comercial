@@ -123,3 +123,16 @@ async def credito_precadastro(
     resultado = consultar_cpf(p["cnpj_cpf"])
     resultado["cliente"] = p["razao"]
     return resultado
+
+
+# ── ADMIN USUARIOS (inline) ───────────────────────────────────
+from fastapi import Body
+@router.get("/../../admin/usuarios")
+async def listar_usuarios_aud(db=Depends(get_db), user=Depends(requer_supervisor())):
+    rows = db.execute("""
+        SELECT u.id, u.nome, u.login, u.ativo, u.ixc_funcionario_id,
+               g.nome AS grupo, g.nivel, u.ultimo_acesso
+        FROM hc_usuarios u JOIN hc_grupos g ON g.id=u.id_grupo
+        ORDER BY g.nivel DESC, u.nome
+    """).fetchall()
+    return {"usuarios": [dict(r) for r in rows]}
