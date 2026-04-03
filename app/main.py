@@ -46,3 +46,4 @@ async def pagina_assinatura(token: str):
 @app.get("/health")
 async def health():
     return {"status":"ok","operacao":os.getenv("OPERACAO","HubComercial"),"versao":"1.0.0"}
+app.include_router(admin.router,       prefix="/api/admin",       tags=["Admin"])

@@ -55,3 +55,32 @@ async def desativar(id: int, db=Depends(get_db), user=Depends(requer_admin())):
     db.execute("UPDATE hc_usuarios SET ativo=0 WHERE id=?", (id,))
     db.commit()
     return {"ok": True}
+
+
+class SolicitacaoAcesso(BaseModel):
+    nome: str
+    login: str
+    senha: str
+    motivo: str
+
+@router.post("/solicitar-acesso")
+async def solicitar_acesso(payload: SolicitacaoAcesso, db=Depends(get_db)):
+    """Endpoint público — cria usuário inativo aguardando aprovação."""
+    if len(payload.senha) < 8:
+        raise HTTPException(400, "Senha deve ter no mínimo 8 caracteres.")
+    existe = db.execute("SELECT id FROM hc_usuarios WHERE login=?", (payload.login,)).fetchone()
+    if existe:
+        raise HTTPException(400, "Login já cadastrado.")
+    gid = db.execute("SELECT id FROM hc_grupos WHERE nivel=10").fetchone()
+    if not gid:
+        raise HTTPException(500, "Grupo não encontrado.")
+    try:
+        db.execute("""
+            INSERT INTO hc_usuarios(nome, login, senha_hash, id_grupo, ativo)
+            VALUES(?, ?, ?, ?, 0)
+        """, (payload.nome, payload.login, h(payload.senha), gid["id"]))
+        db.commit()
+        log.info(f"Solicitação de acesso: {payload.nome} ({payload.login}) — motivo: {payload.motivo}")
+        return {"ok": True, "msg": "Solicitação enviada com sucesso."}
+    except Exception as e:
+        raise HTTPException(400, f"Erro: {e}")
