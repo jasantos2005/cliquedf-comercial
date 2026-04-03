@@ -461,6 +461,7 @@ tbody tr:hover td{background:var(--surf2);}
       <div class="ni-sub" id="sub-auditoria">
         <div class="nis" onclick="navTo('aud-fila')">Auditoria App</div>
         <div class="nis" onclick="navTo('aud-ixc')">Auditoria IXC</div>
+        <div class="nis" onclick="navTo('sem-os')">Sem instalacao</div>
       </div>
 
       <div class="ni" id="ni-vendas" onclick="toggleSub('sub-vendas','ni-vendas')">
@@ -644,6 +645,21 @@ tbody tr:hover td{background:var(--surf2);}
           <div class="tbl-wrap"><table>
             <thead><tr><th>#</th><th>Cliente</th><th>Vendedor</th><th>Cidade</th><th>Plano</th><th>Data</th><th>Nivel</th><th>Problemas</th></tr></thead>
             <tbody id="tbody-aud-ixc"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- SEM OS -->
+      <div id="page-sem-os" class="page">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;" id="sem-os-kpis"></div>
+        <div class="card">
+          <div class="sec-hd">
+            <span class="sec-title">Contratos ativos sem OS de instalacao finalizada</span>
+            <span id="sem-os-total" style="font-size:11px;color:var(--text3);"></span>
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>#</th><th>Cliente</th><th>Cidade</th><th>Bairro</th><th>Vendedor</th><th>Plano</th><th>Ativado em</th><th>Dias</th><th>Gravidade</th></tr></thead>
+            <tbody id="tbody-sem-os"></tbody>
           </table></div>
         </div>
       </div>
@@ -1065,6 +1081,7 @@ function navTo(page) {
     dashboard: carregarDashboard,
     'aud-fila': () => carregarAuditoria(audStatusFiltro),
     'aud-ixc': carregarAuditoriaIXC,
+    'sem-os': carregarSemOS,
     'vendas-lista': () => carregarVendas('mes'),
     'vendas-hub': carregarVendasHub,
     'vendas-cidades': carregarVendasCidades,
@@ -1391,6 +1408,42 @@ async function reauditar(id) {
   } catch (e) { toast('Erro', 'err'); }
 }
 
+
+// -- SEM OS --
+async function carregarSemOS() {
+  const de  = document.getElementById('fb-de').value  || '2026-01-01';
+  const ate = document.getElementById('fb-ate').value || '';
+  const vp  = filtros.vendedor ? '&vendedor_id='+filtros.vendedor : '';
+  const cp  = filtros.cidade   ? '&cidade='+filtros.cidade : '';
+  const tbody = document.getElementById('tbody-sem-os');
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></td></tr>';
+  try {
+    const r = await api('/api/painel/sem-instalacao?de='+de+'&ate='+ate+vp+cp);
+    document.getElementById('sem-os-kpis').innerHTML =
+      '<div class="kpi" style="--ac:var(--red)"><div class="kv">'+r.criticos+'</div><div class="kl">Criticos (+30 dias)</div></div>'+
+      '<div class="kpi" style="--ac:var(--orange)"><div class="kv">'+r.graves+'</div><div class="kl">Graves (8-30 dias)</div></div>'+
+      '<div class="kpi" style="--ac:var(--amber)"><div class="kv">'+r.alertas+'</div><div class="kl">Alertas (1-7 dias)</div></div>'+
+      '<div class="kpi" style="--ac:var(--text3)"><div class="kv">'+r.total+'</div><div class="kl">Total sem instalar</div></div>';
+    document.getElementById('sem-os-total').textContent = r.total + ' contratos';
+    tbody.innerHTML = (r.contratos||[]).map(c => {
+      const d = c.dias || 0;
+      const cor = d>30?'var(--red)':d>7?'var(--orange)':'var(--amber)';
+      const grav = d>30?'CRITICO':d>7?'GRAVE':'ALERTA';
+      return '<tr>'+
+        '<td style="color:var(--text3);font-size:11px;">#'+c.contrato_id+'</td>'+
+        '<td><div class="td-name">'+esc(c.razao||'--')+'</div><div class="td-sub">'+esc(c.cnpj_cpf||'')+(c.telefone_celular?' · '+c.telefone_celular:'')+'</div></td>'+
+        '<td style="color:var(--text3);">'+esc(c.cidade_nome||'--')+'</td>'+
+        '<td style="color:var(--text3);font-size:11px;">'+esc(c.bairro||'--')+'</td>'+
+        '<td style="color:var(--text2);">'+esc(c.vendedor_nome||'Solicitacao cliente')+'</td>'+
+        '<td style="font-size:11px;">'+esc(c.plano_nome||'--')+'</td>'+
+        '<td style="color:var(--text3);font-size:11px;">'+fmtData(c.data_ativacao)+'</td>'+
+        '<td style="font-weight:700;color:'+cor+';">'+d+'d</td>'+
+        '<td><span class="badge" style="color:'+cor+';">'+grav+'</span></td>'+
+      '</tr>';
+    }).join('') || '<tr><td colspan="9" class="empty"><p>Nenhum contrato sem instalacao.</p></td></tr>';
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="9" class="empty"><p>Erro ao carregar.</p></td></tr>'; }
+}
+
 // -- AUDITORIA IXC --
 let audIXCNivelFiltro = '';
 async function carregarAuditoriaIXC() {
@@ -1590,6 +1643,12 @@ async function carregarEvolucao(){
 let cidadesPeriodoAtivo = 'mes';
 
 async function carregarVendasCidades(periodo) {
+  // Se chamado sem argumento (ao navegar), reseta para mes
+  if (periodo === undefined) {
+    periodo = 'mes';
+    cidadesPeriodoAtivo = 'mes';
+    document.querySelectorAll('#pt-cidades .ptab').forEach((t,i) => t.classList.toggle('on', i===0));
+  }
   periodo = periodo || cidadesPeriodoAtivo;
   cidadesPeriodoAtivo = periodo;
   document.getElementById('detalhe-cidade').style.display = 'none';

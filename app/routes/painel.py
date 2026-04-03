@@ -362,8 +362,7 @@ async def vendas_ixc(
                 LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id = cc.id_vd_contrato
                 LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit = cc.id AND o.id_assunto = 227
                 LEFT JOIN ixcprovedor.funcionarios f ON f.id = o.id_tecnico
-                WHERE cc.data >= %s AND cc.status != 'C'
-                  AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
+                WHERE cc.data_ativacao >= %s AND cc.status = 'A'
                   {filtro_vend} {filtro_cid}
                 ORDER BY cc.id DESC LIMIT 500
             """
@@ -451,8 +450,8 @@ async def cidades(
         LEFT JOIN ixcprovedor.cidade ci ON ci.id = c.cidade
         LEFT JOIN ixcprovedor.su_oss_chamado o
             ON o.id_contrato_kit = cc.id AND o.id_assunto = 227
-        WHERE cc.data >= %s AND cc.data <= %s
-          AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
+        WHERE cc.data_ativacao >= %s AND cc.data_ativacao <= %s
+          AND cc.status = 'A'
           {filtro_vend}
         GROUP BY ci.id, ci.nome
         ORDER BY total DESC
@@ -680,7 +679,6 @@ async def ranking_ixc(
                 LEFT JOIN su_oss_chamado o ON o.id_contrato_kit = cc.id
                     AND o.id_assunto IN (227,110,75) AND o.status='F'
                 WHERE cc.data >= %s AND cc.data <= %s
-                  AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29
             """
             params = [_de, _ate]
             if cidade:
@@ -736,3 +734,63 @@ async def auditoria_ixc_resumo(
 ):
     from app.engines.auditoria_ixc_engine import resumo_auditoria
     return resumo_auditoria(de)
+
+
+@router.get("/sem-instalacao")
+async def sem_instalacao(
+    de: str = Query("2026-01-01"),
+    ate: str = Query(""),
+    vendedor_id: str = Query(""),
+    cidade: str = Query(""),
+    user=Depends(requer_backoffice())
+):
+    from datetime import date
+    _ate = ate or date.today().strftime("%Y-%m-%d")
+    filtro_vend = f"AND cc.id_vendedor_ativ = {int(vendedor_id)}" if vendedor_id else ""
+    filtro_cid  = f"AND c.cidade = {int(cidade)}" if cidade and str(cidade).isdigit() else ""
+    try:
+        from app.services.ixc_db import ixc_conn
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(f"""
+                SELECT cc.id AS contrato_id,
+                       c.razao, c.cnpj_cpf, c.telefone_celular,
+                       ci.nome AS cidade_nome, c.bairro,
+                       v.nome AS vendedor_nome,
+                       vc.nome AS plano_nome,
+                       cc.data_ativacao,
+                       DATEDIFF(NOW(), cc.data_ativacao) AS dias
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
+                LEFT JOIN ixcprovedor.cidade ci ON ci.id = c.cidade
+                LEFT JOIN ixcprovedor.vendedor v ON v.id = cc.id_vendedor_ativ
+                LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id = cc.id_vd_contrato
+                LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit = cc.id
+                    AND o.id_assunto IN (227,110,75,15) AND o.status = 'F'
+                WHERE cc.data_ativacao >= %s AND cc.data_ativacao <= %s
+                  AND cc.status = 'A' AND o.id IS NULL
+                  {filtro_vend} {filtro_cid}
+                ORDER BY dias DESC
+            """, (de, _ate))
+            rows = cur.fetchall()
+
+        def sv(v):
+            if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
+            if hasattr(v,'isoformat'): return str(v)
+            return v
+
+        contratos = [{k:sv(val) for k,val in dict(r).items()} for r in rows]
+        criticos = sum(1 for c in contratos if (c.get('dias') or 0) > 30)
+        graves   = sum(1 for c in contratos if 7 < (c.get('dias') or 0) <= 30)
+        alertas  = sum(1 for c in contratos if 1 <= (c.get('dias') or 0) <= 7)
+
+        return {
+            "contratos": contratos,
+            "total": len(contratos),
+            "criticos": criticos,
+            "graves": graves,
+            "alertas": alertas,
+        }
+    except Exception as e:
+        log.error(f"sem-instalacao: {e}")
+        return {"contratos":[],"total":0,"criticos":0,"graves":0,"alertas":0}

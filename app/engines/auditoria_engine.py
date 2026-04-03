@@ -154,6 +154,32 @@ def auditar(f, docs):
         add("R26","pendente","Selfie não anexada")
     else: add("R26","ok")
 
+    # R27 — Cliente com debito em aberto no IXC
+    try:
+        from app.services.ixc_db import ixc_conn
+        cpf_limpo = (p.get("cnpj_cpf") or "").replace(".","").replace("-","").replace("/","").strip()
+        if cpf_limpo:
+            with ixc_conn() as _c:
+                _cur = _c.cursor()
+                _cur.execute("""
+                    SELECT COUNT(*) as total, SUM(f.valor_aberto) as valor
+                    FROM ixcprovedor.fn_areceber f
+                    JOIN ixcprovedor.cliente c ON c.id = f.id_cliente
+                    WHERE REPLACE(REPLACE(REPLACE(c.cnpj_cpf,'.',''),'-',''),'/','') = %s
+                      AND f.status = 'A'
+                      AND f.data_vencimento < CURDATE()
+                """, (cpf_limpo,))
+                row = _cur.fetchone()
+                qtd = int(row["total"] or 0)
+                val = float(row["valor"] or 0)
+            if qtd > 0:
+                add("R27","alerta",f"{qtd} fatura(s) em aberto — R$ {val:.2f}")
+            else:
+                add("R27","ok")
+        else:
+            add("R27","ok")
+    except Exception as _e:
+        add("R27","ok")
     # R28
     add("R28","ok")
 

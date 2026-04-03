@@ -12,6 +12,9 @@ REGRAS = [
     {"id":"R07","legenda":"Sem data de nascimento","nivel":"alerta"},
     {"id":"R08","legenda":"Sem celular cadastrado","nivel":"alerta"},
     {"id":"R09","legenda":"Pre-contrato ha mais de 30 dias","nivel":"grave"},
+    {"id":"R10","legenda":"Ativo sem OS instalacao (+30 dias)","nivel":"critico"},
+    {"id":"R11","legenda":"Ativo sem OS instalacao (8-30 dias)","nivel":"grave"},
+    {"id":"R12","legenda":"Ativo sem OS instalacao (1-7 dias)","nivel":"alerta"},
 ]
 NIVEL_ORDER = {"critico":0,"grave":1,"alerta":2,"ok":3}
 
@@ -27,7 +30,7 @@ def auditar_contratos(de="2026-01-01", ate=None, vendedor_id="", cidade=""):
     resultados = {}
     filtro_vend = f"AND cc.id_vendedor_ativ = {int(vendedor_id)}" if vendedor_id else ""
     filtro_cid  = f"AND c.cidade = {int(cidade)}" if cidade and str(cidade).isdigit() else ""
-    bw = f"WHERE cc.data >= '{de}' AND cc.data <= '{ate}' AND cc.id_vendedor_ativ > 0 AND cc.id_vendedor_ativ != 29 {filtro_vend} {filtro_cid}"
+    bw = f"WHERE cc.data >= '{de}' AND cc.data <= '{ate}' {filtro_vend} {filtro_cid}"
 
     def upsert(r):
         cid = r["contrato_id"]
@@ -138,6 +141,29 @@ def auditar_contratos(de="2026-01-01", ate=None, vendedor_id="", cidade=""):
 
     except Exception as e:
         log.error(f"auditoria_ixc_engine: {e}")
+
+            # R10/R11/R12: Ativo sem OS instalacao finalizada
+            cur.execute(f"""SELECT cc.id AS contrato_id, cc.data AS data_contrato,
+                cc.status AS status_contrato, cc.status_internet,
+                c.razao, c.cnpj_cpf, c.email, c.telefone_celular, c.data_nascimento,
+                v.nome AS vendedor_nome, ci.nome AS cidade_nome, vc.nome AS plano_nome,
+                DATEDIFF(NOW(), cc.data_ativacao) AS dias_sem_os
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id=cc.id_cliente
+                LEFT JOIN ixcprovedor.vendedor v ON v.id=cc.id_vendedor_ativ
+                LEFT JOIN ixcprovedor.cidade ci ON ci.id=c.cidade
+                LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id=cc.id_vd_contrato
+                LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit=cc.id
+                    AND o.id_assunto=227 AND o.status='F'
+                {bw} AND cc.status='A'
+                AND o.id IS NULL
+                ORDER BY dias_sem_os DESC""")
+            for r in cur.fetchall():
+                d = int(r["dias_sem_os"] or 0)
+                det = f"{d} dias ativado sem instalar"
+                if d > 30:  add(r,"R10",det)
+                elif d > 7: add(r,"R11",det)
+                elif d >= 1: add(r,"R12",det)
 
     lista = [v for v in resultados.values() if v["problemas"]]
     lista.sort(key=lambda x: NIVEL_ORDER.get(x["nivel_max"],3))
