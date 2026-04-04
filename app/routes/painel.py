@@ -707,12 +707,15 @@ async def auditoria_ixc(
     vendedor_id: str = Query(""),
     cidade: str = Query(""),
     nivel: str = Query(""),
+    regra: str = Query(""),
     user=Depends(requer_backoffice())
 ):
     from app.engines.auditoria_ixc_engine import auditar_contratos
     lista = auditar_contratos(de, ate or None, vendedor_id, cidade)
     if nivel:
         lista = [c for c in lista if c["nivel_max"] == nivel]
+    if regra:
+        lista = [c for c in lista if any(p["regra"] == regra for p in c["problemas"])]
     def sv(v):
         if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
         if hasattr(v,'isoformat'): return str(v)

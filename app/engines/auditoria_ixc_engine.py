@@ -139,9 +139,6 @@ def auditar_contratos(de="2026-01-01", ate=None, vendedor_id="", cidade=""):
                 d = int(r["dias_pre"] or 0)
                 if d > 30: add(r,"R09",f"{d} dias como pre-contrato")
 
-    except Exception as e:
-        log.error(f"auditoria_ixc_engine: {e}")
-
             # R10/R11/R12: Ativo sem OS instalacao finalizada
             cur.execute(f"""SELECT cc.id AS contrato_id, cc.data AS data_contrato,
                 cc.status AS status_contrato, cc.status_internet,
@@ -154,16 +151,19 @@ def auditar_contratos(de="2026-01-01", ate=None, vendedor_id="", cidade=""):
                 LEFT JOIN ixcprovedor.cidade ci ON ci.id=c.cidade
                 LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id=cc.id_vd_contrato
                 LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit=cc.id
-                    AND o.id_assunto=227 AND o.status='F'
+                    AND o.id_assunto IN (227,110,75,15) AND o.status='F'
                 {bw} AND cc.status='A'
                 AND o.id IS NULL
                 ORDER BY dias_sem_os DESC""")
             for r in cur.fetchall():
                 d = int(r["dias_sem_os"] or 0)
                 det = f"{d} dias ativado sem instalar"
-                if d > 30:  add(r,"R10",det)
-                elif d > 7: add(r,"R11",det)
+                if d > 30:   add(r,"R10",det)
+                elif d > 7:  add(r,"R11",det)
                 elif d >= 1: add(r,"R12",det)
+
+    except Exception as e:
+        log.error(f"auditoria_ixc_engine: {e}")
 
     lista = [v for v in resultados.values() if v["problemas"]]
     lista.sort(key=lambda x: NIVEL_ORDER.get(x["nivel_max"],3))

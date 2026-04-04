@@ -1145,9 +1145,26 @@ function aplicarFiltros() {
 async function syncIXC() {
   toast('Sincronizando com IXC...', 'info');
   try {
-    await api('/api/vendedor/sync', { method: 'POST' });
-    toast('Sync concluído!', 'ok');
-  } catch (e) { toast('Sync concluído (planos e vendedores)', 'ok'); }
+    await api('/api/painel/sync-ixc', { method: 'POST' });
+    toast('Sync IXC iniciado!', 'ok');
+    // Recarregar pagina atual apos 3s
+    setTimeout(() => {
+      const activePage = document.querySelector('.page.active');
+      if (activePage) {
+        const id = activePage.id.replace('page-', '');
+        const loaders = {
+          dashboard: carregarDashboard,
+          'aud-ixc': carregarAuditoriaIXC,
+          'sem-os': carregarSemOS,
+          'vendas-cidades': carregarVendasCidades,
+          'vendas-lista': () => carregarVendas('mes'),
+          evolucao: carregarEvolucao,
+          automacoes: carregarAutomacoes,
+        };
+        if (loaders[id]) loaders[id]();
+      }
+    }, 3000);
+  } catch (e) { toast('Erro no sync', 'err'); }
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────
@@ -1446,6 +1463,16 @@ async function carregarSemOS() {
 
 // -- AUDITORIA IXC --
 let audIXCNivelFiltro = '';
+let audIXCRegraFiltro = '';
+
+function filtroAudIXCRegra(regra) {
+  // Toggle: clicar na mesma regra remove o filtro
+  audIXCRegraFiltro = audIXCRegraFiltro === regra ? '' : regra;
+  // Se filtrou por regra, limpar filtro de nivel
+  if (audIXCRegraFiltro) audIXCNivelFiltro = '';
+  carregarAuditoriaIXC();
+}
+
 async function carregarAuditoriaIXC() {
   const de  = document.getElementById('fb-de').value  || '2026-01-01';
   const ate = document.getElementById('fb-ate').value || '';
@@ -1461,17 +1488,25 @@ async function carregarAuditoriaIXC() {
       '<div class="kpi" style="--ac:var(--orange)"><div class="kv">'+(nv.grave||0)+'</div><div class="kl">Graves</div></div>'+
       '<div class="kpi" style="--ac:var(--amber)"><div class="kv">'+(nv.alerta||0)+'</div><div class="kl">Alertas</div></div>'+
       '<div class="kpi" style="--ac:var(--text3)"><div class="kv">'+(res.total_problemas||0)+'</div><div class="kl">Total com problemas</div></div>';
-    document.getElementById('aud-ixc-regras').innerHTML = (res.por_regra||[]).map(r =>
-      '<div style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;">'+
-      '<div style="font-size:10px;font-weight:700;color:'+(corNv[r.nivel]||'var(--text3)')+'">'+r.regra+'</div>'+
-      '<div style="font-size:11px;font-weight:600;margin-top:2px;">'+esc(r.legenda)+'</div>'+
-      '<div style="font-size:18px;font-weight:900;color:'+(corNv[r.nivel]||'var(--cyan)')+';margin-top:3px;">'+r.total+'</div></div>'
-    ).join('');
+    // audIXCRegraFiltro ja declarado globalmente
+    document.getElementById('aud-ixc-regras').innerHTML = (res.por_regra||[]).map(r => {
+      const ativo = audIXCRegraFiltro === r.regra;
+      const borda = ativo ? 'border:2px solid '+(corNv[r.nivel]||'var(--cyan)')+';' : 'border:1px solid var(--border);';
+      const bg    = ativo ? 'background:rgba(0,0,0,.3);' : 'background:var(--surf2);';
+      return '<div style="'+bg+borda+'border-radius:8px;padding:8px 12px;cursor:pointer;transition:all .15s;" '+
+        'onclick="filtroAudIXCRegra(\''+r.regra+'\')"'+
+        ' onmouseenter="this.style.borderColor=\''+( corNv[r.nivel]||'var(--cyan)')+'\' "'+
+        ' onmouseleave="this.style.borderColor=\''+( ativo ? (corNv[r.nivel]||'var(--cyan)') : 'var(--border)')+'\' ">'+
+        '<div style="font-size:10px;font-weight:700;color:'+(corNv[r.nivel]||'var(--text3)')+'">'+r.regra+(ativo?' ✕':'')+'</div>'+
+        '<div style="font-size:11px;font-weight:600;margin-top:2px;">'+esc(r.legenda)+'</div>'+
+        '<div style="font-size:18px;font-weight:900;color:'+(corNv[r.nivel]||'var(--cyan)')+';margin-top:3px;">'+r.total+'</div>'+
+      '</div>';
+    }).join('');
   } catch(e) { console.error('resumo ixc',e); }
   const tbody = document.getElementById('tbody-aud-ixc');
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></td></tr>';
   try {
-    const r = await api('/api/painel/auditoria-ixc?de='+de+'&ate='+ate+vp+cp+np);
+    const r = await api('/api/painel/auditoria-ixc?de='+de+'&ate='+ate+vp+cp+np+(audIXCRegraFiltro?'&regra='+audIXCRegraFiltro:''));
     document.getElementById('aud-ixc-total').textContent = r.total + ' contratos';
     tbody.innerHTML = (r.contratos||[]).map(c => {
       const probs = c.problemas.map(p =>
