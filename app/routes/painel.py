@@ -797,3 +797,298 @@ async def sem_instalacao(
     except Exception as e:
         log.error(f"sem-instalacao: {e}")
         return {"contratos":[],"total":0,"criticos":0,"graves":0,"alertas":0}
+
+
+# ── VENDEDORES ────────────────────────────────────────────────
+@router.get("/vendedores")
+async def vendedores_lista(user=Depends(requer_backoffice())):
+    from app.services.ixc_db import ixc_conn
+    with ixc_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT v.id, v.nome, COUNT(DISTINCT cc.id) as total
+            FROM ixcprovedor.vendedor v
+            JOIN ixcprovedor.cliente_contrato cc ON cc.id_vendedor_ativ = v.id
+            WHERE cc.data_ativacao >= '2026-01-01' AND cc.status = 'A'
+              AND v.id != 29 AND v.id > 0
+            GROUP BY v.id, v.nome ORDER BY total DESC
+        """)
+        return {"vendedores": [dict(r) for r in cur.fetchall()]}
+
+
+@router.get("/vendedores/{vid}/produtividade")
+async def vendedor_produtividade(
+    vid: int,
+    de: str = Query("2026-01-01"),
+    ate: str = Query(""),
+    user=Depends(requer_backoffice())
+):
+    from datetime import date
+    from app.services.ixc_db import ixc_conn
+    _ate = ate or date.today().strftime("%Y-%m-%d")
+
+    with ixc_conn() as conn:
+        cur = conn.cursor()
+
+        # Info do vendedor
+        cur.execute("SELECT id, nome FROM ixcprovedor.vendedor WHERE id=%s", (vid,))
+        vend = cur.fetchone()
+
+        # KPIs gerais
+        cur.execute("""
+            SELECT COUNT(DISTINCT cc.id) as total,
+                   SUM(cc.status_internet='A') as ativos,
+                   SUM(cc.status_internet='AA') as aguard_ass,
+                   COUNT(DISTINCT DATE(cc.data_ativacao)) as dias_com_venda
+            FROM ixcprovedor.cliente_contrato cc
+            WHERE cc.id_vendedor_ativ=%s
+              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s
+              AND cc.status='A'
+        """, (vid, de, _ate))
+        kpi = cur.fetchone()
+
+        # OS por tipo
+        cur.execute("""
+            SELECT o.id_assunto, o.status AS os_status, COUNT(*) as total
+            FROM ixcprovedor.su_oss_chamado o
+            JOIN ixcprovedor.cliente_contrato cc ON o.id_contrato_kit=cc.id
+            WHERE cc.id_vendedor_ativ=%s
+              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s
+              AND cc.status='A' AND o.id_assunto IN (227,110,75,15)
+            GROUP BY o.id_assunto, o.status
+        """, (vid, de, _ate))
+        os_rows = cur.fetchall()
+
+        nv_inst = nv_pend = tit = rn = reativ = 0
+        for r in os_rows:
+            if r["id_assunto"]==227 and r["os_status"]=="F": nv_inst += r["total"]
+            if r["id_assunto"]==227 and r["os_status"]=="A": nv_pend += r["total"]
+            if r["id_assunto"]==110: tit += r["total"]
+            if r["id_assunto"]==75:  rn  += r["total"]
+            if r["id_assunto"]==15:  reativ += r["total"]
+
+        # Adimplencia
+        cur.execute("""
+            SELECT COUNT(DISTINCT cc.id) as total,
+                   COUNT(DISTINCT CASE WHEN f.status='A' AND f.data_vencimento < CURDATE() THEN cc.id END) as inadimplentes,
+                   COUNT(DISTINCT CASE WHEN f.status='A' AND DATEDIFF(CURDATE(),f.data_vencimento)>30 THEN cc.id END) as criticos
+            FROM ixcprovedor.cliente_contrato cc
+            LEFT JOIN ixcprovedor.fn_areceber f ON f.id_contrato=cc.id
+            WHERE cc.id_vendedor_ativ=%s
+              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s AND cc.status='A'
+        """, (vid, de, _ate))
+        adim = cur.fetchone()
+
+        # Vendas por dia (ultimos 30 dias para grafico)
+        cur.execute("""
+            SELECT DATE(cc.data_ativacao) as dia, COUNT(*) as total
+            FROM ixcprovedor.cliente_contrato cc
+            WHERE cc.id_vendedor_ativ=%s
+              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s AND cc.status='A'
+            GROUP BY DATE(cc.data_ativacao) ORDER BY dia
+        """, (vid, de, _ate))
+        por_dia = [{"dia": str(r["dia"]), "total": r["total"]} for r in cur.fetchall()]
+
+        total = int(kpi["total"] or 0)
+        dias  = int(kpi["dias_com_venda"] or 1)
+        media_dia = round(total/dias, 1)
+
+        def sv(v):
+            if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
+            return int(v) if v is not None else 0
+
+        return {
+            "vendedor": dict(vend) if vend else {},
+            "kpi": {
+                "total": total,
+                "ativos": sv(kpi["ativos"]),
+                "aguard_ass": sv(kpi["aguard_ass"]),
+                "dias_com_venda": dias,
+                "media_dia": media_dia,
+            },
+            "os": {
+                "nv_instaladas": nv_inst,
+                "nv_pendentes": nv_pend,
+                "titularidade": tit,
+                "reconexao": rn,
+                "reativacao": reativ,
+            },
+            "adimplencia": {
+                "total": sv(adim["total"]),
+                "inadimplentes": sv(adim["inadimplentes"]),
+                "criticos": sv(adim["criticos"]),
+                "pct_adimplente": round((sv(adim["total"])-sv(adim["inadimplentes"]))/max(sv(adim["total"]),1)*100),
+            },
+            "por_dia": por_dia,
+        }
+
+
+@router.get("/vendedores/{vid}/perfil")
+async def vendedor_perfil(
+    vid: int,
+    user=Depends(requer_backoffice())
+):
+    from datetime import date, timedelta
+    from app.services.ixc_db import ixc_conn
+    hoje = date.today().strftime("%Y-%m-%d")
+    d90  = (date.today()-timedelta(days=90)).strftime("%Y-%m-%d")
+    d2026 = "2026-01-01"
+
+    with ixc_conn() as conn:
+        cur = conn.cursor()
+
+        cur.execute("SELECT id, nome FROM ixcprovedor.vendedor WHERE id=%s", (vid,))
+        vend = cur.fetchone()
+
+        # META: media de vendas/dia (meta = 4/dia)
+        cur.execute("""
+            SELECT COUNT(*) as total,
+                   COUNT(DISTINCT DATE(data_ativacao)) as dias
+            FROM ixcprovedor.cliente_contrato
+            WHERE id_vendedor_ativ=%s AND data_ativacao>=%s AND status='A'
+        """, (vid, d2026))
+        r = cur.fetchone()
+        total_vendas = int(r["total"] or 0)
+        dias_venda   = int(r["dias"] or 1)
+        media_dia    = round(total_vendas/dias_venda, 1)
+        # Score meta: 4/dia = ideal
+        if media_dia >= 4:    score_meta = 100; nivel_meta = "ideal"
+        elif media_dia >= 2:  score_meta = 60;  nivel_meta = "medio"
+        else:                 score_meta = 30;  nivel_meta = "baixo"
+
+        # RETENCAO: clientes que completaram 90 dias e ainda estao ativos
+        cur.execute("""
+            SELECT COUNT(*) as total,
+                   SUM(status_internet='A') as retidos
+            FROM ixcprovedor.cliente_contrato
+            WHERE id_vendedor_ativ=%s
+              AND data_ativacao>=%s AND data_ativacao<=%s AND status='A'
+        """, (vid, d2026, d90))
+        r = cur.fetchone()
+        total_90  = int(r["total"] or 0)
+        retidos   = int(r["retidos"] or 0)
+        pct_ret   = round(retidos/max(total_90,1)*100)
+        if pct_ret >= 90:   score_ret = 100; nivel_ret = "ideal"
+        elif pct_ret >= 70: score_ret = 60;  nivel_ret = "medio"
+        else:               score_ret = 30;  nivel_ret = "baixo"
+
+        # ADIMPLENCIA: clientes dos ultimos 90 dias com faturas em dia
+        cur.execute("""
+            SELECT COUNT(DISTINCT cc.id) as total,
+                   COUNT(DISTINCT CASE WHEN f.status='A' AND f.data_vencimento<CURDATE() THEN cc.id END) as inad
+            FROM ixcprovedor.cliente_contrato cc
+            LEFT JOIN ixcprovedor.fn_areceber f ON f.id_contrato=cc.id
+            WHERE cc.id_vendedor_ativ=%s AND cc.data_ativacao>=%s AND cc.status='A'
+        """, (vid, d90))
+        r = cur.fetchone()
+        total_adim = int(r["total"] or 0)
+        inad       = int(r["inad"] or 0)
+        pct_adim   = round((total_adim-inad)/max(total_adim,1)*100)
+        if pct_adim >= 90:   score_adim = 100; nivel_adim = "ideal"
+        elif pct_adim >= 70: score_adim = 60;  nivel_adim = "medio"
+        else:                score_adim = 30;  nivel_adim = "baixo"
+
+        # SCORE FINAL
+        score_final = round((score_meta + score_ret + score_adim) / 3)
+        if score_final >= 80:   perfil = "Excelente"
+        elif score_final >= 60: perfil = "Bom"
+        elif score_final >= 40: perfil = "Regular"
+        else:                   perfil = "Necessita atencao"
+
+        return {
+            "vendedor": dict(vend) if vend else {},
+            "score_final": score_final,
+            "perfil": perfil,
+            "dimensoes": {
+                "meta": {
+                    "score": score_meta, "nivel": nivel_meta,
+                    "media_dia": media_dia, "meta_dia": 4,
+                    "total_vendas": total_vendas, "dias_ativos": dias_venda,
+                    "descricao": "Media de vendas por dia ativo (meta: 4/dia)"
+                },
+                "retencao": {
+                    "score": score_ret, "nivel": nivel_ret,
+                    "pct": pct_ret, "retidos": retidos, "total": total_90,
+                    "descricao": "Clientes que permaneceram 90+ dias na base"
+                },
+                "adimplencia": {
+                    "score": score_adim, "nivel": nivel_adim,
+                    "pct": pct_adim, "inadimplentes": inad, "total": total_adim,
+                    "descricao": "Clientes com faturas em dia (ultimos 90 dias)"
+                }
+            }
+        }
+
+
+@router.get("/vendedores/{vid}/detalhe")
+async def vendedor_detalhe(
+    vid: int,
+    tipo: str = Query(""),  # nv_inst, nv_pend, tit, rn, reativ, inadimplentes, criticos
+    de: str = Query("2026-01-01"),
+    ate: str = Query(""),
+    user=Depends(requer_backoffice())
+):
+    from datetime import date
+    from app.services.ixc_db import ixc_conn
+    _ate = ate or date.today().strftime("%Y-%m-%d")
+
+    with ixc_conn() as conn:
+        cur = conn.cursor()
+
+        if tipo in ("nv_inst","nv_pend","tit","rn","reativ"):
+            assunto_map = {"nv_inst":227,"nv_pend":227,"tit":110,"rn":75,"reativ":15}
+            status_map  = {"nv_inst":"F","nv_pend":"A","tit":"F","rn":"F","reativ":"F"}
+            assunto = assunto_map[tipo]
+            os_status = status_map[tipo]
+            cur.execute("""
+                SELECT cc.id AS contrato_id, c.razao, c.cnpj_cpf, c.telefone_celular,
+                       ci.nome AS cidade, c.bairro,
+                       vc.nome AS plano,
+                       cc.data_ativacao,
+                       o.data_abertura, o.data_fechamento,
+                       DATEDIFF(COALESCE(o.data_fechamento,NOW()), o.data_abertura) AS sla,
+                       f.funcionario AS tecnico
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id=cc.id_cliente
+                LEFT JOIN ixcprovedor.cidade ci ON ci.id=c.cidade
+                LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id=cc.id_vd_contrato
+                JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit=cc.id
+                    AND o.id_assunto=%s AND o.status=%s
+                LEFT JOIN ixcprovedor.funcionarios f ON f.id=o.id_tecnico
+                WHERE cc.id_vendedor_ativ=%s
+                  AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s
+                  AND cc.status='A'
+                ORDER BY o.data_abertura DESC
+            """, (assunto, os_status, vid, de, _ate))
+
+        elif tipo in ("inadimplentes","criticos"):
+            dias_min = 30 if tipo=="criticos" else 1
+            cur.execute(f"""
+                SELECT cc.id AS contrato_id, c.razao, c.cnpj_cpf, c.telefone_celular,
+                       ci.nome AS cidade,
+                       vc.nome AS plano,
+                       MAX(DATEDIFF(CURDATE(),f.data_vencimento)) AS dias_atraso,
+                       SUM(f.valor_aberto) AS valor_total
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id=cc.id_cliente
+                LEFT JOIN ixcprovedor.cidade ci ON ci.id=c.cidade
+                LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id=cc.id_vd_contrato
+                JOIN ixcprovedor.fn_areceber f ON f.id_contrato=cc.id
+                    AND f.status='A' AND f.data_vencimento < CURDATE()
+                WHERE cc.id_vendedor_ativ=%s
+                  AND cc.data_ativacao>=%s AND cc.status='A'
+                GROUP BY cc.id HAVING MAX(DATEDIFF(CURDATE(),f.data_vencimento)) >= {dias_min}
+                ORDER BY dias_atraso DESC
+            """, (vid, de))
+        else:
+            return {"itens": []}
+
+        rows = cur.fetchall()
+
+    def sv(v):
+        if v is None: return None
+        if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
+        if hasattr(v,'isoformat'): return str(v)
+        return v
+
+    return {"itens": [{k:sv(val) for k,val in dict(r).items()} for r in rows]}

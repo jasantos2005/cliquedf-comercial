@@ -459,7 +459,7 @@ tbody tr:hover td{background:var(--surf2);}
         <svg class="ni-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
       <div class="ni-sub" id="sub-auditoria">
-        <div class="nis" onclick="navTo('aud-fila')">Auditoria App</div>
+        <div class="nis" onclick="navTo('aud-fila')">Auditorias App</div>
         <div class="nis" onclick="navTo('aud-ixc')">Auditoria IXC</div>
         <div class="nis" onclick="navTo('sem-os')">Sem instalacao</div>
       </div>
@@ -477,6 +477,15 @@ tbody tr:hover td{background:var(--surf2);}
 
       </div>
 
+      <div class="ni" id="ni-vendedores" onclick="toggleSub('sub-vendedores','ni-vendedores')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <span class="ni-label">Vendedores</span>
+        <svg class="ni-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <div class="ni-sub" id="sub-vendedores">
+        <div class="nis" onclick="navTo('vend-produtividade')">Produtividade</div>
+        <div class="nis" onclick="navTo('vend-perfil')">Perfil do vendedor</div>
+      </div>
       <div class="ni" id="ni-clientes" onclick="navTo('clientes')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
         <span class="ni-label">Clientes</span>
@@ -603,25 +612,22 @@ tbody tr:hover td{background:var(--surf2);}
 
       <!-- AUDITORIA FILA -->
       <div id="page-aud-fila" class="page">
-        <div class="split" id="split-aud">
-          <div class="split-l">
-            <div class="split-l-hd">
-              <div class="ftabs" id="ftabs-aud">
-                <div class="ftab on" onclick="filtroAud('todos',this)">Todos</div>
-                <div class="ftab" onclick="filtroAud('enviado',this)">Enviado</div>
-                <div class="ftab" onclick="filtroAud('em_auditoria',this)">Auditoria</div>
-                <div class="ftab" onclick="filtroAud('pendente',this)">Pendente</div>
-                <div class="ftab" onclick="filtroAud('reprovado',this)">Reprovado</div>
-                <div class="ftab" onclick="filtroAud('aprovado',this)">Aprovado</div>
-                <div class="ftab" onclick="filtroAud('assinatura_pendente',this)">Assinatura</div>
-                <div class="ftab" onclick="filtroAud('ativado',this)">Ativado</div>
-              </div>
-            </div>
-            <div class="split-l-body" id="lista-aud"></div>
-          </div>
-          <div class="split-r" id="detalhe-aud">
-            <div class="empty"><div class="ei">←</div><p>Selecione um cadastro para ver os detalhes.</p></div>
-          </div>
+        <div class="ftabs" id="ftabs-aud" style="margin-bottom:14px;flex-wrap:wrap;">
+          <div class="ftab on" onclick="filtroAud('todos',this)">Todos</div>
+          <div class="ftab" onclick="filtroAud('enviado',this)">Enviado</div>
+          <div class="ftab" onclick="filtroAud('em_auditoria',this)">Auditoria</div>
+          <div class="ftab" onclick="filtroAud('pendente',this)">Pendente</div>
+          <div class="ftab" onclick="filtroAud('reprovado',this)">Reprovado</div>
+          <div class="ftab" onclick="filtroAud('aprovado',this)">Aprovado</div>
+          <div class="ftab" onclick="filtroAud('assinatura_pendente',this)">Assinatura</div>
+          <div class="ftab" onclick="filtroAud('ativado',this)">Ativado</div>
+        </div>
+        <div class="card">
+          <div class="sec-hd"><span class="sec-title">Cadastros do App</span><span id="aud-fila-total" style="font-size:11px;color:var(--text3);"></span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Cliente</th><th>Plano</th><th>Vendedor</th><th>Cidade</th><th>Status</th><th>Auditoria</th><th>Data</th></tr></thead>
+            <tbody id="tbody-aud-fila"></tbody>
+          </table></div>
         </div>
       </div>
 
@@ -778,6 +784,28 @@ tbody tr:hover td{background:var(--surf2);}
         </div>
       </div>
 
+      <!-- VENDEDORES PRODUTIVIDADE -->
+      <div id="page-vend-produtividade" class="page">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <select id="vp-select" class="fb-select" style="width:220px;" onchange="carregarProdutividade()">
+            <option value="">Selecione um vendedor</option>
+          </select>
+          <span style="font-size:11px;color:var(--text3);">Periodo do filterbar e aplicado automaticamente</span>
+        </div>
+        <div id="vp-content"><div class="empty"><div class="ei">👆</div><p>Selecione um vendedor acima para ver a produtividade.</p></div></div>
+      </div>
+
+      <!-- VENDEDORES PERFIL -->
+      <div id="page-vend-perfil" class="page">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+          <select id="vpf-select" class="fb-select" style="width:220px;" onchange="carregarPerfil()">
+            <option value="">Selecione um vendedor</option>
+          </select>
+          <span style="font-size:11px;color:var(--text3);">Score calculado com base nos ultimos 90 dias</span>
+        </div>
+        <div id="vpf-content"><div class="empty"><div class="ei">👆</div><p>Selecione um vendedor acima para ver o perfil.</p></div></div>
+      </div>
+
       <!-- CLIENTES -->
       <div id="page-clientes" class="page">
         <div class="card">
@@ -910,6 +938,16 @@ tbody tr:hover td{background:var(--surf2);}
 </div>
 
 <!-- MODAIS -->
+<div class="overlay" id="modal-aud-detalhe">
+  <div class="modal" style="width:560px;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 id="mad-titulo" style="font-size:16px;font-weight:800;margin:0;">Detalhe</h3>
+      <button class="btn btn-outline" style="font-size:11px;padding:4px 10px;" onclick="fecharModal('modal-aud-detalhe')">✕ Fechar</button>
+    </div>
+    <div id="mad-body"></div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-aprovar">
   <div class="modal">
     <h3>✓ Aprovar cadastro</h3>
@@ -1044,6 +1082,8 @@ function mostrarApp() {
   document.getElementById('sb-av').textContent = usuario.nome.charAt(0).toUpperCase();
   carregarFiltros();
   carregarDashboard();
+  // Pre-carregar lista de vendedores para os selects
+  setTimeout(preCarregarVendedores, 1000);
 }
 
 function logout() {
@@ -1065,6 +1105,8 @@ const PAGE_TITLES = {
   dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria',
   'vendas-lista': 'Vendas Realizadas — IXC', 'vendas-hub': 'Vendas — Hub Comercial',
   clientes: 'Clientes Ativados', ranking: 'Ranking de Vendedores',
+    'vend-produtividade': 'Vendedores — Produtividade',
+    'vend-perfil': 'Vendedores — Perfil',
   financeiro: 'Financeiro', cancelamentos: 'Cancelamentos',
   usuarios: 'Usuários', permissoes: 'Permissões por Grupo'
 };
@@ -1285,30 +1327,78 @@ async function carregarDashboard() {
 // ── AUDITORIA ────────────────────────────────────────────────
 async function carregarAuditoria(status = 'todos') {
   audStatusFiltro = status;
-  const el = document.getElementById('lista-aud');
-  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);"><span class="spinner"></span></div>';
+  const de  = document.getElementById('fb-de').value || '';
+  const ate = document.getElementById('fb-ate').value || '';
+  const vp  = filtros.vendedor ? '&vendedor_id='+filtros.vendedor : '';
+  const tbody = document.getElementById('tbody-aud-fila');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></td></tr>';
   try {
-    const r = await api(`/api/auditoria/pendentes?status=${status}&pagina=1`);
+    const r = await api(`/api/auditoria/pendentes?status=${status}&pagina=1&de=${de}&ate=${ate}${vp}`);
     const lista = r.cadastros || [];
-    if (!lista.length) { el.innerHTML = '<div class="empty"><div class="ei">✓</div><p>Nenhum cadastro.</p></div>'; return; }
-    el.innerHTML = lista.map(c => `
-      <div class="aud-row ${audAtivo === c.id ? 'active' : ''}" onclick="abrirDetalhe(${c.id})">
-        <div class="ar-name">${esc(c.razao || '—')}</div>
-        <div class="ar-sub">${c.cnpj_cpf || ''} · ${c.plano_nome || '—'} · ${c.cidade_nome || '—'}/${c.uf_sigla || ''}</div>
-        <div class="ar-ft">
-          <span class="badge b-${c.status}">${statusLabel(c.status)}</span>
-          <span style="font-size:10px;color:var(--text3);">${esc(c.vendedor_nome || '—')} · ${fmtData(c.criado_em)}</span>
-        </div>
-        ${c.qtd_reprovadas > 0 ? `<div style="font-size:10px;color:var(--red);margin-top:3px;">❌ ${c.qtd_reprovadas} regra(s) reprovada(s)</div>` : ''}
-        ${c.qtd_pendentes > 0 ? `<div style="font-size:10px;color:var(--amber);margin-top:2px;">⚠️ ${c.qtd_pendentes} regra(s) pendente(s)</div>` : ''}
-      </div>
-    `).join('');
-  } catch (e) { el.innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>'; }
+    document.getElementById('aud-fila-total').textContent = lista.length + ' cadastros';
+    if (!lista.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty"><p>Nenhum cadastro encontrado.</p></td></tr>'; return; }
+    tbody.innerHTML = lista.map(c => {
+      const rep  = c.qtd_reprovadas > 0;
+      const pend = c.qtd_pendentes > 0;
+      const audCor = rep ? 'var(--red)' : pend ? 'var(--amber)' : 'var(--green)';
+      const audTxt = rep ? c.qtd_reprovadas+' reprov.' : pend ? c.qtd_pendentes+' pend.' : 'OK';
+      return '<tr style="cursor:pointer;" onclick="abrirModalAud('+c.id+')">'+ 
+        '<td><div class="td-name">'+esc(c.razao||'--')+'</div><div class="td-sub">'+esc(c.cnpj_cpf||'')+'</div></td>'+
+        '<td style="font-size:11px;">'+esc(c.plano_nome||'--')+'</td>'+
+        '<td style="color:var(--text3);">'+esc(c.vendedor_nome||'--')+'</td>'+
+        '<td style="color:var(--text3);font-size:11px;">'+esc((c.cidade_nome||'--')+'/'+(c.uf_sigla||''))+'</td>'+
+        '<td><span class="badge b-'+c.status+'">'+statusLabel(c.status)+'</span></td>'+
+        '<td><span style="font-size:11px;font-weight:700;color:'+audCor+';">'+audTxt+'</span></td>'+
+        '<td style="color:var(--text3);font-size:11px;">'+fmtData(c.criado_em)+'</td>'+
+      '</tr>';
+    }).join('');
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="7" class="empty"><p>Erro ao carregar.</p></td></tr>'; }
 }
 
 function filtroAud(status, el) {
   document.querySelectorAll('#ftabs-aud .ftab').forEach(t => t.classList.remove('on'));
   el.classList.add('on'); carregarAuditoria(status);
+}
+
+async function abrirModalAud(id) {
+  const modal = document.getElementById('modal-aud-detalhe');
+  modal.classList.add('show');
+  document.getElementById('mad-body').innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></div>';
+  try {
+    const d = await api(`/api/auditoria/${id}`);
+    const p = d.precadastro, aud = d.auditoria || [];
+    const rep  = aud.filter(a=>a.resultado==='reprovado');
+    const pend = aud.filter(a=>a.resultado==='pendente');
+    const ale  = aud.filter(a=>a.resultado==='alerta');
+    const corNv = {reprovado:'var(--red)',pendente:'var(--amber)',alerta:'var(--amber)',ok:'var(--green)'};
+    document.getElementById('mad-titulo').textContent = p.razao || '--';
+    document.getElementById('mad-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div class="info-row"><span class="ir-key">CPF/CNPJ</span><span>${esc(p.cnpj_cpf||'--')}</span></div>
+        <div class="info-row"><span class="ir-key">Celular</span><span>${esc(p.telefone_celular||'--')}</span></div>
+        <div class="info-row"><span class="ir-key">Vendedor</span><span>${esc(p.vendedor_nome||'--')}</span></div>
+        <div class="info-row"><span class="ir-key">Plano</span><span>${esc(p.plano_nome||'--')} — R$ ${fmtVal(p.plano_valor||0)}/mes</span></div>
+        <div class="info-row"><span class="ir-key">Cidade</span><span>${esc((p.cidade_nome||'--')+'/'+(p.uf_sigla||''))}</span></div>
+        <div class="info-row"><span class="ir-key">Cadastrado em</span><span>${fmtData(p.criado_em)}</span></div>
+        <div class="info-row"><span class="ir-key">Status</span><span class="badge b-${p.status}">${statusLabel(p.status)}</span></div>
+        <div class="info-row"><span class="ir-key">Canal</span><span>${esc(p.canal_venda||'--')}</span></div>
+      </div>
+      ${[...rep,...pend,...ale].length > 0 ? `
+      <div class="sec-title" style="margin-bottom:8px;">Problemas na auditoria (${[...rep,...pend,...ale].length})</div>
+      ${[...rep,...pend,...ale].map(a=>`
+        <div class="regra-row">
+          <div class="rr-ic rr-${a.resultado==='reprovado'?'rep':a.resultado==='ok'?'ok':'pend'}">${a.resultado==='reprovado'?'✗':a.resultado==='ok'?'✓':'!'}</div>
+          <div style="flex:1;"><div style="font-weight:500;font-size:12px;">${esc(a.legenda||a.regra)}</div>${a.detalhes?`<div style="font-size:10px;color:var(--text3);">${esc(a.detalhes)}</div>`:''}</div>
+          <span class="badge b-${a.resultado}" style="font-size:10px;">${a.resultado}</span>
+        </div>`).join('')}` : '<div style="color:var(--green);font-size:12px;">✓ Sem problemas na auditoria</div>'}
+      <div class="btn-grp" style="margin-top:16px;">
+        ${['pendente','reprovado','em_auditoria'].includes(p.status)?`<button class="btn btn-green" onclick="fecharModal('modal-aud-detalhe');abrirModalAprovar(${id})">✓ Aprovar</button>`:''}
+        ${!['ativado','assinado'].includes(p.status)?`<button class="btn btn-red" onclick="fecharModal('modal-aud-detalhe');abrirModalReprovar(${id})">✗ Reprovar</button>`:''}
+        ${p.status==='aprovado'?`<button class="btn btn-cyan" onclick="fecharModal('modal-aud-detalhe');gerarLink(${id})">🔗 Gerar link</button>`:''}
+        <button class="btn btn-outline" onclick="fecharModal('modal-aud-detalhe');reauditar(${id})">↻ Reauditar</button>
+      </div>
+    `;
+  } catch(e) { document.getElementById('mad-body').innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>'; }
 }
 
 async function abrirDetalhe(id) {
@@ -1808,6 +1898,202 @@ async function abrirCidade(cidadeId, cidadeNome) {
 }
 
 // ── CLIENTES ─────────────────────────────────────────────────
+
+// -- VENDEDORES --
+async function preCarregarVendedores() {
+  try {
+    const r = await api('/api/painel/vendedores');
+    const vends = r.vendedores || [];
+    ['vp-select','vpf-select'].forEach(selId => {
+      const sel = document.getElementById(selId);
+      if (!sel || sel.options.length > 1) return;
+      vends.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v.id;
+        o.textContent = v.nome;
+        sel.appendChild(o);
+      });
+    });
+  } catch(e) {}
+}
+
+async function carregarVendProdutividade() {
+  try {
+    const r = await api('/api/painel/vendedores');
+    const sel = document.getElementById('vp-select');
+    if (sel.options.length <= 1) {
+      (r.vendedores||[]).forEach(v => {
+        const o = document.createElement('option'); o.value=v.id; o.textContent=v.nome; sel.appendChild(o);
+      });
+    }
+  } catch(e) {}
+}
+
+async function carregarProdutividade() {
+  const vid = document.getElementById('vp-select').value;
+  const de  = document.getElementById('fb-de').value || '2026-01-01';
+  const ate = document.getElementById('fb-ate').value || '';
+  const el  = document.getElementById('vp-content');
+  if (!vid) { el.innerHTML = '<div class="empty"><div class="ei">👆</div><p>Selecione um vendedor.</p></div>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:30px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></div>';
+  try {
+    const d = await api(`/api/painel/vendedores/${vid}/produtividade?de=${de}&ate=${ate}`);
+    const k=d.kpi, o=d.os, a=d.adimplencia;
+    const maxDia = Math.max(...(d.por_dia||[]).map(x=>x.total),1);
+    el.setAttribute('data-vid', vid);
+    el.setAttribute('data-de', de);
+    el.setAttribute('data-ate', ate);
+    el.innerHTML = `
+      <div style="font-size:18px;font-weight:800;margin-bottom:16px;">${esc(d.vendedor.nome||'--')}</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;">
+        <div class="kpi" style="--ac:var(--cyan)"><div class="kv">${k.total}</div><div class="kl">Total contratos</div></div>
+        <div class="kpi" style="--ac:var(--green)"><div class="kv">${k.ativos}</div><div class="kl">Ativos</div></div>
+        <div class="kpi" style="--ac:var(--amber)"><div class="kv">${k.aguard_ass}</div><div class="kl">Aguard. assinatura</div></div>
+        <div class="kpi" style="--ac:var(--purple)"><div class="kv">${k.media_dia}</div><div class="kl">Media vendas/dia</div></div>
+        <div class="kpi" style="--ac:var(--blue)"><div class="kv">${k.dias_com_venda}</div><div class="kl">Dias com venda</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+        <div class="card">
+          <div class="sec-title" style="margin-bottom:12px;">OS de instalacao <span style="font-size:10px;color:var(--text3);">(clique para ver detalhes)</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'nv_inst')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Nova inst. instalada</span><span style="color:var(--green);font-weight:700;">${o.nv_instaladas} →</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'nv_pend')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Nova inst. pendente</span><span style="color:var(--amber);font-weight:700;">${o.nv_pendentes} →</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'tit')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Titularidade</span><span style="color:var(--cyan);">${o.titularidade} →</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'rn')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Reconexao</span><span style="color:var(--text2);">${o.reconexao} →</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'reativ')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Reativacao</span><span style="color:var(--text2);">${o.reativacao} →</span></div>
+        </div>
+        <div class="card">
+          <div class="sec-title" style="margin-bottom:12px;">Adimplencia da carteira <span style="font-size:10px;color:var(--text3);">(clique para ver detalhes)</span></div>
+          <div class="info-row"><span class="ir-key">Total clientes</span><span>${a.total}</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'inadimplentes')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Inadimplentes</span><span style="color:var(--amber);font-weight:700;">${a.inadimplentes} →</span></div>
+          <div class="info-row" style="cursor:pointer;" onclick="abrirDetalheVendFromEl(this,'criticos')" onmouseenter="this.style.background='var(--surf2)'" onmouseleave="this.style.background=''"><span class="ir-key">Criticos (+30d)</span><span style="color:var(--red);font-weight:700;">${a.criticos} →</span></div>
+          <div class="info-row" style="border-top:1px solid var(--border2);margin-top:6px;padding-top:8px;"><span class="ir-key" style="font-weight:700;">% Adimplente</span>
+            <span style="font-size:18px;font-weight:900;color:${a.pct_adimplente>=90?'var(--green)':a.pct_adimplente>=70?'var(--amber)':'var(--red)'}">${a.pct_adimplente}%</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="sec-title" style="margin-bottom:10px;">Vendas por dia</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:80px;">
+          ${(d.por_dia||[]).map(x=>{
+            const h=Math.max(4,Math.round((x.total/maxDia)*60));
+            return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;">'+
+              '<div style="font-size:9px;color:var(--cyan);font-weight:700;">'+x.total+'</div>'+
+              '<div title="'+x.dia+': '+x.total+'" style="width:100%;height:'+h+'px;background:var(--cyan);border-radius:2px 2px 0 0;opacity:.8;"></div>'+
+            '</div>';
+          }).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;">
+          ${d.por_dia&&d.por_dia.length>0?'<span style="font-size:9px;color:var(--text3);">'+d.por_dia[0].dia.slice(5)+'</span><span style="font-size:9px;color:var(--text3);">'+d.por_dia[d.por_dia.length-1].dia.slice(5)+'</span>':''}
+        </div>
+      </div>
+    `;
+  } catch(e) { el.innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>'; }
+}
+
+function abrirDetalheVendFromEl(el, tipo) {
+  const container = document.getElementById('vp-content');
+  const vid = container.getAttribute('data-vid');
+  const de  = container.getAttribute('data-de');
+  const ate = container.getAttribute('data-ate');
+  abrirDetalheVend(vid, de, ate, tipo);
+}
+
+async function abrirDetalheVend(vid, de, ate, tipo) {
+  const titulos = {
+    nv_inst:'Nova Instalacao — Instaladas', nv_pend:'Nova Instalacao — Pendentes',
+    tit:'Titularidade', rn:'Reconexao', reativ:'Reativacao',
+    inadimplentes:'Inadimplentes', criticos:'Inadimplencia Critica (+30d)'
+  };
+  const modal = document.getElementById('modal-aud-detalhe');
+  modal.classList.add('show');
+  document.getElementById('mad-titulo').textContent = titulos[tipo] || tipo;
+  document.getElementById('mad-body').innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></div>';
+  try {
+    const r = await api(`/api/painel/vendedores/${vid}/detalhe?tipo=${tipo}&de=${de}&ate=${ate||''}`);
+    const itens = r.itens || [];
+    if (!itens.length) {
+      document.getElementById('mad-body').innerHTML = '<div class="empty"><p>Nenhum registro encontrado.</p></div>';
+      return;
+    }
+    const isOS = ['nv_inst','nv_pend','tit','rn','reativ'].includes(tipo);
+    document.getElementById('mad-body').innerHTML = '<div class="tbl-wrap"><table>' +
+      '<thead><tr><th>Cliente</th><th>Cidade</th><th>Plano</th>' +
+      (isOS ? '<th>Aberta em</th><th>Fechada em</th><th>SLA</th><th>Tecnico</th>' : '<th>Atraso</th><th>Valor aberto</th>') +
+      '</tr></thead><tbody>' +
+      itens.map(it => '<tr>'+
+        '<td><div class="td-name">'+esc(it.razao||'--')+'</div><div class="td-sub">'+esc(it.cnpj_cpf||'')+(it.telefone_celular?' · '+it.telefone_celular:'')+'</div></td>'+
+        '<td style="color:var(--text3);font-size:11px;">'+esc(it.cidade||'--')+(it.bairro?' / '+it.bairro:'')+'</td>'+
+        '<td style="font-size:11px;">'+esc(it.plano||'--')+'</td>'+
+        (isOS ?
+          '<td style="color:var(--text3);font-size:11px;">'+fmtData(it.data_abertura)+'</td>'+
+          '<td style="color:var(--text3);font-size:11px;">'+(it.data_fechamento?fmtData(it.data_fechamento):'<span style="color:var(--amber);">Aberta</span>')+'</td>'+
+          '<td style="font-weight:700;color:'+(it.sla<=1?'var(--green)':it.sla<=3?'var(--amber)':'var(--red)')+';">'+(it.sla!=null?it.sla+'d':'--')+'</td>'+
+          '<td style="color:var(--text3);font-size:11px;">'+esc(it.tecnico||'--')+'</td>'
+          :
+          '<td style="font-weight:700;color:'+(it.dias_atraso>30?'var(--red)':'var(--amber)')+';">'+it.dias_atraso+'d</td>'+
+          '<td style="font-weight:700;color:var(--red);">R$ '+fmtVal(it.valor_total||0)+'</td>'
+        )+
+      '</tr>').join('')+
+      '</tbody></table></div>';
+  } catch(e) { document.getElementById('mad-body').innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>'; }
+}
+
+async function carregarVendPerfil() {
+  try {
+    const r = await api('/api/painel/vendedores');
+    const sel = document.getElementById('vpf-select');
+    if (sel.options.length <= 1) {
+      (r.vendedores||[]).forEach(v => {
+        const o = document.createElement('option'); o.value=v.id; o.textContent=v.nome; sel.appendChild(o);
+      });
+    }
+  } catch(e) {}
+}
+
+async function carregarPerfil() {
+  const vid = document.getElementById('vpf-select').value;
+  const el  = document.getElementById('vpf-content');
+  if (!vid) { el.innerHTML = '<div class="empty"><div class="ei">👆</div><p>Selecione um vendedor.</p></div>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:30px;"><span class="spinner" style="border-top-color:var(--cyan);width:16px;height:16px;border-width:2px;"></span></div>';
+  try {
+    const d = await api(`/api/painel/vendedores/${vid}/perfil`);
+    const dim = d.dimensoes;
+    const corNivel = {ideal:'var(--green)',medio:'var(--amber)',baixo:'var(--red)'};
+    const corScore = d.score_final>=80?'var(--green)':d.score_final>=60?'var(--amber)':'var(--red)';
+    const renderDim = (titulo, info) => `
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;">${titulo}</div>
+          <span class="badge" style="color:${corNivel[info.nivel]||'var(--text3)'};font-size:11px;padding:3px 10px;">${info.nivel.toUpperCase()}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:10px;">${esc(info.descricao)}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="flex:1;background:var(--surf2);border-radius:4px;height:8px;overflow:hidden;">
+            <div style="width:${info.score}%;height:100%;background:${corNivel[info.nivel]||'var(--cyan)'};border-radius:4px;transition:width .5s;"></div>
+          </div>
+          <div style="font-size:18px;font-weight:900;color:${corNivel[info.nivel]||'var(--cyan)'}">${info.score}</div>
+        </div>
+      </div>`;
+    el.innerHTML = `
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+        <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:#000;">${d.vendedor.nome?d.vendedor.nome.charAt(0):''}</div>
+        <div>
+          <div style="font-size:20px;font-weight:800;">${esc(d.vendedor.nome||'--')}</div>
+          <div style="font-size:14px;color:${corScore};font-weight:700;margin-top:4px;">${d.perfil} — Score ${d.score_final}/100</div>
+        </div>
+        <div style="margin-left:auto;text-align:center;">
+          <div style="font-size:48px;font-weight:900;color:${corScore};">${d.score_final}</div>
+          <div style="font-size:11px;color:var(--text3);">Score final</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;">
+        ${renderDim('Metas de vendas', {...dim.meta, descricao: dim.meta.descricao+'  ('+dim.meta.media_dia+'/dia | meta: '+dim.meta.meta_dia+'/dia)'})}
+        ${renderDim('Retencao de clientes', {...dim.retencao, descricao: dim.retencao.descricao+'  ('+dim.retencao.retidos+'/'+dim.retencao.total+' retidos — '+dim.retencao.pct+'%)'})}
+        ${renderDim('Adimplencia', {...dim.adimplencia, descricao: dim.adimplencia.descricao+'  ('+dim.adimplencia.inadimplentes+' inadimplentes — '+dim.adimplencia.pct+'% OK)'})}
+      </div>
+    `;
+  } catch(e) { el.innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>'; }
+}
+
 async function carregarClientes() {
   const tbody = document.getElementById('tbody-clientes');
   try {
