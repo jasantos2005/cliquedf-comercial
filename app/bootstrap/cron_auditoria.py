@@ -27,7 +27,9 @@ def enviar_telegram(msg):
 def processar():
     conn = get_db(); cur = conn.cursor()
     pendentes = cur.execute("""
-        SELECT p.*, v.nome AS vendedor_nome FROM hc_precadastros p
+        SELECT p.*, COALESCE(v.nome, 'Vendedor') AS vendedor_nome,
+               v.ixc_funcionario_id AS vend_func_id
+        FROM hc_precadastros p
         LEFT JOIN hc_usuarios v ON v.id=p.id_vendedor_hub
         WHERE p.status='enviado' ORDER BY p.criado_em ASC LIMIT 20
     """).fetchall()
@@ -51,11 +53,65 @@ def processar():
         novo = status_map.get(resultado["resultado_final"],"pendente")
         cur.execute("UPDATE hc_precadastros SET status=?,atualizado_em=datetime('now','-3 hours') WHERE id=?",(novo,pid)); conn.commit()
         log.info(f"#{pid} {p.get('razao','?')[:30]} → {novo}")
-        vendedor=(p.get("vendedor_nome") or "Vendedor").upper()
+        # Buscar nome real no IXC se possivel
+        try:
+            from app.services.ixc_db import ixc_conn as _ixc
+            with _ixc() as _c:
+                with _c.cursor() as _icur:
+                    _icur.execute("SELECT funcionario FROM ixcprovedor.funcionarios WHERE id=%s", (p.get('vend_func_id'),))
+                    _fr = _icur.fetchone()
+                    vendedor = (_fr['funcionario'] if _fr else p.get('vendedor_nome') or 'Vendedor').upper()
+        except:
+            vendedor = (p.get('vendedor_nome') or 'Vendedor').upper()
         cliente=(p.get("razao") or "—").upper()
         proto=p.get("protocolo") or f"#{pid}"
         if novo=="aprovado":
-            enviar_telegram(f"✅ *CADASTRO APROVADO*\n\nVendedor: {vendedor}\nCliente: {cliente}\nProtocolo: `{proto}`\n\n_Aguardando assinatura._")
+            # Criar lead no IXC
+            try:
+                from app.services.ixc_db import ixc_conn
+                fone = (p.get('telefone_celular') or '').strip()
+                whats = (p.get('whatsapp') or fone).strip()
+                with ixc_conn() as ixc:
+                    with ixc.cursor() as icur:
+                        icur.execute("""
+                            INSERT INTO ixcprovedor.contato
+                            (id_contato_tipo, id_cliente, id_fornecedor, nome, fone_celular,
+                             fone_whatsapp, email, principal, lid, lead, id_responsavel,
+                             endereco, numero, bairro, cidade, uf, cep, cnpj_cpf,
+                             data_nascimento, tipo_pessoa, ativo, id_filial,
+                             data_cadastro, ultima_atualizacao, id_candidato_tipo,
+                             id_segmento, tipo_localidade, origem)
+                            VALUES
+                            (0, 0, 0, %s, %s,
+                             %s, %s, 'S', 'N', 'N', %s,
+                             %s, %s, %s, %s, %s, %s, %s,
+                             %s, %s, 'S', 1,
+                             NOW(), NOW(), 0,
+                             0, 'U', 'hub_comercial')
+                        """, (
+                            p.get('razao',''),
+                            fone, whats,
+                            p.get('email',''),
+                            conn.execute('SELECT ixc_funcionario_id FROM hc_usuarios WHERE id=?',(p.get('id_vendedor_hub'),)).fetchone()[0] or 27,
+                            p.get('endereco',''),
+                            p.get('numero',''),
+                            p.get('bairro',''),
+                            p.get('ixc_cidade_id') or 0,
+                            p.get('ixc_uf_id') or 7,
+                            p.get('cep',''),
+                            p.get('cnpj_cpf',''),
+                            p.get('data_nascimento') or None,
+                            p.get('tipo_pessoa','F'),
+                        ))
+                        ixc.commit()
+                        lead_id = icur.lastrowid
+                        cur.execute("UPDATE hc_precadastros SET obs=? WHERE id=?",
+                            (f"lead_ixc_id={lead_id}", pid))
+                        conn.commit()
+                        log.info(f"#{pid} Lead IXC criado id={lead_id}")
+            except Exception as e:
+                log.error(f"#{pid} Erro ao criar lead IXC: {e}")
+            enviar_telegram(f"✅ *CADASTRO APROVADO*\n\nVendedor: {vendedor}\nCliente: {cliente}\nProtocolo: `{proto}`\n\n_Lead criado no IXC. Aguardando consulta Serasa._")
         else:
             probs=[r for r in resultado["regras"] if r["resultado"] in("reprovado","pendente","alerta")]
             linhas="\n".join(f"{'❌' if r['resultado']=='reprovado' else '⚠️'} {r['legenda']}" for r in probs)

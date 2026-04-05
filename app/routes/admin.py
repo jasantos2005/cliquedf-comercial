@@ -1,7 +1,7 @@
 """Hub Comercial — app/routes/admin.py"""
 import sqlite3, hashlib, logging
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 from app.services.auth import requer_supervisor, requer_admin
@@ -62,6 +62,44 @@ class SolicitacaoAcesso(BaseModel):
     login: str
     senha: str
     motivo: str
+
+
+
+@router.put("/usuarios/{id}")
+async def editar(id: int, request: Request, db=Depends(get_db), user=Depends(requer_supervisor())):
+    payload = await request.json()
+    nome  = payload.get("nome", "").strip()
+    login = payload.get("login", "").strip()
+    nivel = payload.get("nivel")
+    ixc   = payload.get("ixc_funcionario_id")
+    if not nome or not login:
+        raise HTTPException(400, "Nome e login obrigatorios")
+    db.execute(
+        "UPDATE hc_usuarios SET nome=?, login=?, id_grupo=(SELECT id FROM hc_grupos WHERE nivel=? LIMIT 1), ixc_funcionario_id=? WHERE id=?",
+        (nome, login, nivel, ixc, id)
+    )
+    db.commit()
+    return {"ok": True}
+
+@router.post("/usuarios/{id}/senha")
+async def redefinir_senha(id: int, request: Request, db=Depends(get_db), user=Depends(requer_supervisor())):
+    import hashlib
+    payload = await request.json()
+    senha = payload.get("senha", "").strip()
+    if len(senha) < 8:
+        raise HTTPException(400, "Senha deve ter no minimo 8 caracteres")
+    hash_senha = hashlib.sha256(senha.encode()).hexdigest()
+    db.execute("UPDATE hc_usuarios SET senha_hash=? WHERE id=?", (hash_senha, id))
+    db.commit()
+    return {"ok": True}
+
+@router.patch("/usuarios/{id}/ativo")
+async def toggle_ativo(id: int, request: Request, db=Depends(get_db), user=Depends(requer_supervisor())):
+    payload = await request.json()
+    ativo = 1 if payload.get("ativo") else 0
+    db.execute("UPDATE hc_usuarios SET ativo=? WHERE id=?", (ativo, id))
+    db.commit()
+    return {"ok": True}
 
 @router.post("/solicitar-acesso")
 async def solicitar_acesso(payload: SolicitacaoAcesso, db=Depends(get_db)):

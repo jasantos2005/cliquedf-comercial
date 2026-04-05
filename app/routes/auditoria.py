@@ -44,6 +44,54 @@ async def listar_pendentes(status:str=Query("pendente"),pagina:int=Query(1,ge=1)
     total = db.execute("SELECT COUNT(*) FROM hc_precadastros WHERE status=?",(status,)).fetchone()[0]
     return {"pagina":pagina,"por_pagina":pp,"total":total,"cadastros":[dict(r) for r in rows]}
 
+
+# ── LIBERAÇÕES ────────────────────────────────────────────────
+from pydantic import BaseModel as _BM
+
+class LiberacaoPayload(_BM):
+    motivo: str
+
+@router.get("/liberacoes")
+async def listar_liberacoes(db=Depends(get_db), user=Depends(requer_supervisor())):
+    rows = db.execute("""
+        SELECT p.id, p.razao, p.cnpj_cpf, p.status, p.plano_nome, p.plano_valor,
+               p.cidade_nome, p.uf_sigla, p.telefone_celular, p.whatsapp, p.email,
+               p.canal_venda, p.atualizado_em, p.criado_em,
+               u.nome AS vendedor_nome,
+               (SELECT GROUP_CONCAT(a.legenda, ' | ')
+                FROM hc_auditoria_log a
+                WHERE a.precadastro_id = p.id AND a.resultado = 'reprovado'
+                ORDER BY a.id DESC LIMIT 5) AS motivos_reprovacao
+        FROM hc_precadastros p
+        LEFT JOIN hc_usuarios u ON u.id = p.id_vendedor_hub
+        WHERE p.status = 'reprovado'
+        ORDER BY p.atualizado_em DESC LIMIT 50
+    """).fetchall()
+    return {"liberacoes": [dict(r) for r in rows]}
+
+@router.post("/liberacoes/{id}/aprovar")
+async def liberar_aprovar(id: int, payload: LiberacaoPayload, db=Depends(get_db), user=Depends(requer_supervisor())):
+    import os, requests as _req
+    u = db.execute("SELECT nome FROM hc_usuarios WHERE id=?", (user["sub"],)).fetchone()
+    liberador = u["nome"] if u else "Supervisor"
+    pre = db.execute("SELECT p.*, u.nome AS vendedor_nome FROM hc_precadastros p LEFT JOIN hc_usuarios u ON u.id=p.id_vendedor_hub WHERE p.id=?", (id,)).fetchone()
+    if not pre: raise HTTPException(404, "Não encontrado")
+    pre = dict(pre)
+    if pre["status"] != "reprovado": raise HTTPException(400, "Cadastro não está reprovado")
+    db.execute("UPDATE hc_precadastros SET status='aprovado', obs=COALESCE(obs||' ','')|| 'liberado_supervisor=1', atualizado_em=datetime('now','-3 hours') WHERE id=?", (id,))
+    db.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes) VALUES(?,99,'LIBERACAO','Liberado por supervisor','aprovado',?)",
+        (id, f"Liberado por {liberador}: {payload.motivo}"))
+    db.commit()
+    token = os.getenv("TELEGRAM_TOKEN"); chat = os.getenv("TELEGRAM_CHAT_ID")
+    if token and chat:
+        try:
+            _req.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                "chat_id": chat,
+                "text": f"✅ *VENDA LIBERADA*\n\nCliente: *{pre.get('razao','?')}*\nVendedor: {pre.get('vendedor_nome') or ''}\nLiberado por: {liberador}\nMotivo: {payload.motivo}",
+                "parse_mode": "Markdown"}, timeout=10)
+        except: pass
+    return {"ok": True}
+
 @router.get("/{id}")
 async def detalhe(id:int, db=Depends(get_db), user=Depends(requer_backoffice())):
     p = db.execute("SELECT p.*,v.nome AS vendedor_nome FROM hc_precadastros p LEFT JOIN hc_usuarios v ON v.id=p.id_vendedor_hub WHERE p.id=?",(id,)).fetchone()
@@ -136,3 +184,25 @@ async def listar_usuarios_aud(db=Depends(get_db), user=Depends(requer_supervisor
         ORDER BY g.nivel DESC, u.nome
     """).fetchall()
     return {"usuarios": [dict(r) for r in rows]}
+
+
+@router.post("/liberacoes/{id}/recusar")
+async def liberar_recusar(id: int, payload: LiberacaoPayload, db=Depends(get_db), user=Depends(requer_supervisor())):
+    import os, requests as _req
+    u = db.execute("SELECT nome FROM hc_usuarios WHERE id=?", (user["sub"],)).fetchone()
+    liberador = u["nome"] if u else "Supervisor"
+    pre = db.execute("SELECT p.*, u.nome AS vendedor_nome FROM hc_precadastros p LEFT JOIN hc_usuarios u ON u.id=p.id_vendedor_hub WHERE p.id=?", (id,)).fetchone()
+    if not pre: raise HTTPException(404, "Não encontrado")
+    pre = dict(pre)
+    db.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes) VALUES(?,99,'LIBERACAO_NEGADA','Recusado pelo supervisor','reprovado',?)",
+        (id, f"Recusado por {liberador}: {payload.motivo}"))
+    db.commit()
+    token = os.getenv("TELEGRAM_TOKEN"); chat = os.getenv("TELEGRAM_CHAT_ID")
+    if token and chat:
+        try:
+            _req.post(f"https://api.telegram.org/bot{token}/sendMessage", json={
+                "chat_id": chat,
+                "text": f"❌ *VENDA RECUSADA*\n\nCliente: *{pre.get('razao','?')}*\nRecusado por: {liberador}\nMotivo: {payload.motivo}",
+                "parse_mode": "Markdown"}, timeout=10)
+        except: pass
+    return {"ok": True}

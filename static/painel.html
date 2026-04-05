@@ -460,6 +460,7 @@ tbody tr:hover td{background:var(--surf2);}
       </div>
       <div class="ni-sub" id="sub-auditoria">
         <div class="nis" onclick="navTo('aud-fila')">Auditorias App</div>
+        <div class="nis" onclick="navTo('liberacoes')" style="color:var(--amber);">⚡ Liberações</div>
         <div class="nis" onclick="navTo('aud-ixc')">Auditoria IXC</div>
         <div class="nis" onclick="navTo('sem-os')">Sem instalacao</div>
       </div>
@@ -519,6 +520,10 @@ tbody tr:hover td{background:var(--surf2);}
       <div class="ni" id="ni-permissoes" onclick="navTo('permissoes')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
         <span class="ni-label">Permissões</span>
+      </div>
+      <div class="ni" id="ni-vend-config" onclick="navTo('vend-config')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+        <span class="ni-label">Vendedores ativos</span>
       </div>
     </nav>
     <div class="sb-foot">
@@ -611,6 +616,11 @@ tbody tr:hover td{background:var(--surf2);}
       </div>
 
       <!-- AUDITORIA FILA -->
+      <div id="page-liberacoes" class="page">
+        <div style="font-size:13px;color:var(--text3);margin-bottom:16px;">Clientes reprovados que precisam de aprovação manual do supervisor.</div>
+        <div id="liberacoes-lista"></div>
+      </div>
+
       <div id="page-aud-fila" class="page">
         <div class="ftabs" id="ftabs-aud" style="margin-bottom:14px;flex-wrap:wrap;">
           <div class="ftab on" onclick="filtroAud('todos',this)">Todos</div>
@@ -889,6 +899,18 @@ tbody tr:hover td{background:var(--surf2);}
         </div>
       </div>
 
+      <!-- VENDEDORES CONFIG -->
+      <div id="page-vend-config" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div>
+            <div style="font-size:16px;font-weight:700;">Vendedores Ativos</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">Gerencie quais vendedores aparecem nos filtros e relatorios</div>
+          </div>
+          <button class="btn btn-cyan" onclick="abrirModalNovoVendedor()">+ Adicionar vendedor</button>
+        </div>
+        <div id="vend-config-lista"></div>
+      </div>
+
       <!-- USUÁRIOS -->
       <div id="page-usuarios" class="page">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -970,6 +992,32 @@ tbody tr:hover td{background:var(--surf2);}
   </div>
 </div>
 
+<div class="overlay" id="modal-liberacao">
+  <div class="modal">
+    <h3 id="ml-titulo">Liberacao de venda</h3>
+    <div id="ml-info" style="background:var(--surf2);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;"></div>
+    <div class="modal-field"><label id="ml-motivo-label">Motivo *</label>
+      <textarea id="ml-motivo" rows="3" placeholder="Descreva o motivo..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--surf2);color:var(--text1);font-size:13px;resize:vertical;"></textarea>
+    </div>
+    <div id="ml-err" style="color:var(--red);font-size:12px;margin-top:4px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModal('modal-liberacao')">Cancelar</button>
+      <button id="ml-btn" class="btn btn-cyan" onclick="confirmarLiberacao()">Confirmar</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="modal-senha">
+  <div class="modal">
+    <h3 id="ms-titulo">Redefinir Senha</h3>
+    <div class="modal-field"><label>Nova senha</label><input type="password" id="ms-senha" placeholder="Mínimo 8 caracteres"></div>
+    <div class="modal-field"><label>Confirmar senha</label><input type="password" id="ms-confirma" placeholder="Repita a senha"></div>
+    <div id="ms-err" style="color:var(--red);font-size:12px;margin-top:4px;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="fecharModal('modal-senha')">Cancelar</button>
+      <button class="btn btn-cyan" onclick="confirmarSenha()">Salvar senha</button>
+    </div>
+  </div>
+</div>
 <div class="overlay" id="modal-usuario">
   <div class="modal">
     <h3 id="mu-titulo">Criar Usuário</h3>
@@ -996,8 +1044,13 @@ tbody tr:hover td{background:var(--surf2);}
 
 <script>
 const API = '';
-let token = localStorage.getItem('hc_p_token');
-let usuario = JSON.parse(localStorage.getItem('hc_p_usuario') || 'null');
+// Storage com fallback em memoria
+const _store = {};
+function _sGet(k) { try { return sessionStorage.getItem(k); } catch(e) { return _store[k]||null; } }
+function _sSet(k,v) { try { sessionStorage.setItem(k,v); } catch(e) { _store[k]=v; } }
+function _sDel(k) { try { sessionStorage.removeItem(k); } catch(e) { delete _store[k]; } }
+let token = _sGet('hc_p_token');
+let usuario = JSON.parse(_sGet('hc_p_usuario') || 'null');
 let audAtivo = null, audStatusFiltro = 'todos';
 let filtros = { de: '', ate: '', vendedor: '', cidade: '', bairro: '' };
 let _audId = null;
@@ -1067,8 +1120,8 @@ async function doLogin() {
     if (!r.ok) { err.textContent = d.detail || 'Login inválido.'; return; }
     if (d.usuario.nivel < 30) { err.textContent = 'Acesso negado. Este painel é para backoffice.'; return; }
     token = d.token; usuario = d.usuario;
-    localStorage.setItem('hc_p_token', token);
-    localStorage.setItem('hc_p_usuario', JSON.stringify(usuario));
+    _sSet('hc_p_token', token);
+    _sSet('hc_p_usuario', JSON.stringify(usuario));
     mostrarApp();
   } catch (e) { err.textContent = 'Erro de conexão.'; }
   finally { btn.innerHTML = 'Entrar'; btn.disabled = false; }
@@ -1087,7 +1140,7 @@ function mostrarApp() {
 }
 
 function logout() {
-  localStorage.removeItem('hc_p_token'); localStorage.removeItem('hc_p_usuario');
+  _sDel('hc_p_token'); _sDel('hc_p_usuario');
   token = null; usuario = null;
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('shell').style.display = 'none';
@@ -1102,7 +1155,7 @@ function toggleSub(subId, niId) {
 
 // ── NAVEGAÇÃO ────────────────────────────────────────────────
 const PAGE_TITLES = {
-  dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria',
+  dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria', 'liberacoes': 'Liberações — Vendas Reprovadas',
   'vendas-lista': 'Vendas Realizadas — IXC', 'vendas-hub': 'Vendas — Hub Comercial',
   clientes: 'Clientes Ativados', ranking: 'Ranking de Vendedores',
     'vend-produtividade': 'Vendedores — Produtividade',
@@ -1122,6 +1175,7 @@ function navTo(page) {
   const loaders = {
     dashboard: carregarDashboard,
     'aud-fila': () => carregarAuditoria(audStatusFiltro),
+    'liberacoes': carregarLiberacoes,
     'aud-ixc': carregarAuditoriaIXC,
     'sem-os': carregarSemOS,
     'vendas-lista': () => carregarVendas('mes'),
@@ -2224,6 +2278,65 @@ async function verLog(id, motor) {
   } catch(e) { document.getElementById('log-conteudo').textContent = 'Erro ao carregar log.'; }
 }
 
+
+// -- VENDEDORES CONFIG --
+async function carregarVendConfig() {
+  try {
+    const r = await api('/api/admin/vendedores-ativos');
+    const lista = r.vendedores || [];
+    document.getElementById('vend-config-lista').innerHTML = lista.map(v => `
+      <div class="user-row">
+        <div class="u-avatar" style="background:${v.ativo?'linear-gradient(135deg,var(--cyan),var(--blue))':'var(--surf3)'}">${v.nome.charAt(0)}</div>
+        <div class="u-info">
+          <div class="u-name">${esc(v.nome)}</div>
+          <div class="u-sub">IXC ID: ${v.ixc_id} · <span style="color:${v.ativo?'var(--green)':'var(--red)'}">${v.ativo?'Ativo':'Inativo'}</span></div>
+        </div>
+        <div class="u-actions">
+          <button class="u-btn" style="background:${v.ativo?'rgba(255,77,106,.12)':'rgba(0,229,160,.12)'};color:${v.ativo?'var(--red)':'var(--green)'}" onclick="toggleVendedor(${v.ixc_id},${v.ativo?0:1},'${esc(v.nome)}')">${v.ativo?'Desativar':'Ativar'}</button>
+          <button class="u-btn u-btn-block" onclick="removerVendedor(${v.ixc_id},'${esc(v.nome)}')">Remover</button>
+        </div>
+      </div>
+    `).join('') || '<div class="empty"><p>Nenhum vendedor configurado.</p></div>';
+  } catch(e) { console.error(e); }
+}
+
+async function toggleVendedor(id, ativo, nome) {
+  try {
+    await api(`/api/admin/vendedores-ativos/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ativo})});
+    toast(`${nome} ${ativo?'ativado':'desativado'}`, 'ok');
+    carregarVendConfig();
+  } catch(e) { toast('Erro', 'err'); }
+}
+
+async function removerVendedor(id, nome) {
+  if (!confirm(`Remover ${nome} da lista?`)) return;
+  try {
+    await api(`/api/admin/vendedores-ativos/${id}`, {method:'DELETE'});
+    toast('Removido', 'ok'); carregarVendConfig();
+  } catch(e) { toast('Erro', 'err'); }
+}
+
+async function abrirModalNovoVendedor() {
+  // Buscar vendedores do IXC que nao estao na lista
+  try {
+    const [config, ixc] = await Promise.all([
+      api('/api/admin/vendedores-ativos'),
+      api('/api/painel/filtros')
+    ]);
+    const idsAtivos = new Set(config.vendedores.map(v=>v.ixc_id));
+    const disponiveis = (ixc.vendedores||[]).filter(v=>!idsAtivos.has(v.id) && v.id!=29);
+    if (!disponiveis.length) { toast('Todos os vendedores ja estao na lista', 'info'); return; }
+    const sel = disponiveis.map(v=>`<option value="${v.id}">${esc(v.nome)}</option>`).join('');
+    const vid = prompt('IDs disponiveis:\n'+disponiveis.map(v=>v.id+' - '+v.nome).join('\n')+'\n\nDigite o ID do vendedor:');
+    if (!vid) return;
+    const vend = disponiveis.find(v=>v.id==parseInt(vid));
+    if (!vend) { toast('Vendedor nao encontrado', 'err'); return; }
+    await api('/api/admin/vendedores-ativos', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ixc_id:vend.id, nome:vend.nome})});
+    toast(`${vend.nome} adicionado!`, 'ok');
+    carregarVendConfig();
+  } catch(e) { toast('Erro', 'err'); }
+}
+
 async function carregarUsuarios() {
   try {
     const r = await api('/api/admin/usuarios');
@@ -2238,8 +2351,8 @@ async function carregarUsuarios() {
         <div style="font-size:11px;color:var(--text3);white-space:nowrap;">${u.ultimo_acesso?fmtData(u.ultimo_acesso):'Nunca'}</div>
         <div class="u-actions">
           <button class="u-btn u-btn-edit" onclick="editarUsuario(${u.id})">← Editar</button>
-          <button class="u-btn u-btn-pass" onclick="toast('Em breve: redefinição de senha','info')">🔑 Senha</button>
-          <button class="u-btn u-btn-block" onclick="bloquearUsuario(${u.id},'${esc(u.nome)}')">${u.ativo?'Bloquear':'Desbloquear'}</button>
+          <button class="u-btn u-btn-pass" onclick="redefinirSenha(${u.id},'${esc(u.nome)}')">🔑 Senha</button>
+          <button class="u-btn u-btn-block" onclick="bloquearUsuario(${u.id},'${esc(u.nome)}',!!u.ativo)">${u.ativo?'Bloquear':'Desbloquear'}</button>
         </div>
       </div>
     `).join('') || '<div class="empty"><p>Nenhum usuário.</p></div>';
@@ -2247,31 +2360,196 @@ async function carregarUsuarios() {
 }
 
 function abrirModalUsuario() {
+  document.getElementById('modal-usuario').dataset.editId = '';
+  document.getElementById('mu-titulo').textContent = 'Criar Usuário';
+  document.getElementById('mu-senha').placeholder = 'Senha inicial';
   ['mu-nome','mu-login','mu-senha','mu-ixc'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('mu-titulo').textContent = 'Criar Usuário';
   document.getElementById('modal-usuario').classList.add('show');
 }
 
 async function salvarUsuario() {
-  const nome = document.getElementById('mu-nome').value.trim();
+  const nome  = document.getElementById('mu-nome').value.trim();
   const login = document.getElementById('mu-login').value.trim();
   const senha = document.getElementById('mu-senha').value;
   const nivel = parseInt(document.getElementById('mu-grupo').value);
-  const ixc = document.getElementById('mu-ixc').value;
-  if (!nome || !login || !senha) { toast('Preencha nome, login e senha', 'err'); return; }
+  const ixc   = document.getElementById('mu-ixc').value;
+  const editId = document.getElementById('modal-usuario').dataset.editId;
+  if (!nome || !login) { toast('Preencha nome e login', 'err'); return; }
+  if (!editId && !senha) { toast('Informe a senha', 'err'); return; }
   try {
-    await api('/api/admin/usuarios', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null }) });
-    fecharModal('modal-usuario'); toast('Usuário criado!', 'ok'); carregarUsuarios();
-  } catch (e) { toast('Erro ao criar usuário', 'err'); }
+    const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+    if (editId) {
+      // EDITAR
+      const re = await fetch(`/api/admin/usuarios/${editId}`, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
+        body: JSON.stringify({nome, login, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
+      });
+      if (!re.ok) { const d=await re.json(); toast(d.detail||'Erro ao editar','err'); return; }
+      // Redefinir senha se preenchida
+      if (senha && senha.length >= 8) {
+        await fetch(`/api/admin/usuarios/${editId}/senha`, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
+          body: JSON.stringify({senha})
+        });
+      }
+      fecharModal('modal-usuario');
+      document.getElementById('modal-usuario').dataset.editId = '';
+      toast('Usuário atualizado!', 'ok');
+    } else {
+      // CRIAR
+      if (senha.length < 8) { toast('Senha mínimo 8 caracteres', 'err'); return; }
+      await api('/api/admin/usuarios', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
+      });
+      fecharModal('modal-usuario');
+      toast('Usuário criado!', 'ok');
+    }
+    carregarUsuarios();
+  } catch(e) { toast('Erro ao salvar usuário', 'err'); }
 }
 
-function editarUsuario(id) { toast('Em breve: edição de usuário', 'info'); }
-async function bloquearUsuario(id, nome) {
-  if (!confirm(`Bloquear ${nome}?`)) return;
+function editarUsuario(id) {
+  const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+  fetch('/api/admin/usuarios', {headers:{'Authorization':'Bearer '+tk}})
+    .then(r=>r.json())
+    .then(r => {
+      const u = (r.usuarios||[]).find(x=>x.id===id);
+      if (!u) return toast('Usuário não encontrado','err');
+      document.getElementById('mu-titulo').textContent = 'Editar Usuário';
+      document.getElementById('mu-nome').value  = u.nome || '';
+      document.getElementById('mu-login').value = u.login || '';
+      document.getElementById('mu-senha').value = '';
+      document.getElementById('mu-senha').placeholder = 'Deixe em branco para manter';
+      document.getElementById('mu-grupo').value = String(u.nivel || 10);
+      document.getElementById('mu-ixc').value   = u.ixc_funcionario_id || '';
+      document.getElementById('modal-usuario').dataset.editId = id;
+      document.getElementById('modal-usuario').classList.add('show');
+    }).catch(e => toast('Erro ao carregar usuário','err'));
+}
+async function bloquearUsuario(id, nome, ativo) {
+  const acao = ativo ? 'Bloquear' : 'Desbloquear';
+  if (!confirm(`${acao} ${nome}?`)) return;
   try {
-    await api(`/api/admin/usuarios/${id}`, { method: 'DELETE' });
-    toast('Usuário bloqueado', 'ok'); carregarUsuarios();
-  } catch (e) { toast('Erro', 'err'); }
+    const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+    const rb = await fetch(`/api/admin/usuarios/${id}/ativo`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
+      body: JSON.stringify({ativo: !ativo})
+    });
+    if (!rb.ok) throw new Error('Erro');
+    toast(`${nome} ${ativo?'bloqueado':'desbloqueado'}`, 'ok');
+    carregarUsuarios();
+  } catch(e) { toast('Erro', 'err'); }
+}
+
+function redefinirSenha(id, nome) {
+  document.getElementById('ms-titulo').textContent = 'Redefinir Senha — ' + nome;
+  document.getElementById('ms-senha').value = '';
+  document.getElementById('ms-confirma').value = '';
+  document.getElementById('ms-err').textContent = '';
+  document.getElementById('modal-senha').dataset.uid = id;
+  document.getElementById('modal-senha').dataset.nome = nome;
+  document.getElementById('modal-senha').classList.add('show');
+}
+async function confirmarSenha() {
+  const id   = document.getElementById('modal-senha').dataset.uid;
+  const nome = document.getElementById('modal-senha').dataset.nome;
+  const senha = document.getElementById('ms-senha').value;
+  const conf  = document.getElementById('ms-confirma').value;
+  const err   = document.getElementById('ms-err');
+  if (senha.length < 8) { err.textContent = 'Mínimo 8 caracteres.'; return; }
+  if (senha !== conf)   { err.textContent = 'As senhas não coincidem.'; return; }
+  // Pegar token direto — nao depender da variavel global
+  const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+  if (!tk) { err.textContent = 'Sessão expirada. Faça login novamente.'; return; }
+  try {
+    const r = await fetch('/api/admin/usuarios/' + id + '/senha', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + tk},
+      body: JSON.stringify({senha})
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = 'Erro: ' + (d.detail || r.status); return; }
+    fecharModal('modal-senha');
+    toast('Senha de ' + nome + ' redefinida!', 'ok');
+  } catch(e) { console.error('Erro senha:', e); err.textContent = 'Erro: ' + (e.message||e); }
+}
+async function _old_redefinirSenha(id, nome) {
+  const senha = prompt(`Nova senha para ${nome} (mínimo 8 caracteres):`);
+  if (!senha) return;
+  if (senha.length < 8) { toast('Senha muito curta', 'err'); return; }
+  try {
+    await api(`/api/admin/usuarios/${id}/senha`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({senha})
+    });
+    toast(`Senha de ${nome} redefinida`, 'ok');
+  } catch(e) { toast('Erro ao redefinir senha', 'err'); }
+}
+
+// ── LIBERAÇÕES ────────────────────────────────────────────────
+let _libId = null, _libAcao = null;
+async function carregarLiberacoes() {
+  const el = document.getElementById('liberacoes-lista');
+  el.innerHTML = '<div class="empty"><p>Carregando...</p></div>';
+  try {
+    const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+    const r = await fetch('/api/auditoria/liberacoes', {headers:{'Authorization':'Bearer '+(tk||'')}});
+    if (!tk) { el.innerHTML = '<div class="empty"><p>Sessao expirada. Faca login novamente.</p></div>'; return; }
+    const d = await r.json();
+    const lista = d.liberacoes || [];
+    if (!lista.length) { el.innerHTML = '<div class="empty"><p>Nenhuma venda reprovada aguardando liberacao.</p></div>'; return; }
+    el.innerHTML = lista.map(l => `
+      <div class="card" style="margin-bottom:12px;padding:16px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <div style="font-weight:500;font-size:15px;margin-bottom:4px;">${esc(l.razao||'—')}</div>
+            <div style="font-size:12px;color:var(--text3);">${esc(l.cnpj_cpf||'—')} · ${esc(l.plano_nome||'—')} · ${esc(l.cidade_nome||'—')}/${esc(l.uf_sigla||'')}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px;">Vendedor: ${esc(l.vendedor_nome||'—')} · ${fmtData(l.atualizado_em)}</div>
+            ${l.motivos_reprovacao ? '<div style="margin-top:8px;font-size:12px;color:var(--red);background:rgba(255,77,106,.08);padding:6px 10px;border-radius:6px;">❌ '+esc(l.motivos_reprovacao)+'</div>' : ''}
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0;">
+            <button class="btn btn-green" style="font-size:12px;padding:6px 14px;" onclick="abrirLiberacao(${l.id},'${esc(l.razao||'')}','aprovar')">✓ Liberar</button>
+            <button class="btn btn-red" style="font-size:12px;padding:6px 14px;" onclick="abrirLiberacao(${l.id},'${esc(l.razao||'')}','recusar')">✗ Recusar</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>'; }
+}
+function abrirLiberacao(id, nome, acao) {
+  _libId = id; _libAcao = acao;
+  const ok = acao === 'aprovar';
+  document.getElementById('ml-titulo').textContent = ok ? 'Liberar venda' : 'Recusar venda';
+  document.getElementById('ml-info').innerHTML = '<strong>'+esc(nome)+'</strong><br><span style="color:'+(ok?'var(--green)':'var(--red)')+';">'+(ok?'Liberando mesmo com restricoes no Serasa.':'Confirmando recusa da venda.')+'</span>';
+  document.getElementById('ml-motivo-label').textContent = ok ? 'Motivo da liberacao *' : 'Motivo da recusa *';
+  document.getElementById('ml-motivo').value = '';
+  document.getElementById('ml-err').textContent = '';
+  document.getElementById('ml-btn').style.background = ok ? 'var(--green)' : 'var(--red)';
+  document.getElementById('ml-btn').textContent = ok ? 'Confirmar liberacao' : 'Confirmar recusa';
+  document.getElementById('modal-liberacao').classList.add('show');
+}
+async function confirmarLiberacao() {
+  const motivo = document.getElementById('ml-motivo').value.trim();
+  const err = document.getElementById('ml-err');
+  if (!motivo) { err.textContent = 'Informe o motivo.'; return; }
+  const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+  try {
+    const r = await fetch('/api/auditoria/liberacoes/'+_libId+'/'+_libAcao, {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},
+      body: JSON.stringify({motivo})
+    });
+    const d = await r.json();
+    if (!r.ok) { err.textContent = d.detail || 'Erro'; return; }
+    fecharModal('modal-liberacao');
+    toast(_libAcao==='aprovar' ? 'Venda liberada! Cliente recebera o link.' : 'Recusa registrada.', 'ok');
+    carregarLiberacoes();
+  } catch(e) { err.textContent = 'Erro ao processar.'; }
 }
 
 // ── PERMISSÕES ───────────────────────────────────────────────
@@ -2381,8 +2659,9 @@ function fecharTV() { document.getElementById('tv-overlay').classList.remove('sh
 // ── UTILS ────────────────────────────────────────────────────
 async function api(path, opts = {}) {
   const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}`, ...(opts.headers||{}) }, ...opts });
-  if (r.status === 401) { logout(); throw new Error('401'); }
-  return r.json();
+  const data = await r.json();
+  if (!r.ok) { console.error('API erro', r.status, path, data); throw new Error(data.detail || String(r.status)); }
+  return data;
 }
 
 function ixcContratoLabel(s) {

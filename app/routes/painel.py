@@ -801,17 +801,23 @@ async def sem_instalacao(
 
 # ── VENDEDORES ────────────────────────────────────────────────
 @router.get("/vendedores")
-async def vendedores_lista(user=Depends(requer_backoffice())):
+async def vendedores_lista(db=Depends(get_db), user=Depends(requer_backoffice())):
+    # Buscar IDs autorizados da tabela SQLite
+    ativos = db.execute("SELECT ixc_id FROM hc_vendedores_ativos WHERE ativo=1").fetchall()
+    ids = [str(r["ixc_id"]) for r in ativos]
+    if not ids:
+        return {"vendedores": []}
+    ids_str = ",".join(ids)
     from app.services.ixc_db import ixc_conn
     with ixc_conn() as conn:
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(f"""
             SELECT v.id, v.nome, COUNT(DISTINCT cc.id) as total
             FROM ixcprovedor.vendedor v
             JOIN ixcprovedor.cliente_contrato cc ON cc.id_vendedor_ativ = v.id
             WHERE cc.data_ativacao >= '2026-01-01' AND cc.status = 'A'
-              AND v.id != 29 AND v.id > 0
-            GROUP BY v.id, v.nome ORDER BY total DESC
+              AND v.id IN ({ids_str})
+            GROUP BY v.id, v.nome ORDER BY v.nome
         """)
         return {"vendedores": [dict(r) for r in cur.fetchall()]}
 
