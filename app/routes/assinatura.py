@@ -138,6 +138,75 @@ async def assinar(token: str, payload: AssinarPayload, db=Depends(get_db)):
     except Exception as e:
         log.error(f"Erro na ativação #{pid}: {e}")
 
+    # Atualizar status_internet para Ativo após assinatura
+    try:
+        pre_full = db.execute("SELECT * FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
+        if pre_full and pre_full["ixc_contrato_id"]:
+            from app.services.ixc_db import ixc_conn
+            with ixc_conn() as ixc:
+                with ixc.cursor() as cur:
+                    cur.execute(
+                        "UPDATE ixcprovedor.cliente_contrato SET status_internet='A', ultima_atualizacao=NOW() WHERE id=%s",
+                        (pre_full["ixc_contrato_id"],)
+                    )
+                    ixc.commit()
+                    log.info(f"#{pid} status_internet atualizado para A")
+    except Exception as e:
+        log.error(f"#{pid} Erro ao atualizar status_internet: {e}")
+
+    # Enviar documentos do hub para arquivos do cliente IXC
+    try:
+        import os, requests as _req, base64 as _b64
+        # Reabrir conexao para garantir dados atualizados apos ativacao
+        import sqlite3 as _sq
+        _conn2 = _sq.connect(str(Path(__file__).resolve().parent.parent.parent / "hub_comercial.db"), check_same_thread=False)
+        _conn2.row_factory = _sq.Row
+        pre_full = _conn2.execute("SELECT * FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
+        docs = _conn2.execute("SELECT tipo, arquivo FROM hc_precadastro_docs WHERE precadastro_id=?", (pid,)).fetchall()
+        _conn2.close()
+        ixc_cli_id = pre_full["ixc_cliente_id"] if pre_full else None
+        log.info(f"#{pid} envio docs — ixc_cli_id={ixc_cli_id} docs={len(docs) if docs else 0}")
+        IXC_URL   = os.getenv("IXC_API_URL","")
+        IXC_USER  = os.getenv("IXC_API_USER","")
+        IXC_TOKEN = os.getenv("IXC_API_TOKEN","")
+        if ixc_cli_id and IXC_URL and docs:
+            import base64 as _b64e
+            auth = _b64e.b64encode(f"{IXC_USER}:{IXC_TOKEN}".encode()).decode()
+            headers_ixc = {"Authorization": f"Basic {auth}", "ixcsoft": "gravar"}
+            base_dir = Path(__file__).resolve().parent.parent.parent
+            razao_curta = (pre_full["razao"] or "").split()[0].upper() if pre_full else ""
+            # Enviar cada documento via multipart
+            for doc in docs:
+                doc_path = base_dir / doc["arquivo"] if not doc["arquivo"].startswith("/") else Path(doc["arquivo"])
+                if not doc_path.exists():
+                    doc_path = base_dir / "static" / doc["arquivo"]
+                if doc_path.exists():
+                    descricao = doc["tipo"].replace("_", " ").upper()
+                    nome_arq = f"{descricao} {razao_curta}{doc_path.suffix}"
+                    mime = "image/jpeg" if doc_path.suffix.lower() in [".jpg",".jpeg"] else "image/png" if doc_path.suffix.lower()==".png" else "application/octet-stream"
+                    with open(doc_path, "rb") as f:
+                        _req.post(f"{IXC_URL}/webservice/v1/cliente_arquivos",
+                            headers=headers_ixc,
+                            files={"arquivo": (nome_arq, f, mime)},
+                            data={"id_cliente": str(ixc_cli_id), "descricao": descricao, "nome_arquivo": nome_arq},
+                            timeout=15)
+            # Enviar PDF do contrato assinado
+            pdf_files = list((base_dir / "uploads" / str(pid)).glob("contrato_*.pdf")) if (base_dir / "uploads" / str(pid)).exists() else []
+            if not pdf_files:
+                pdf_files = list((base_dir / "uploads" / str(pid)).glob("*.pdf"))
+            if pdf_files:
+                pdf_path = sorted(pdf_files)[-1]
+                descricao_pdf = f"Contrato ID.{pre_full['ixc_contrato_id']} com assinatura digital"
+                with open(pdf_path, "rb") as f:
+                    _req.post(f"{IXC_URL}/webservice/v1/cliente_arquivos",
+                        headers=headers_ixc,
+                        files={"arquivo": (pdf_path.name, f, "application/pdf")},
+                        data={"id_cliente": str(ixc_cli_id), "descricao": descricao_pdf, "nome_arquivo": pdf_path.name},
+                        timeout=15)
+            log.info(f"#{pid} documentos enviados para IXC cliente {ixc_cli_id}")
+    except Exception as e:
+        log.error(f"#{pid} Erro ao enviar documentos IXC: {e}")
+
     return {
         "ok": True,
         "msg": "Contrato assinado com sucesso! Aguarde o contato do nosso técnico para instalação.",

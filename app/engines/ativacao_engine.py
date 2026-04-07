@@ -192,7 +192,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             id_cliente, id_vd_contrato, status, data,
             renovacao_automatica, valor_unitario,
             id_tipo_contrato, id_filial, id_tipo_documento,
-            id_carteira_cobranca, id_vendedor,
+            id_carteira_cobranca, id_vendedor, id_vendedor_ativ,
             status_internet, bloqueio_automatico, aviso_atraso,
             taxa_instalacao, desconto_fidelidade, fidelidade,
             tipo, data_cadastro_sistema, ultima_atualizacao,
@@ -202,12 +202,12 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             condicao_pagamento_primeira_fat,
             obs, tipo_localidade,
             descricao_aux_plano_venda, id_modelo,
-            contrato
+            contrato, motivo_inclusao
         ) VALUES (
             %s, %s, %s, %s,
             %s, %s,
             %s, %s, %s,
-            %s, %s,
+            %s, %s, %s,
             %s, %s, %s,
             %s, %s, %s,
             %s, %s, %s,
@@ -217,15 +217,20 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             %s,
             %s, %s,
             %s, %s,
-            %s
+            %s, %s
         )
     """
+    # Motivo inclusao enum: I=Instalacao, T=Titularidade, R=Reativacao
+    os_assunto = int(p.get("os_assunto") or 227)
+    motivo_map = {227: 'I', 110: 'T', 75: 'R', 15: 'R'}
+    motivo_inclusao = motivo_map.get(os_assunto, 'I')
+
     params = (
         ixc_cliente_id, plano, "P", _hoje(),
         "S", valor,
         IXC_ID_TIPO_CONTRATO, IXC_ID_FILIAL, IXC_ID_TIPO_DOC,
-        IXC_ID_CARTEIRA, vend,
-        "A", "S", "S",
+        IXC_ID_CARTEIRA, vend, vend,
+        "AA", "S", "S",
         taxa, taxa, fidel,
         "I", _agora(), _agora(),
         "S", expira,
@@ -235,7 +240,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         primeiro_venc,
         p.get("obs") or "", "U",
         _nome_plano(p.get("ixc_plano_id")), 13,
-        _nome_plano(p.get("ixc_plano_id")),
+        _nome_plano(p.get("ixc_plano_id")), motivo_inclusao,
     )
     return ixc_insert(sql, params)
 
