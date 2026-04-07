@@ -549,9 +549,6 @@ function renderFormPasso(n){
     if(formDados.telefone_celular) document.getElementById('f-cel').value=formDados.telefone_celular;
     if(formDados.email) document.getElementById('f-email').value=formDados.email;
     if(formDados.data_nascimento) document.getElementById('f-nasc').value=formDados.data_nascimento;
-    if(formDados.sexo) setSexo(formDados.sexo);
-    if(formDados.rg_orgao_emissor && document.getElementById('f-orgao')) document.getElementById('f-orgao').value=formDados.rg_orgao_emissor;
-    if(formDados.nacionalidade && document.getElementById('f-nac')) document.getElementById('f-nac').value=formDados.nacionalidade;
   }
 }
 
@@ -627,24 +624,6 @@ function renderPasso2(){return`
   <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Data de nascimento<span style="color:var(--red)">*</span></label>
   <input id="f-nasc" type="date" max="${new Date().toISOString().split('T')[0]}" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
   <div id="err-nasc" style="display:none;font-size:11px;color:var(--red);margin-top:4px;">Data de nascimento obrigatória</div>
-</div>
-<div style="margin-bottom:16px;">
-  <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:8px;">Gênero</label>
-  <div style="display:flex;flex-wrap:wrap;gap:6px;">
-    <button id="sb-M" type="button" onclick="setSexo('M')" style="padding:8px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Masculino</button>
-    <button id="sb-F" type="button" onclick="setSexo('F')" style="padding:8px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Feminino</button>
-    <button id="sb-N" type="button" onclick="setSexo('N')" style="padding:8px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Não-binário</button>
-    <button id="sb-O" type="button" onclick="setSexo('O')" style="padding:8px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Outro</button>
-    <button id="sb-P" type="button" onclick="setSexo('P')" style="padding:8px 14px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Prefiro não dizer</button>
-  </div>
-</div>
-<div style="margin-bottom:16px;">
-  <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Órgão emissor do RG</label>
-  <input id="f-orgao" type="text" autocapitalize="characters" placeholder="Ex: SSP/SE" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
-</div>
-<div style="margin-bottom:16px;">
-  <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Nacionalidade</label>
-  <input id="f-nac" type="text" placeholder="Brasileiro" value="Brasileiro" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
 </div>
 <button class="btn btn-cyan" onclick="avancarPasso(3)">Próximo →</button>
 `;}
@@ -788,9 +767,6 @@ function coletarPasso(n){
     formDados.whatsapp=document.getElementById('f-cel').value;
     formDados.email=document.getElementById('f-email').value.trim();
     formDados.data_nascimento=document.getElementById('f-nasc').value;
-    // Novos campos — sexo já está em formDados.sexo via setSexo()
-    formDados.rg_orgao_emissor=(document.getElementById('f-orgao')?.value||'').trim().toUpperCase();
-    formDados.nacionalidade=(document.getElementById('f-nac')?.value||'Brasileiro').trim();
   }
   if(n===3){
     formDados.ixc_plano_id=document.getElementById('f-plano').value;
@@ -800,19 +776,6 @@ function coletarPasso(n){
     const pl=planos.find(p=>String(p.id)===String(formDados.ixc_plano_id));
     if(pl){formDados.plano_nome=pl.nome;formDados.plano_valor=pl.valor;formDados.taxa_instalacao=pl.taxa_instalacao||0;formDados.fidelidade=pl.fidelidade||0;}
   }
-}
-
-function setSexo(s) {
-  /** Seleciona o gênero. M/F passam direto para o IXC; N/O/P ficam como '' no IXC. */
-  formDados.sexo = s;
-  ['M','F','N','O','P'].forEach(v => {
-    const btn = document.getElementById('sb-' + v);
-    if (!btn) return;
-    const on = v === s;
-    btn.style.background   = on ? 'var(--cyan)' : 'var(--surf2)';
-    btn.style.color        = on ? '#000'         : 'var(--muted)';
-    btn.style.borderColor  = on ? 'var(--cyan)'  : 'var(--border)';
-  });
 }
 
 function setTipo(t){

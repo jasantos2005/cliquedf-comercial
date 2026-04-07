@@ -1120,9 +1120,6 @@ async function doLogin() {
     if (!r.ok) { err.textContent = d.detail || 'Login inválido.'; return; }
     if (d.usuario.nivel < 30) { err.textContent = 'Acesso negado. Este painel é para backoffice.'; return; }
     token = d.token; usuario = d.usuario;
-    // Token salvo em ambos: localStorage (persistente) e sessionStorage (fallback)
-    localStorage.setItem('hc_p_token', token);
-    localStorage.setItem('hc_p_usuario', JSON.stringify(usuario));
     _sSet('hc_p_token', token);
     _sSet('hc_p_usuario', JSON.stringify(usuario));
     mostrarApp();
@@ -1144,8 +1141,6 @@ function mostrarApp() {
 
 function logout() {
   _sDel('hc_p_token'); _sDel('hc_p_usuario');
-  localStorage.removeItem('hc_p_token');
-  localStorage.removeItem('hc_p_usuario');
   token = null; usuario = null;
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('shell').style.display = 'none';
@@ -2374,72 +2369,24 @@ function abrirModalUsuario() {
   document.getElementById('modal-usuario').classList.add('show');
 }
 
-async function editarUsuario(id) {
-  /**
-   * Abre o modal preenchido com os dados do usuário para edição.
-   * Senha é opcional — só altera se o campo for preenchido (mín. 8 chars).
-   */
-  if (!usuario || usuario.nivel < 50) { toast('Sem permissão para editar usuários.', 'err'); return; }
-  try {
-    const r = await api('/api/admin/usuarios');
-    const u = (r.usuarios || []).find(x => x.id === id);
-    if (!u) { toast('Usuário não encontrado.', 'err'); return; }
-    document.getElementById('modal-usuario').dataset.editId = id;
-    document.getElementById('mu-titulo').textContent = 'Editar Usuário';
-    document.getElementById('mu-nome').value  = u.nome  || '';
-    document.getElementById('mu-login').value = u.login || '';
-    document.getElementById('mu-senha').value = '';
-    document.getElementById('mu-senha').placeholder = 'Deixe em branco para manter';
-    document.getElementById('mu-grupo').value = String(u.nivel || 10);
-    document.getElementById('mu-ixc').value   = u.ixc_funcionario_id || '';
-    document.getElementById('modal-usuario').classList.add('show');
-  } catch(e) { toast('Erro ao carregar usuário.', 'err'); console.error(e); }
-}
-
 async function salvarUsuario() {
   const nome  = document.getElementById('mu-nome').value.trim();
   const login = document.getElementById('mu-login').value.trim();
   const senha = document.getElementById('mu-senha').value;
   const nivel = parseInt(document.getElementById('mu-grupo').value);
   const ixc   = document.getElementById('mu-ixc').value;
-  const editId = document.getElementById('modal-usuario').dataset.editId;
   if (!nome || !login) { toast('Preencha nome e login', 'err'); return; }
-  if (!editId && !senha) { toast('Informe a senha para novo usuário', 'err'); return; }
+  if (!senha) { toast('Informe a senha', 'err'); return; }
   try {
-    if (editId) {
-      // Modo edição: supervisor+ pode editar (PUT)
-      await api(`/api/admin/usuarios/${editId}`, {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({nome, login, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
-      });
-      // Alterar senha apenas se preenchida
-      if (senha && senha.length >= 8) {
-        await api(`/api/admin/usuarios/${editId}/senha`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({senha})
-        });
-      }
-      fecharModal('modal-usuario');
-      toast('Usuário atualizado!', 'ok');
-    } else {
-      // Modo criação: requer admin (nível 99)
-      await api('/api/admin/usuarios', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
-      });
-      fecharModal('modal-usuario');
-      toast('Usuário criado!', 'ok');
-    }
+    const r = await api('/api/admin/usuarios', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
+    });
+    fecharModal('modal-usuario');
+    toast('Usuario criado!', 'ok');
     carregarUsuarios();
-  } catch(e) {
-    const m = e.message || '';
-    if (m.includes('403') || m.includes('Acesso')) { toast('Sem permissão para esta ação.', 'err'); }
-    else { toast('Erro: ' + m, 'err'); }
-    console.error(e);
-  }
+  } catch(e) { const m=e.message||''; toast(m.includes('403')||m.includes('Acesso')?'Sem permissao. So administradores podem criar usuarios.':'Erro ao criar: '+m, 'err'); console.error(e); }
 }
 
 async function bloquearUsuario(id, nome, ativo) {
