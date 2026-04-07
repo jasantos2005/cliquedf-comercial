@@ -131,6 +131,24 @@ async def assinar(token: str, payload: AssinarPayload, db=Depends(get_db)):
 
     log.info(f"Contrato #{pid} assinado — {p['razao']}")
 
+    # Gerar PDF do contrato com assinatura
+    try:
+        from app.engines.contrato_engine import gerar_html_contrato
+        import pdfkit, unicodedata as _ud
+        pre_pdf = db.execute("SELECT * FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
+        if pre_pdf:
+            html_contrato = gerar_html_contrato(dict(pre_pdf))
+            import base64 as _b64
+            sig_path = pasta / "assinatura_cliente.png"
+            if sig_path.exists():
+                sig_b64 = _b64.b64encode(sig_path.read_bytes()).decode()
+                sig_tag = f'<img src="data:image/png;base64,{sig_b64}" style="max-width:300px;"/>' 
+                html_contrato = html_contrato.replace("___________________________", sig_tag, 1)
+            pdf_path = pasta / f"contrato_{pid}.pdf"
+            pdfkit.from_string(html_contrato, str(pdf_path), options={"quiet": ""})
+            log.info(f"#{pid} PDF contrato gerado: {pdf_path.name}")
+    except Exception as e:
+        log.error(f"#{pid} Erro ao gerar PDF contrato: {e}")
     # Disparar ativação no IXC em background
     try:
         from app.engines.ativacao_engine import ativar_cliente
@@ -174,7 +192,9 @@ async def assinar(token: str, payload: AssinarPayload, db=Depends(get_db)):
             auth = _b64e.b64encode(f"{IXC_USER}:{IXC_TOKEN}".encode()).decode()
             headers_ixc = {"Authorization": f"Basic {auth}", "ixcsoft": "gravar"}
             base_dir = Path(__file__).resolve().parent.parent.parent
-            razao_curta = (pre_full["razao"] or "").split()[0].upper() if pre_full else ""
+            import unicodedata as _ud
+            _razao = (pre_full["razao"] or "").split()[0].upper() if pre_full else ""
+            razao_curta = _ud.normalize("NFKD", _razao).encode("ascii", "ignore").decode("ascii")
             # Enviar cada documento via multipart
             for doc in docs:
                 doc_path = base_dir / doc["arquivo"] if not doc["arquivo"].startswith("/") else Path(doc["arquivo"])
@@ -182,14 +202,33 @@ async def assinar(token: str, payload: AssinarPayload, db=Depends(get_db)):
                     doc_path = base_dir / "static" / doc["arquivo"]
                 if doc_path.exists():
                     descricao = doc["tipo"].replace("_", " ").upper()
-                    nome_arq = f"{descricao} {razao_curta}{doc_path.suffix}"
+                    nome_arq = f"{descricao}_{razao_curta}{doc_path.suffix}".replace(" ", "_")
                     mime = "image/jpeg" if doc_path.suffix.lower() in [".jpg",".jpeg"] else "image/png" if doc_path.suffix.lower()==".png" else "application/octet-stream"
                     with open(doc_path, "rb") as f:
-                        _req.post(f"{IXC_URL}/webservice/v1/cliente_arquivos",
+                        r = _req.post(f"{IXC_URL}/webservice/v1/cliente_arquivos",
                             headers=headers_ixc,
-                            files={"arquivo": (nome_arq, f, mime)},
-                            data={"id_cliente": str(ixc_cli_id), "descricao": descricao, "nome_arquivo": nome_arq},
+                            files={"arquivo": (doc_path.name, f, mime)},
+                            data={
+                                "id_cliente": str(ixc_cli_id),
+                                "descricao": descricao,
+                                "local_arquivo": f"arquivos/{doc_path.name}",
+                            },
                             timeout=15)
+                        log.info(f"#{pid} doc {nome_arq} → status={r.status_code} resp={r.text[:200]}")
+                        # Corrigir nome_arquivo via INSERT direto no MySQL
+                        try:
+                            import json as _json
+                            resp_data = _json.loads(r.text)
+                            new_id = resp_data.get("id")
+                            if new_id:
+                                from app.services.ixc_db import ixc_conn
+                                with ixc_conn() as _ixc:
+                                    with _ixc.cursor() as _cur:
+                                        _cur.execute("UPDATE ixcprovedor.cliente_arquivos SET nome_arquivo=%s WHERE id=%s", (nome_arq, new_id))
+                                    _ixc.commit()
+                                log.info(f"#{pid} nome_arquivo corrigido id={new_id} → {nome_arq}")
+                        except Exception as _e:
+                            log.warning(f"#{pid} nao corrigiu nome_arquivo: {_e}")
             # Enviar PDF do contrato assinado
             pdf_files = list((base_dir / "uploads" / str(pid)).glob("contrato_*.pdf")) if (base_dir / "uploads" / str(pid)).exists() else []
             if not pdf_files:
@@ -198,11 +237,18 @@ async def assinar(token: str, payload: AssinarPayload, db=Depends(get_db)):
                 pdf_path = sorted(pdf_files)[-1]
                 descricao_pdf = f"Contrato ID.{pre_full['ixc_contrato_id']} com assinatura digital"
                 with open(pdf_path, "rb") as f:
-                    _req.post(f"{IXC_URL}/webservice/v1/cliente_arquivos",
+                    pdf_local = pdf_path.name.lower().replace(" ", "_")
+                    r = _req.post(f"{IXC_URL}/webservice/v1/cliente_arquivos",
                         headers=headers_ixc,
-                        files={"arquivo": (pdf_path.name, f, "application/pdf")},
-                        data={"id_cliente": str(ixc_cli_id), "descricao": descricao_pdf, "nome_arquivo": pdf_path.name},
+                        files={"arquivo": (pdf_local, f, "application/pdf")},
+                        data={
+                            "id_cliente": str(ixc_cli_id),
+                            "descricao": descricao_pdf,
+                            "nome_arquivo": pdf_path.name,
+                            "local_arquivo": f"arquivos/{pdf_local}",
+                        },
                         timeout=15)
+                    log.info(f"#{pid} pdf {pdf_path.name} → status={r.status_code} resp={r.text[:200]}")
             log.info(f"#{pid} documentos enviados para IXC cliente {ixc_cli_id}")
     except Exception as e:
         log.error(f"#{pid} Erro ao enviar documentos IXC: {e}")

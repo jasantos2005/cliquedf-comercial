@@ -1049,8 +1049,8 @@ const _store = {};
 function _sGet(k) { try { return sessionStorage.getItem(k); } catch(e) { return _store[k]||null; } }
 function _sSet(k,v) { try { sessionStorage.setItem(k,v); } catch(e) { _store[k]=v; } }
 function _sDel(k) { try { sessionStorage.removeItem(k); } catch(e) { delete _store[k]; } }
-let token = _sGet('hc_p_token');
-let usuario = JSON.parse(_sGet('hc_p_usuario') || 'null');
+let token = localStorage.getItem('hc_p_token') || _sGet('hc_p_token');
+let usuario = JSON.parse(localStorage.getItem('hc_p_usuario') || _sGet('hc_p_usuario') || 'null');
 let audAtivo = null, audStatusFiltro = 'todos';
 let filtros = { de: '', ate: '', vendedor: '', cidade: '', bairro: '' };
 let _audId = null;
@@ -2360,6 +2360,7 @@ async function carregarUsuarios() {
 }
 
 function abrirModalUsuario() {
+  if (!usuario || usuario.nivel < 99) { toast('Apenas administradores podem criar usuarios.', 'err'); return; }
   document.getElementById('modal-usuario').dataset.editId = '';
   document.getElementById('mu-titulo').textContent = 'Criar Usuário';
   document.getElementById('mu-senha').placeholder = 'Senha inicial';
@@ -2374,68 +2375,25 @@ async function salvarUsuario() {
   const senha = document.getElementById('mu-senha').value;
   const nivel = parseInt(document.getElementById('mu-grupo').value);
   const ixc   = document.getElementById('mu-ixc').value;
-  const editId = document.getElementById('modal-usuario').dataset.editId;
   if (!nome || !login) { toast('Preencha nome e login', 'err'); return; }
-  if (!editId && !senha) { toast('Informe a senha', 'err'); return; }
+  if (!senha) { toast('Informe a senha', 'err'); return; }
   try {
-    const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
-    if (editId) {
-      // EDITAR
-      const re = await fetch(`/api/admin/usuarios/${editId}`, {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
-        body: JSON.stringify({nome, login, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
-      });
-      if (!re.ok) { const d=await re.json(); toast(d.detail||'Erro ao editar','err'); return; }
-      // Redefinir senha se preenchida
-      if (senha && senha.length >= 8) {
-        await fetch(`/api/admin/usuarios/${editId}/senha`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
-          body: JSON.stringify({senha})
-        });
-      }
-      fecharModal('modal-usuario');
-      document.getElementById('modal-usuario').dataset.editId = '';
-      toast('Usuário atualizado!', 'ok');
-    } else {
-      // CRIAR
-      if (senha.length < 8) { toast('Senha mínimo 8 caracteres', 'err'); return; }
-      await api('/api/admin/usuarios', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
-      });
-      fecharModal('modal-usuario');
-      toast('Usuário criado!', 'ok');
-    }
+    const r = await api('/api/admin/usuarios', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
+    });
+    fecharModal('modal-usuario');
+    toast('Usuario criado!', 'ok');
     carregarUsuarios();
-  } catch(e) { toast('Erro ao salvar usuário', 'err'); }
+  } catch(e) { const m=e.message||''; toast(m.includes('403')||m.includes('Acesso')?'Sem permissao. So administradores podem criar usuarios.':'Erro ao criar: '+m, 'err'); console.error(e); }
 }
 
-function editarUsuario(id) {
-  const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
-  fetch('/api/admin/usuarios', {headers:{'Authorization':'Bearer '+tk}})
-    .then(r=>r.json())
-    .then(r => {
-      const u = (r.usuarios||[]).find(x=>x.id===id);
-      if (!u) return toast('Usuário não encontrado','err');
-      document.getElementById('mu-titulo').textContent = 'Editar Usuário';
-      document.getElementById('mu-nome').value  = u.nome || '';
-      document.getElementById('mu-login').value = u.login || '';
-      document.getElementById('mu-senha').value = '';
-      document.getElementById('mu-senha').placeholder = 'Deixe em branco para manter';
-      document.getElementById('mu-grupo').value = String(u.nivel || 10);
-      document.getElementById('mu-ixc').value   = u.ixc_funcionario_id || '';
-      document.getElementById('modal-usuario').dataset.editId = id;
-      document.getElementById('modal-usuario').classList.add('show');
-    }).catch(e => toast('Erro ao carregar usuário','err'));
-}
 async function bloquearUsuario(id, nome, ativo) {
   const acao = ativo ? 'Bloquear' : 'Desbloquear';
   if (!confirm(`${acao} ${nome}?`)) return;
   try {
-    const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+    const tk = token || localStorage.getItem('hc_p_token');
     const rb = await fetch(`/api/admin/usuarios/${id}/ativo`, {
       method: 'PATCH',
       headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
@@ -2465,7 +2423,7 @@ async function confirmarSenha() {
   if (senha.length < 8) { err.textContent = 'Mínimo 8 caracteres.'; return; }
   if (senha !== conf)   { err.textContent = 'As senhas não coincidem.'; return; }
   // Pegar token direto — nao depender da variavel global
-  const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+  const tk = token || localStorage.getItem('hc_p_token');
   if (!tk) { err.textContent = 'Sessão expirada. Faça login novamente.'; return; }
   try {
     const r = await fetch('/api/admin/usuarios/' + id + '/senha', {
@@ -2499,7 +2457,7 @@ async function carregarLiberacoes() {
   const el = document.getElementById('liberacoes-lista');
   el.innerHTML = '<div class="empty"><p>Carregando...</p></div>';
   try {
-    const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+    const tk = token || localStorage.getItem('hc_p_token');
     const r = await fetch('/api/auditoria/liberacoes', {headers:{'Authorization':'Bearer '+(tk||'')}});
     if (!tk) { el.innerHTML = '<div class="empty"><p>Sessao expirada. Faca login novamente.</p></div>'; return; }
     const d = await r.json();
@@ -2538,7 +2496,7 @@ async function confirmarLiberacao() {
   const motivo = document.getElementById('ml-motivo').value.trim();
   const err = document.getElementById('ml-err');
   if (!motivo) { err.textContent = 'Informe o motivo.'; return; }
-  const tk = token || _sGet('hc_p_token') || _store['hc_p_token'];
+  const tk = token || localStorage.getItem('hc_p_token');
   try {
     const r = await fetch('/api/auditoria/liberacoes/'+_libId+'/'+_libAcao, {
       method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},
