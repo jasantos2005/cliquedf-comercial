@@ -679,6 +679,8 @@ async def ranking_ixc(
                 LEFT JOIN su_oss_chamado o ON o.id_contrato_kit = cc.id
                     AND o.id_assunto IN (227,110,75) AND o.status='F'
                 WHERE cc.data >= %s AND cc.data <= %s
+                  AND cc.id_vendedor_ativ > 0
+                  AND cc.id_vendedor_ativ != 29
             """
             params = [_de, _ate]
             if cidade:
