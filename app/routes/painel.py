@@ -217,9 +217,9 @@ async def ranking(
     resultado = []
     for i, r in enumerate(rows):
         d = dict(r)
-        leads = d["leads"] or 0
-        ativ  = d["ativados"] or 0
-        conv  = d["convertidos"] or 0
+        leads = int(d["leads"] or 0)
+        ativ  = int(d["ativados"] or 0)
+        conv  = int(d["convertidos"] or 0)
         d["posicao"]        = i + 1
         d["taxa_conversao"] = round(conv / max(leads, 1) * 100, 1)
         d["taxa_ativacao"]  = round(ativ / max(leads, 1) * 100, 1)
@@ -227,7 +227,7 @@ async def ranking(
         d["score"] = min(100, round(
             (ativ * 40 / max(leads, 1)) +
             (conv * 30 / max(leads, 1)) +
-            (max(0, leads - d["reprovados"]) * 30 / max(leads, 1))
+            (max(0, leads - (d["reprovados"] or 0)) * 30 / max(leads, 1))
         ))
         resultado.append(d)
 

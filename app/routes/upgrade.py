@@ -123,7 +123,7 @@ async def atualizar_negociacao(
     if payload.status_negociacao not in status_validos:
         raise HTTPException(400, f"Status inválido. Use: {status_validos}")
 
-    row = db.execute("SELECT id FROM hc_upgrades_base WHERE id=?", (id,)).fetchone()
+    row = db.execute("SELECT * FROM hc_upgrades_base WHERE id=?", (id,)).fetchone()
     if not row: raise HTTPException(404, "Não encontrado.")
 
     db.execute("""
@@ -132,6 +132,10 @@ async def atualizar_negociacao(
         WHERE id=?
     """, (payload.status_negociacao, payload.obs_negociacao, id))
     db.commit()
+
+    # Notificar Telegram para qualquer mudança de status
+    _notif_telegram_negociacao(dict(row), payload.status_negociacao,
+                                payload.obs_negociacao or "", user["login"])
     return {"ok": True}
 
 
@@ -413,6 +417,9 @@ async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_vendedor())):
 
 def _notif_telegram(p, plano_ant, payload, diferenca, tipo, por):
     import requests as _req
+    from dotenv import load_dotenv
+    from pathlib import Path as _Path
+    load_dotenv(_Path(__file__).resolve().parent.parent.parent / ".env")
     token   = os.getenv("TELEGRAM_TOKEN", "")
     chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
     if not token or not chat_id:
@@ -437,3 +444,51 @@ def _notif_telegram(p, plano_ant, payload, diferenca, tipo, por):
         )
     except Exception as e:
         log.warning(f"Telegram upgrade: {e}")
+
+def _notif_telegram_negociacao(cl, status, obs, por):
+    """Notifica o grupo comercial sobre qualquer mudança de status de negociação."""
+    import requests as _req
+    from dotenv import load_dotenv
+    from pathlib import Path as _Path
+    load_dotenv(_Path(__file__).resolve().parent.parent.parent / ".env")
+    token   = os.getenv("TELEGRAM_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return
+
+    icons = {
+        "em_contato":    "📞",
+        "negociando":    "🤝",
+        "confirmado":    "✅",
+        "recusou":       "❌",
+        "nao_contatado": "📋",
+    }
+    labels = {
+        "em_contato":    "EM CONTATO",
+        "negociando":    "NEGOCIANDO",
+        "confirmado":    "CONFIRMADO",
+        "recusou":       "RECUSOU",
+        "nao_contatado": "NÃO CONTATADO",
+    }
+    icon  = icons.get(status, "📋")
+    label = labels.get(status, status.upper())
+
+    msg = (
+        f"{icon} *UPGRADE — {label}*\n\n"
+        f"👤 *Cliente:* {cl.get('cliente','—')}\n"
+        f"📍 *Cidade:* {cl.get('cidade','—')}\n"
+        f"📦 *Plano atual:* {cl.get('plano_nome','—')}\n"
+        f"📞 *Telefone:* {cl.get('telefone_celular') or cl.get('telefone_residencial','—')}\n"
+    )
+    if obs:
+        msg += f"💬 *Obs:* {obs}\n"
+    msg += f"\n👨‍💼 *Por:* {por}"
+
+    try:
+        _req.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+            timeout=5
+        )
+    except Exception as e:
+        log.warning(f"Telegram negociacao: {e}")

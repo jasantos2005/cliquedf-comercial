@@ -347,7 +347,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         p.get("obs") or "", "U",         # obs, tipo_localidade=U (urbano)
         nome_plano, 13,                  # descricao_aux_plano_venda, id_modelo=13
         nome_plano,                      # contrato (nome do plano)
-        id_motivo_inclusao,              # 1=NV, 6=TIT, 8=Reativação
+        id_motivo_incl,                  # 1=NV, 6=TIT, 8=Reativação
     )
     return ixc_insert(sql, params)
 
@@ -393,7 +393,7 @@ def inserir_os_instalacao(p: dict, ixc_cliente_id: int, ixc_contrato_id: int) ->
         IXC_ID_FILIAL,
         _agora(),                       # data_abertura
         msg,
-        0, "Instalação",                # id_tecnico (sem técnico inicial), setor
+        0, "27",                         # id_tecnico (sem técnico inicial), setor=27
         p.get("endereco") or "",
         p.get("bairro") or "",
         p.get("referencia") or "",

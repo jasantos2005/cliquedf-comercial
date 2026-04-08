@@ -122,3 +122,40 @@ async def solicitar_acesso(payload: SolicitacaoAcesso, db=Depends(get_db)):
         return {"ok": True, "msg": "Solicitação enviada com sucesso."}
     except Exception as e:
         raise HTTPException(400, f"Erro: {e}")
+
+# ── Vendedores Ativos ─────────────────────────────────────────
+@router.get("/vendedores-ativos")
+async def listar_vendedores_ativos(db=Depends(get_db), user=Depends(requer_admin())):
+    rows = db.execute("SELECT id, ixc_id, nome, ativo FROM hc_vendedores_ativos ORDER BY nome").fetchall()
+    return {"vendedores": [dict(r) for r in rows]}
+
+class VendAtivoIn(BaseModel):
+    ixc_id: int
+    nome: str
+
+class VendAtivoUpdate(BaseModel):
+    ativo: int
+
+@router.post("/vendedores-ativos")
+async def adicionar_vendedor_ativo(payload: VendAtivoIn, db=Depends(get_db), user=Depends(requer_admin())):
+    payload = payload.dict()
+    existing = db.execute("SELECT id FROM hc_vendedores_ativos WHERE ixc_id=?", (payload["ixc_id"],)).fetchone()
+    if existing:
+        db.execute("UPDATE hc_vendedores_ativos SET ativo=1, nome=? WHERE ixc_id=?", (payload["nome"], payload["ixc_id"]))
+    else:
+        db.execute("INSERT INTO hc_vendedores_ativos (ixc_id, nome, ativo) VALUES (?,?,1)", (payload["ixc_id"], payload["nome"]))
+    db.commit()
+    return {"ok": True}
+
+@router.put("/vendedores-ativos/{id}")
+async def atualizar_vendedor_ativo(id: int, payload: VendAtivoUpdate, db=Depends(get_db), user=Depends(requer_admin())):
+    payload = payload.dict()
+    db.execute("UPDATE hc_vendedores_ativos SET ativo=? WHERE id=?", (int(payload["ativo"]), id))
+    db.commit()
+    return {"ok": True}
+
+@router.delete("/vendedores-ativos/{id}")
+async def remover_vendedor_ativo(id: int, db=Depends(get_db), user=Depends(requer_admin())):
+    db.execute("DELETE FROM hc_vendedores_ativos WHERE id=?", (id,))
+    db.commit()
+    return {"ok": True}
