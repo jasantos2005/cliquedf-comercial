@@ -163,11 +163,12 @@ async def listar_planos_ixc(user=Depends(requer_backoffice())):
 # ── Realizar upgrade ──────────────────────────────────────────
 
 class UpgradePayload(BaseModel):
-    base_id:          int            # ID da hc_upgrades_base
-    plano_novo_id:    int            # ID do novo plano no IXC
-    plano_novo_nome:  str
-    plano_novo_valor: float
-    obs:              Optional[str] = ""
+    base_id:           int
+    plano_novo_id:     int
+    plano_novo_nome:   str
+    plano_novo_valor:  float
+    obs:               Optional[str] = ""
+    apenas_registrar:  bool = False
 
 @router.post("/realizar")
 async def realizar_upgrade(
@@ -230,6 +231,18 @@ async def realizar_upgrade(
     log_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
     db.commit()
 
+    # Se apenas_registrar=True (vendedor) nao aplica no IXC
+    if payload.apenas_registrar:
+        db.execute(
+            "UPDATE hc_upgrades_base SET status_negociacao='confirmado',"
+            " ixc_plano_id=?, plano_nome=? WHERE id=?",
+            (payload.plano_novo_id, payload.plano_novo_nome, payload.base_id)
+        )
+        db.commit()
+        _notif_telegram(p, plano_ant_nome, payload, diferenca, tipo_mudanca, user["login"])
+        return {"ok": True, "tipo": tipo_mudanca, "diferenca": diferenca,
+                "msg": "Negociacao registrada. Backoffice aplicara no IXC."}
+
     # Aplicar no IXC via MySQL direto
     try:
         with ixc_conn() as ixc:
@@ -263,9 +276,10 @@ async def realizar_upgrade(
         """, (payload.plano_novo_id, payload.plano_novo_nome, payload.base_id))
         db.commit()
 
+        _notif_telegram(p, plano_ant_nome, payload, diferenca, tipo_mudanca, user["login"])
         log.info(
             f"Upgrade #{p['ixc_contrato_id']} — {p['cliente']} — "
-            f"{plano_ant_nome} → {payload.plano_novo_nome} — por {user['login']}"
+            f"{plano_ant_nome} — {payload.plano_novo_nome} — por {user['login']}"
         )
         return {
             "ok": True,
@@ -396,3 +410,30 @@ async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_backoffice()))
         "planos": [dict(r) for r in planos],
         "cidades": [dict(r) for r in cidades],
     }
+
+def _notif_telegram(p, plano_ant, payload, diferenca, tipo, por):
+    import requests as _req
+    token   = os.getenv("TELEGRAM_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return
+    icon = "⬆️" if tipo == "upgrade" else "⬇️" if tipo == "downgrade" else "↔️"
+    pendente = " _(aguard. integração IXC)_" if payload.apenas_registrar else " ✅ _Integrado no IXC_"
+    msg = (
+        f"{icon} *UPGRADE NEGOCIADO*{pendente}\n\n"
+        f"👤 *Cliente:* {p.get('cliente','—')}\n"
+        f"📍 *Cidade:* {p.get('cidade','—')}\n"
+        f"📋 *Contrato:* #{p.get('ixc_contrato_id','—')}\n\n"
+        f"📦 *De:* {plano_ant}\n"
+        f"🚀 *Para:* {payload.plano_novo_nome}\n"
+        f"💰 *Diferença:* {'+' if diferenca>=0 else ''}R$ {diferenca:.2f}/mês\n\n"
+        f"👨‍💼 *Por:* {por}"
+    )
+    try:
+        _req.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"},
+            timeout=5
+        )
+    except Exception as e:
+        log.warning(f"Telegram upgrade: {e}")

@@ -222,6 +222,85 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       </div>
     </div>
 
+    <!-- UPGRADE: A REALIZAR -->
+    <div id="s-upgrade" class="screen">
+      <div class="sec-title">Upgrade — Clientes a Contatar</div>
+      <!-- Busca -->
+      <div style="margin-bottom:10px;">
+        <input id="upg-app-busca" type="text" placeholder="Buscar cliente ou telefone..."
+          oninput="_upgAppFiltrar()"
+          style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;color:var(--text);outline:none;box-sizing:border-box;">
+      </div>
+      <!-- Filtro cidade -->
+      <div style="margin-bottom:12px;">
+        <select id="upg-app-cidade" onchange="_upgAppFiltrar()"
+          style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;color:var(--text);outline:none;-webkit-appearance:none;">
+          <option value="">Todas as cidades</option>
+          <option value="Neópolis">Neópolis</option>
+          <option value="Ilha das Flores">Ilha das Flores</option>
+          <option value="Brejo Grande">Brejo Grande</option>
+          <option value="Pacatuba">Pacatuba</option>
+          <option value="Santana do São Francisco">Santana do SF</option>
+          <option value="Japoatã">Japoatã</option>
+        </select>
+      </div>
+      <!-- Filtros status rápido -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+        <button onclick="_upgAppStatus('todos')" id="upg-f-todos"
+          style="padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--cyan);background:var(--cyan);color:#000;cursor:pointer;">Todos</button>
+        <button onclick="_upgAppStatus('nao_contatado')" id="upg-f-nao_contatado"
+          style="padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Não contatado</button>
+        <button onclick="_upgAppStatus('em_contato')" id="upg-f-em_contato"
+          style="padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Em contato</button>
+        <button onclick="_upgAppStatus('negociando')" id="upg-f-negociando"
+          style="padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Negociando</button>
+        <button onclick="_upgAppStatus('confirmado')" id="upg-f-confirmado"
+          style="padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Confirmado</button>
+        <button onclick="_upgAppStatus('recusou')" id="upg-f-recusou"
+          style="padding:6px 12px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--surf2);color:var(--muted);cursor:pointer;">Recusou</button>
+      </div>
+      <!-- Lista -->
+      <div id="upg-app-lista"></div>
+      <div id="upg-app-pag" style="display:flex;gap:6px;justify-content:center;margin-top:12px;padding-bottom:16px;"></div>
+    </div>
+
+    <!-- MODAL UPGRADE VENDEDOR -->
+    <div id="upg-app-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;overflow-y:auto;padding:16px;">
+      <div style="background:var(--surf);border-radius:16px;padding:20px;max-width:480px;margin:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="font-size:16px;font-weight:700;">Registrar Negociação</div>
+          <button onclick="_upgAppFecharModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div id="upg-app-modal-dados" style="background:var(--surf2);border-radius:10px;padding:12px;margin-bottom:14px;font-size:13px;"></div>
+        <!-- Status -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Status da negociação</label>
+          <select id="upg-app-neg-status"
+            style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:11px;font-size:14px;color:var(--text);outline:none;">
+            <option value="em_contato">Em contato</option>
+            <option value="negociando">Negociando</option>
+            <option value="confirmado">✅ Confirmado — pronto para upgrade</option>
+            <option value="recusou">❌ Recusou</option>
+          </select>
+        </div>
+        <!-- Plano destino -->
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Plano destino</label>
+          <select id="upg-app-plano-novo"
+            style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:11px;font-size:14px;color:var(--text);outline:none;">
+            <option value="">Selecione o plano destino</option>
+          </select>
+        </div>
+        <!-- Observação -->
+        <div style="margin-bottom:16px;">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Observação</label>
+          <textarea id="upg-app-obs" rows="2" placeholder="Ex: Cliente confirmou, quer plano 100MB..."
+            style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:11px;font-size:14px;color:var(--text);outline:none;resize:none;box-sizing:border-box;"></textarea>
+        </div>
+        <button class="btn btn-cyan" onclick="_upgAppSalvar()" style="width:100%;">Salvar negociação</button>
+      </div>
+    </div>
+
     <!-- FORMULÁRIO (novo cadastro) -->
     <div id="s-form" class="screen" style="padding:0;">
       <div style="background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:50;">
@@ -248,6 +327,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     </button>
     <button class="nb" id="nb-financeiro" onclick="navTo('financeiro')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Financeiro
+    </button>
+    <button class="nb" id="nb-upgrade" onclick="navTo('upgrade')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>Upgrade
     </button>
     <button class="nb" id="nb-mais" onclick="navTo('mais')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>Mais
@@ -314,7 +396,8 @@ function navTo(tela){
   if(nb)nb.classList.add('on');
   telaAtual=tela;
   const loaders={inicio:carregarInicio,leads:()=>carregarLeads('todos'),
-    clientes:carregarClientes,financeiro:carregarFinanceiro,mais:carregarMais};
+    clientes:carregarClientes,financeiro:carregarFinanceiro,mais:carregarMais,
+    upgrade:carregarUpgradeApp};
   if(loaders[tela])loaders[tela]();
 }
 
@@ -986,6 +1069,197 @@ function statusLabel(s){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function fmtVal(v){return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtData(dt){if(!dt)return'—';try{return new Date(dt.replace(' ','T')).toLocaleDateString('pt-BR');}catch{return dt.slice(0,10);}}
+
+// ══════════════════════════════════════════════════════════════
+// UPGRADE APP VENDEDOR
+// ══════════════════════════════════════════════════════════════
+let _upgApp = {pagina:1, status:'todos', cliente:null, planos:[]};
+
+async function carregarUpgradeApp() {
+  await _upgAppCarregarLista(1);
+  // Pré-carregar planos
+  if (!_upgApp.planos.length) {
+    try {
+      const r = await apiVend('/api/upgrade/planos');
+      _upgApp.planos = r.planos || [];
+    } catch(e) {}
+  }
+}
+
+async function _upgAppCarregarLista(pagina=1) {
+  _upgApp.pagina = pagina;
+  const busca   = document.getElementById('upg-app-busca')?.value || '';
+  const cidade  = document.getElementById('upg-app-cidade')?.value || '';
+  const status  = _upgApp.status || 'todos';
+  const lista   = document.getElementById('upg-app-lista');
+  lista.innerHTML = '<div class="empty"><p>Carregando...</p></div>';
+
+  try {
+    const r = await apiVend(
+      `/api/upgrade/base?pagina=${pagina}&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}&status=${status}`
+    );
+    const STATUS_COR = {
+      nao_contatado:'var(--muted)', em_contato:'var(--amber)',
+      negociando:'var(--amber)', confirmado:'var(--green)', recusou:'var(--red)'
+    };
+    const STATUS_LABEL = {
+      nao_contatado:'Não contatado', em_contato:'Em contato',
+      negociando:'Negociando', confirmado:'Confirmado', recusou:'Recusou'
+    };
+    if (!(r.clientes||[]).length) {
+      lista.innerHTML = '<div class="empty"><div class="ei">📋</div><p>Nenhum cliente encontrado.</p></div>';
+      return;
+    }
+    lista.innerHTML = r.clientes.map(cl => `
+      <div onclick="_upgAppAbrirModal(${cl.id})"
+        style="background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+          <div style="font-size:14px;font-weight:700;flex:1;">${cl.cliente}</div>
+          <span style="font-size:11px;color:${STATUS_COR[cl.status_negociacao]||'var(--muted)'};font-weight:600;margin-left:8px;">
+            ${STATUS_LABEL[cl.status_negociacao]||cl.status_negociacao}
+          </span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">
+          📍 ${cl.cidade||'—'} · ${cl.bairro||'—'}
+        </div>
+        <div style="font-size:12px;color:var(--cyan);font-weight:600;">${cl.plano_nome||'—'}</div>
+        <div style="font-size:12px;color:var(--muted);">📞 ${cl.telefone_celular||cl.telefone_residencial||'—'}</div>
+      </div>
+    `).join('');
+
+    // Paginação
+    const totalPag = Math.ceil((r.total||0) / 50);
+    const pag = document.getElementById('upg-app-pag');
+    pag.innerHTML = '';
+    for (let i = 1; i <= Math.min(totalPag,8); i++) {
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.style.cssText = `padding:6px 12px;border-radius:8px;font-size:13px;border:1px solid ${i===pagina?'var(--cyan)':'var(--border)'};background:${i===pagina?'var(--cyan)':'var(--surf2)'};color:${i===pagina?'#000':'var(--text)'};cursor:pointer;`;
+      btn.onclick = () => _upgAppCarregarLista(i);
+      pag.appendChild(btn);
+    }
+  } catch(e) {
+    lista.innerHTML = '<div class="empty"><p>Erro ao carregar.</p></div>';
+    console.error(e);
+  }
+}
+
+let _upgAppFiltrarTimer = null;
+function _upgAppFiltrar() {
+  clearTimeout(_upgAppFiltrarTimer);
+  _upgAppFiltrarTimer = setTimeout(() => _upgAppCarregarLista(1), 400);
+}
+
+function _upgAppStatus(status) {
+  _upgApp.status = status;
+  // Atualizar visual dos botões
+  ['todos','nao_contatado','em_contato','negociando','confirmado','recusou'].forEach(s => {
+    const btn = document.getElementById('upg-f-' + s);
+    if (!btn) return;
+    const on = s === status;
+    btn.style.background   = on ? 'var(--cyan)' : 'var(--surf2)';
+    btn.style.color        = on ? '#000' : 'var(--muted)';
+    btn.style.borderColor  = on ? 'var(--cyan)' : 'var(--border)';
+  });
+  _upgAppCarregarLista(1);
+}
+
+async function _upgAppAbrirModal(id) {
+  try {
+    const r = await apiVend(`/api/upgrade/base/${id}`);
+    const cl = r.cliente;
+    _upgApp.cliente = cl;
+
+    document.getElementById('upg-app-modal-dados').innerHTML = `
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px;">${cl.cliente}</div>
+      <div style="color:var(--muted);">📍 ${cl.cidade||'—'} · ${cl.bairro||'—'}</div>
+      <div style="color:var(--muted);">📞 ${cl.telefone_celular||cl.telefone_residencial||'—'}</div>
+      <div style="margin-top:6px;">Plano atual: <strong style="color:var(--cyan);">${cl.plano_nome||'—'}</strong></div>
+    `;
+
+    document.getElementById('upg-app-neg-status').value = 
+      cl.status_negociacao === 'nao_contatado' ? 'em_contato' : (cl.status_negociacao||'em_contato');
+    document.getElementById('upg-app-obs').value = cl.obs_negociacao || '';
+
+    // Preencher planos
+    const sel = document.getElementById('upg-app-plano-novo');
+    sel.innerHTML = '<option value="">Selecione o plano destino</option>';
+    _upgApp.planos.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.dataset.nome  = p.nome;
+      opt.dataset.valor = p.valor || 0;
+      opt.textContent   = `${p.nome} — R$ ${Number(p.valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}/mês`;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('upg-app-modal').style.display = 'block';
+  } catch(e) {
+    toast('Erro ao abrir cliente.', 'err');
+    console.error(e);
+  }
+}
+
+function _upgAppFecharModal() {
+  document.getElementById('upg-app-modal').style.display = 'none';
+  _upgApp.cliente = null;
+}
+
+async function _upgAppSalvar() {
+  if (!_upgApp.cliente) return;
+  const tk = localStorage.getItem('hc_v_token') || _sGet('hc_v_token');
+  if (!tk) { toast('Sessão inválida.','err'); return; }
+
+  const negStatus = document.getElementById('upg-app-neg-status').value;
+  const obs       = document.getElementById('upg-app-obs').value;
+  const selPlano  = document.getElementById('upg-app-plano-novo');
+  const optPlano  = selPlano.options[selPlano.selectedIndex];
+  const planoId   = optPlano?.value || '';
+  const planoNome = optPlano?.dataset?.nome || '';
+  const planoVal  = parseFloat(optPlano?.dataset?.valor || 0);
+
+  const H = {'Content-Type':'application/json','Authorization':'Bearer '+tk};
+
+  try {
+    // Salvar negociação
+    const r = await fetch(`/api/upgrade/base/${_upgApp.cliente.id}/negociacao`, {
+      method:'POST', headers:H,
+      body:JSON.stringify({status_negociacao:negStatus, obs_negociacao:obs})
+    });
+    if (!r.ok) { toast('Erro ao salvar.','err'); return; }
+
+    // Se confirmado e tem plano → registrar no log (backoffice aplica no IXC)
+    if (negStatus === 'confirmado' && planoId) {
+      await fetch('/api/upgrade/realizar', {
+        method:'POST', headers:H,
+        body:JSON.stringify({
+          base_id:         _upgApp.cliente.id,
+          plano_novo_id:   parseInt(planoId),
+          plano_novo_nome: planoNome,
+          plano_novo_valor:planoVal,
+          obs:             obs,
+          apenas_registrar:true   // backoffice aplica no IXC
+        })
+      });
+    }
+
+    _upgAppFecharModal();
+    toast('Negociação salva!', 'ok');
+    _upgAppCarregarLista(_upgApp.pagina);
+  } catch(e) {
+    toast('Erro ao salvar.','err');
+    console.error(e);
+  }
+}
+
+// Helper fetch autenticado para o app vendedor
+async function apiVend(path, opts={}) {
+  const tk = localStorage.getItem('hc_v_token') || _sGet('hc_v_token');
+  const r = await fetch(path, {headers:{Authorization:'Bearer '+tk,...(opts.headers||{})},...opts});
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.detail||String(r.status));
+  return d;
+}
 
 function toast(msg,tipo=''){
   const el=document.getElementById('toast');
