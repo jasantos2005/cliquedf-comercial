@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hub Comercial · Cliquedf</title>
+<title>Hub Comercial v1775602719 · Cliquedf</title>
 <style>
 /* ============================================================
    HUB COMERCIAL — Estilo HubProdutividade
@@ -939,24 +939,18 @@ tbody tr:hover td{background:var(--surf2);}
 
 <!-- TV OVERLAY -->
 <div id="tv-overlay">
+  <!-- Header fixo -->
   <div class="tv-hd">
     <div class="tv-title">Hub<span style="color:var(--cyan)">Comercial</span> · Painel TV</div>
-    <div style="display:flex;align-items:center;gap:12px;">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <!-- Indicadores de tela (dots) -->
+      <div id="tv-dots" style="display:flex;gap:6px;align-items:center;"></div>
       <div class="tv-time" id="tv-time">—</div>
       <button class="tv-close" onclick="fecharTV()">✕ Fechar</button>
     </div>
   </div>
-  <div class="tv-kpis" id="tv-kpis"></div>
-  <div class="grid2" style="flex:1;">
-    <div class="card" style="height:100%;">
-      <div class="sec-title" style="margin-bottom:12px;">Ranking vendedores — hoje</div>
-      <div id="tv-rank"></div>
-    </div>
-    <div class="card" style="height:100%;">
-      <div class="sec-title" style="margin-bottom:12px;">Últimas ativações</div>
-      <div id="tv-ativ"></div>
-    </div>
-  </div>
+  <!-- Container das telas — só uma visível por vez -->
+  <div id="tv-screens" style="flex:1;overflow:hidden;"></div>
 </div>
 
 <!-- MODAIS -->
@@ -1044,13 +1038,12 @@ tbody tr:hover td{background:var(--surf2);}
 
 <script>
 const API = '';
-// Storage com fallback em memoria
-const _store = {};
-function _sGet(k) { try { return sessionStorage.getItem(k); } catch(e) { return _store[k]||null; } }
-function _sSet(k,v) { try { sessionStorage.setItem(k,v); } catch(e) { _store[k]=v; } }
-function _sDel(k) { try { sessionStorage.removeItem(k); } catch(e) { delete _store[k]; } }
-let token = localStorage.getItem('hc_p_token') || _sGet('hc_p_token');
-let usuario = JSON.parse(localStorage.getItem('hc_p_usuario') || _sGet('hc_p_usuario') || 'null');
+// Auth — apenas localStorage, sem fallbacks complexos
+function _sGet(k) { return localStorage.getItem(k); }
+function _sSet(k,v) { localStorage.setItem(k,v); }
+function _sDel(k) { localStorage.removeItem(k); }
+let token = localStorage.getItem('hc_p_token');
+let usuario = JSON.parse(localStorage.getItem('hc_p_usuario') || 'null');
 let audAtivo = null, audStatusFiltro = 'todos';
 let filtros = { de: '', ate: '', vendedor: '', cidade: '', bairro: '' };
 let _audId = null;
@@ -1120,11 +1113,8 @@ async function doLogin() {
     if (!r.ok) { err.textContent = d.detail || 'Login inválido.'; return; }
     if (d.usuario.nivel < 30) { err.textContent = 'Acesso negado. Este painel é para backoffice.'; return; }
     token = d.token; usuario = d.usuario;
-    // Token salvo em ambos: localStorage (persistente) e sessionStorage (fallback)
     localStorage.setItem('hc_p_token', token);
     localStorage.setItem('hc_p_usuario', JSON.stringify(usuario));
-    _sSet('hc_p_token', token);
-    _sSet('hc_p_usuario', JSON.stringify(usuario));
     mostrarApp();
   } catch (e) { err.textContent = 'Erro de conexão.'; }
   finally { btn.innerHTML = 'Entrar'; btn.disabled = false; }
@@ -1143,7 +1133,6 @@ function mostrarApp() {
 }
 
 function logout() {
-  _sDel('hc_p_token'); _sDel('hc_p_usuario');
   localStorage.removeItem('hc_p_token');
   localStorage.removeItem('hc_p_usuario');
   token = null; usuario = null;
@@ -2405,39 +2394,31 @@ async function salvarUsuario() {
   const editId = document.getElementById('modal-usuario').dataset.editId;
   if (!nome || !login) { toast('Preencha nome e login', 'err'); return; }
   if (!editId && !senha) { toast('Informe a senha para novo usuário', 'err'); return; }
+  // Usa fetch direto com token do localStorage — sem passar por api()
+  const tk = localStorage.getItem('hc_p_token');
+  if (!tk) { toast('Sessão inválida. Faça login novamente.', 'err'); return; }
+  const H = {'Content-Type':'application/json', 'Authorization':'Bearer '+tk};
   try {
+    let r, d;
     if (editId) {
-      // Modo edição: supervisor+ pode editar (PUT)
-      await api(`/api/admin/usuarios/${editId}`, {
-        method: 'PUT',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({nome, login, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
-      });
-      // Alterar senha apenas se preenchida
+      r = await fetch(`/api/admin/usuarios/${editId}`, {method:'PUT', headers:H, body:JSON.stringify({nome, login, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})});
+      d = await r.json();
+      if (!r.ok) { toast('Erro ao editar: ' + (d.detail||r.status), 'err'); return; }
       if (senha && senha.length >= 8) {
-        await api(`/api/admin/usuarios/${editId}/senha`, {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({senha})
-        });
+        const r2 = await fetch(`/api/admin/usuarios/${editId}/senha`, {method:'POST', headers:H, body:JSON.stringify({senha})});
+        if (!r2.ok) { toast('Usuário editado mas erro ao alterar senha.', 'err'); }
       }
-      fecharModal('modal-usuario');
       toast('Usuário atualizado!', 'ok');
     } else {
-      // Modo criação: requer admin (nível 99)
-      await api('/api/admin/usuarios', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})
-      });
-      fecharModal('modal-usuario');
+      r = await fetch('/api/admin/usuarios', {method:'POST', headers:H, body:JSON.stringify({nome, login, senha, nivel, ixc_funcionario_id: ixc ? parseInt(ixc) : null})});
+      d = await r.json();
+      if (!r.ok) { toast('Erro ao criar: ' + (d.detail||r.status), 'err'); return; }
       toast('Usuário criado!', 'ok');
     }
+    fecharModal('modal-usuario');
     carregarUsuarios();
   } catch(e) {
-    const m = e.message || '';
-    if (m.includes('403') || m.includes('Acesso')) { toast('Sem permissão para esta ação.', 'err'); }
-    else { toast('Erro: ' + m, 'err'); }
+    toast('Erro de conexão.', 'err');
     console.error(e);
   }
 }
@@ -2635,42 +2616,354 @@ function togglePerm(key) {
 }
 
 // ── TV ───────────────────────────────────────────────────────
+// ── PAINEL TV ────────────────────────────────────────────────
+// Vendedores ativos (IDs IXC) — Denison excluído
+const TV_VENDEDORES = [
+  {id: 45, nome: 'CINDIA FARIAS'},
+  {id:  6, nome: 'FRANCIELE SOUZA'},
+  {id: 48, nome: 'CLEA'},
+  {id: 49, nome: 'MARCOS'},
+  {id: 22, nome: 'MARIA ERILEIDE'},
+  {id: 31, nome: 'BRUNA MATHIAS'},
+];
+
+let _tvTelaAtual = 0;   // índice da tela atual (0=geral, 1..N=vendedores)
+let _tvTimer     = null; // intervalo de rotação
+let _tvTelas     = [];   // HTML de cada tela pré-carregado
+
+// Abre o painel TV e inicia a rotação
 async function abrirTV() {
   document.getElementById('tv-overlay').classList.add('show');
+  _tvTelaAtual = 0;
+  _tvTelas = [];
+  clearInterval(_tvTimer);
+
+  // Carregar todas as telas em paralelo
   try {
-    const d = await api('/api/painel/resumo');
-    const t = d.totais;
-    document.getElementById('tv-kpis').innerHTML = `
-      <div class="tv-kpi" style="--ac:var(--cyan)"><div class="tv-v">${t.total}</div><div class="tv-l">Total Leads</div></div>
-      <div class="tv-kpi" style="--ac:var(--green)"><div class="tv-v">${t.ativados}</div><div class="tv-l">Ativados</div></div>
-      <div class="tv-kpi" style="--ac:var(--amber)"><div class="tv-v">${t.pendentes}</div><div class="tv-l">Pendentes</div></div>
-      <div class="tv-kpi" style="--ac:var(--purple)"><div class="tv-v">${t.aguard_assinatura}</div><div class="tv-l">Aguard. Assinatura</div></div>
-      <div class="tv-kpi" style="--ac:var(--red)"><div class="tv-v">${t.reprovados}</div><div class="tv-l">Reprovados</div></div>
-    `;
-    const rv = await api('/api/painel/ranking?periodo=mes');
-    document.getElementById('tv-rank').innerHTML = (rv.vendedores||[]).slice(0,8).map((v,i) => `
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
-        <div style="font-size:18px;width:28px;">${i<3?['🥇','🥈','🥉'][i]:i+1+'º'}</div>
-        <div style="flex:1;font-size:14px;font-weight:600;">${esc(v.nome)}</div>
-        <div style="font-size:18px;font-weight:900;color:var(--cyan);">${v.ativados}</div>
-      </div>
-    `).join('');
-    document.getElementById('tv-ativ').innerHTML = (d.atividades||[]).slice(0,8).map(a => `
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-        <span class="badge b-${a.status}" style="font-size:11px;">${statusLabel(a.status)}</span>
-        <div style="flex:1;font-size:13px;font-weight:500;">${esc(a.razao||'—')}</div>
-        <div style="font-size:11px;color:var(--text3);">${fmtData(a.atualizado_em)}</div>
-      </div>
-    `).join('');
-  } catch (e) {}
+    await _tvCarregarTelas();
+    _tvRenderizar(_tvTelaAtual);
+    _tvAtualizarDots();
+    // Rotação a cada 30 segundos
+    _tvTimer = setInterval(() => {
+      _tvTelaAtual = (_tvTelaAtual + 1) % _tvTelas.length;
+      _tvRenderizar(_tvTelaAtual);
+      _tvAtualizarDots();
+    }, 30000);
+  } catch(e) { console.error('TV erro:', e); }
 }
 
-function fecharTV() { document.getElementById('tv-overlay').classList.remove('show'); }
+function fecharTV() {
+  document.getElementById('tv-overlay').classList.remove('show');
+  clearInterval(_tvTimer);
+  _tvTimer = null;
+}
+
+// Carrega HTML de todas as telas
+async function _tvCarregarTelas() {
+  _tvTelas = [];
+
+  // ── Tela 0: KPIs gerais + Ranking hoje + Últimas ativações ──
+  try {
+    const hoje = new Date().toISOString().split('T')[0];
+    const [resumo, ranking] = await Promise.all([
+      api('/api/painel/resumo-tv'),
+      api('/api/painel/ranking-ixc?de=' + hoje + '&ate=' + hoje),
+    ]);
+    const t = resumo.totais || {};
+    const atividades = (resumo.atividades || []).slice(0, 10);
+    const vendRank   = (ranking.vendedores || []).slice(0, 8);
+
+    const tipoOS = {227:'NV', 110:'TIT', 75:'RN', 15:'RN'};
+
+    _tvTelas.push(`
+      <!-- Tela 0: Visão Geral -->
+      <div style="display:flex;flex-direction:column;height:100%;gap:16px;">
+        <!-- KPIs -->
+        <div class="tv-kpis">
+          <div class="tv-kpi" style="--ac:var(--cyan)">
+            <div class="tv-v">${t.total||0}</div>
+            <div class="tv-l">Total Leads</div>
+          </div>
+          <div class="tv-kpi" style="--ac:var(--green)">
+            <div class="tv-v">${t.ativados||0}</div>
+            <div class="tv-l">Ativados (IXC)</div>
+          </div>
+          <div class="tv-kpi" style="--ac:var(--amber)">
+            <div class="tv-v">${t.pendentes||0}</div>
+            <div class="tv-l">Pendentes</div>
+          </div>
+          <div class="tv-kpi" style="--ac:var(--purple)">
+            <div class="tv-v">${t.aguard_assinatura||0}</div>
+            <div class="tv-l">Aguard. Assinatura</div>
+          </div>
+          <div class="tv-kpi" style="--ac:var(--red)">
+            <div class="tv-v">${t.reprovados||0}</div>
+            <div class="tv-l">Reprovados</div>
+          </div>
+        </div>
+        <!-- Ranking + Ativações -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1;overflow:hidden;">
+          <!-- Ranking de hoje -->
+          <div class="card" style="overflow:hidden;">
+            <div class="sec-title" style="margin-bottom:14px;">🏆 Ranking — Hoje</div>
+            ${vendRank.length ? vendRank.map((v,i) => `
+              <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+                <div style="font-size:22px;width:32px;text-align:center;">${i<3?['🥇','🥈','🥉'][i]:(i+1)+'º'}</div>
+                <div style="flex:1;font-size:15px;font-weight:700;">${esc(v.nome)}</div>
+                <div style="display:flex;gap:10px;align-items:center;">
+                  <span style="font-size:11px;color:var(--muted);">NV</span>
+                  <span style="font-size:20px;font-weight:900;color:var(--cyan);">${v.nv||0}</span>
+                  <span style="font-size:11px;color:var(--muted);">TIT</span>
+                  <span style="font-size:16px;font-weight:700;color:var(--purple);">${v.tit||0}</span>
+                  <span style="font-size:11px;color:var(--muted);">Total</span>
+                  <span style="font-size:20px;font-weight:900;color:var(--green);">${v.total||0}</span>
+                </div>
+              </div>
+            `).join('') : '<div style="color:var(--muted);padding:16px;">Sem ativações hoje</div>'}
+          </div>
+          <!-- Últimas ativações -->
+          <div class="card" style="overflow:hidden;">
+            <div class="sec-title" style="margin-bottom:14px;">⚡ Últimas Ativações</div>
+            ${atividades.length ? atividades.map(a => `
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+                <span class="badge" style="background:rgba(0,212,255,.1);color:var(--cyan);font-size:10px;flex-shrink:0;">
+                  ${tipoOS[a.tipo_os]||'—'}
+                </span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.razao||'—')}</div>
+                  <div style="font-size:11px;color:var(--muted);">${esc(a.vendedor||'—')}</div>
+                </div>
+                <div style="font-size:11px;color:var(--muted);flex-shrink:0;">${fmtData(a.data_instalacao||a.data_cadastro)}</div>
+              </div>
+            `).join('') : '<div style="color:var(--muted);padding:16px;">Sem ativações recentes</div>'}
+          </div>
+        </div>
+      </div>
+    `);
+  } catch(e) {
+    console.error('TV tela 0:', e);
+    _tvTelas.push('<div style="color:var(--red);padding:32px;">Erro ao carregar dados gerais.</div>');
+  }
+
+  // ── Telas 1-N: Um vendedor por tela ──────────────────────────
+  const hoje = new Date().toISOString().split('T')[0];
+  const anoInicio = hoje.slice(0,4) + '-01-01';
+
+  for (const vend of TV_VENDEDORES) {
+    try {
+      const [prod, perf] = await Promise.all([
+        api(`/api/painel/vendedores/${vend.id}/produtividade?de=${anoInicio}&ate=${hoje}`),
+        api(`/api/painel/vendedores/${vend.id}/perfil`),
+      ]);
+      const [prodHoje] = await Promise.all([
+        api(`/api/painel/vendedores/${vend.id}/produtividade?de=${hoje}&ate=${hoje}`),
+      ]);
+
+      const kpi  = prod.kpi  || {};
+      const os   = prod.os   || {};
+      const adim = prod.adimplencia || {};
+      const kpiH = prodHoje.kpi || {};
+      const osH  = prodHoje.os  || {};
+      const dim  = perf.dimensoes || {};
+      const scoreFinal = perf.score_final || 0;
+      const perfilLabel = perf.perfil || '—';
+      const scoreCor = scoreFinal >= 80 ? 'var(--green)' : scoreFinal >= 60 ? 'var(--cyan)' : scoreFinal >= 40 ? 'var(--amber)' : 'var(--red)';
+
+      const nivelCor = (n) => n === 'ideal' ? 'var(--green)' : n === 'medio' ? 'var(--amber)' : 'var(--red)';
+
+      _tvTelas.push(`
+        <!-- Tela vendedor: ${vend.nome} -->
+        <div style="display:flex;flex-direction:column;height:100%;gap:14px;">
+          <!-- Header do vendedor -->
+          <div style="display:flex;align-items:center;gap:16px;padding:12px 16px;background:var(--surf);border-radius:var(--radius);border:1px solid var(--border);">
+            <div style="width:52px;height:52px;border-radius:50%;background:rgba(0,212,255,.15);border:2px solid var(--cyan);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:var(--cyan);">
+              ${esc(vend.nome.charAt(0))}
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:22px;font-weight:900;">${esc(vend.nome)}</div>
+              <div style="font-size:13px;color:var(--muted);">Vendedor · ${anoInicio.slice(0,4)} até hoje</div>
+            </div>
+            <!-- Score geral -->
+            <div style="text-align:center;padding:12px 20px;background:var(--surf2);border-radius:var(--radius);border:1px solid var(--border);">
+              <div style="font-size:40px;font-weight:900;color:${scoreCor};line-height:1;">${scoreFinal}</div>
+              <div style="font-size:12px;color:${scoreCor};font-weight:600;margin-top:4px;">${perfilLabel}</div>
+            </div>
+          </div>
+
+          <!-- Corpo: 3 colunas -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;flex:1;overflow:hidden;">
+
+            <!-- Coluna 1: Produtividade do ano -->
+            <div class="card" style="overflow:auto;">
+              <div class="sec-title" style="margin-bottom:12px;">📊 Produtividade — Ano</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--cyan);">${os.nv_instaladas||0}</div>
+                  <div style="font-size:11px;color:var(--muted);">NV Instaladas</div>
+                </div>
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--amber);">${os.nv_pendentes||0}</div>
+                  <div style="font-size:11px;color:var(--muted);">NV Pendentes</div>
+                </div>
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--purple);">${os.titularidade||0}</div>
+                  <div style="font-size:11px;color:var(--muted);">Titularidade</div>
+                </div>
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--green);">${(os.reconexao||0)+(os.reativacao||0)}</div>
+                  <div style="font-size:11px;color:var(--muted);">Reconex./Reativ.</div>
+                </div>
+              </div>
+              <div style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);border-radius:10px;padding:12px;text-align:center;">
+                <div style="font-size:40px;font-weight:900;color:var(--cyan);">${kpi.total||0}</div>
+                <div style="font-size:12px;color:var(--muted);">Total Ativados no Ano</div>
+              </div>
+            </div>
+
+            <!-- Coluna 2: Produtividade de hoje -->
+            <div class="card" style="overflow:auto;">
+              <div class="sec-title" style="margin-bottom:12px;">⚡ Hoje</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--cyan);">${osH.nv_instaladas||0}</div>
+                  <div style="font-size:11px;color:var(--muted);">NV Instaladas</div>
+                </div>
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--amber);">${osH.nv_pendentes||0}</div>
+                  <div style="font-size:11px;color:var(--muted);">NV Pendentes</div>
+                </div>
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--purple);">${osH.titularidade||0}</div>
+                  <div style="font-size:11px;color:var(--muted);">Titularidade</div>
+                </div>
+                <div style="background:var(--surf2);border-radius:10px;padding:12px;text-align:center;">
+                  <div style="font-size:32px;font-weight:900;color:var(--green);">${(osH.reconexao||0)+(osH.reativacao||0)}</div>
+                  <div style="font-size:11px;color:var(--muted);">Reconex./Reativ.</div>
+                </div>
+              </div>
+              <div style="background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.25);border-radius:10px;padding:12px;text-align:center;">
+                <div style="font-size:40px;font-weight:900;color:var(--green);">${kpiH.total||0}</div>
+                <div style="font-size:12px;color:var(--muted);">Total Ativados Hoje</div>
+              </div>
+            </div>
+
+            <!-- Coluna 3: Perfil da carteira -->
+            <div class="card" style="overflow:auto;">
+              <div class="sec-title" style="margin-bottom:12px;">🎯 Perfil da Carteira</div>
+
+              <!-- Meta -->
+              <div style="margin-bottom:12px;padding:10px;background:var(--surf2);border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                  <span style="font-size:12px;color:var(--muted);">Meta/dia (ideal: 4)</span>
+                  <span style="font-size:13px;font-weight:700;color:${nivelCor(dim.meta?.nivel)};">${dim.meta?.media_dia||0}/dia</span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;">
+                  <div style="height:100%;width:${Math.min(100,(dim.meta?.media_dia||0)/4*100)}%;background:${nivelCor(dim.meta?.nivel)};border-radius:4px;"></div>
+                </div>
+              </div>
+
+              <!-- Retenção -->
+              <div style="margin-bottom:12px;padding:10px;background:var(--surf2);border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                  <span style="font-size:12px;color:var(--muted);">Retenção 90 dias</span>
+                  <span style="font-size:13px;font-weight:700;color:${nivelCor(dim.retencao?.nivel)};">${dim.retencao?.pct||0}%</span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;">
+                  <div style="height:100%;width:${dim.retencao?.pct||0}%;background:${nivelCor(dim.retencao?.nivel)};border-radius:4px;"></div>
+                </div>
+              </div>
+
+              <!-- Adimplência -->
+              <div style="margin-bottom:16px;padding:10px;background:var(--surf2);border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                  <span style="font-size:12px;color:var(--muted);">Adimplência</span>
+                  <span style="font-size:13px;font-weight:700;color:${nivelCor(dim.adimplencia?.nivel)};">${dim.adimplencia?.pct||0}%</span>
+                </div>
+                <div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;">
+                  <div style="height:100%;width:${dim.adimplencia?.pct||0}%;background:${nivelCor(dim.adimplencia?.nivel)};border-radius:4px;"></div>
+                </div>
+              </div>
+
+              <!-- Carteira -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div style="background:rgba(0,229,160,.08);border:1px solid rgba(0,229,160,.2);border-radius:10px;padding:10px;text-align:center;">
+                  <div style="font-size:26px;font-weight:900;color:var(--green);">${adim.total||0}</div>
+                  <div style="font-size:10px;color:var(--muted);">Total Clientes</div>
+                </div>
+                <div style="background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.2);border-radius:10px;padding:10px;text-align:center;">
+                  <div style="font-size:26px;font-weight:900;color:var(--red);">${adim.criticos||0}</div>
+                  <div style="font-size:10px;color:var(--muted);">Críticos +30d</div>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /grid 3 colunas -->
+        </div><!-- /tela vendedor -->
+      `);
+    } catch(e) {
+      console.error(`TV vendedor ${vend.nome}:`, e);
+      _tvTelas.push(`<div style="color:var(--red);padding:32px;">Erro ao carregar dados de ${esc(vend.nome)}.</div>`);
+    }
+  }
+}
+
+// Renderiza a tela pelo índice
+function _tvRenderizar(idx) {
+  const el = document.getElementById('tv-screens');
+  if (!el || !_tvTelas[idx]) return;
+  el.innerHTML = _tvTelas[idx];
+}
+
+// Atualiza os dots de navegação
+function _tvAtualizarDots() {
+  const el = document.getElementById('tv-dots');
+  if (!el) return;
+  el.innerHTML = _tvTelas.map((_,i) => `
+    <div onclick="_tvIrPara(${i})" style="
+      width:${i===_tvTelaAtual?'24px':'8px'};height:8px;border-radius:4px;cursor:pointer;
+      background:${i===_tvTelaAtual?'var(--cyan)':'var(--border)'};
+      transition:all .3s;
+    "></div>
+  `).join('');
+}
+
+// Permite clicar nos dots para navegar
+function _tvIrPara(idx) {
+  _tvTelaAtual = idx;
+  _tvRenderizar(idx);
+  _tvAtualizarDots();
+  // Reinicia o timer
+  clearInterval(_tvTimer);
+  _tvTimer = setInterval(() => {
+    _tvTelaAtual = (_tvTelaAtual + 1) % _tvTelas.length;
+    _tvRenderizar(_tvTelaAtual);
+    _tvAtualizarDots();
+  }, 30000);
+}
 
 // ── UTILS ────────────────────────────────────────────────────
 async function api(path, opts = {}) {
-  const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}`, ...(opts.headers||{}) }, ...opts });
+  // Sempre lê o token direto do localStorage — fonte única de verdade
+  const tk = localStorage.getItem('hc_p_token');
+  if (!tk) {
+    localStorage.removeItem('hc_p_token');
+    localStorage.removeItem('hc_p_usuario');
+    token = null; usuario = null;
+    document.getElementById('login-page').style.display = 'flex';
+    document.getElementById('shell').style.display = 'none';
+    return Promise.reject('__expired__');
+  }
+  token = tk; // Sincroniza variável global
+  const r = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${tk}`, ...(opts.headers||{}) }, ...opts });
   const data = await r.json();
+  if (r.status === 401) {
+    localStorage.removeItem('hc_p_token');
+    localStorage.removeItem('hc_p_usuario');
+    token = null; usuario = null;
+    document.getElementById('login-page').style.display = 'flex';
+    document.getElementById('shell').style.display = 'none';
+    return Promise.reject('__expired__');
+  }
   if (!r.ok) { console.error('API erro', r.status, path, data); throw new Error(data.detail || String(r.status)); }
   return data;
 }

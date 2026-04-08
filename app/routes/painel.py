@@ -845,11 +845,10 @@ async def vendedor_produtividade(
             SELECT COUNT(DISTINCT cc.id) as total,
                    SUM(cc.status_internet='A') as ativos,
                    SUM(cc.status_internet='AA') as aguard_ass,
-                   COUNT(DISTINCT DATE(cc.data_ativacao)) as dias_com_venda
+                   COUNT(DISTINCT DATE(cc.data)) as dias_com_venda
             FROM ixcprovedor.cliente_contrato cc
             WHERE cc.id_vendedor_ativ=%s
-              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s
-              AND cc.status='A'
+              AND cc.data>=%s AND cc.data<=%s
         """, (vid, de, _ate))
         kpi = cur.fetchone()
 
@@ -859,8 +858,7 @@ async def vendedor_produtividade(
             FROM ixcprovedor.su_oss_chamado o
             JOIN ixcprovedor.cliente_contrato cc ON o.id_contrato_kit=cc.id
             WHERE cc.id_vendedor_ativ=%s
-              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s
-              AND cc.status='A' AND o.id_assunto IN (227,110,75,15)
+              AND cc.data>=%s AND cc.data<=%s AND o.id_assunto IN (227,110,75,15)
             GROUP BY o.id_assunto, o.status
         """, (vid, de, _ate))
         os_rows = cur.fetchall()
@@ -881,17 +879,17 @@ async def vendedor_produtividade(
             FROM ixcprovedor.cliente_contrato cc
             LEFT JOIN ixcprovedor.fn_areceber f ON f.id_contrato=cc.id
             WHERE cc.id_vendedor_ativ=%s
-              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s AND cc.status='A'
+              AND cc.data>=%s AND cc.data<=%s AND cc.status='A'
         """, (vid, de, _ate))
         adim = cur.fetchone()
 
         # Vendas por dia (ultimos 30 dias para grafico)
         cur.execute("""
-            SELECT DATE(cc.data_ativacao) as dia, COUNT(*) as total
+            SELECT DATE(cc.data) as dia, COUNT(*) as total
             FROM ixcprovedor.cliente_contrato cc
             WHERE cc.id_vendedor_ativ=%s
-              AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s AND cc.status='A'
-            GROUP BY DATE(cc.data_ativacao) ORDER BY dia
+              AND cc.data>=%s AND cc.data<=%s AND cc.status='A'
+            GROUP BY DATE(cc.data) ORDER BY dia
         """, (vid, de, _ate))
         por_dia = [{"dia": str(r["dia"]), "total": r["total"]} for r in cur.fetchall()]
 
@@ -949,9 +947,9 @@ async def vendedor_perfil(
         # META: media de vendas/dia (meta = 4/dia)
         cur.execute("""
             SELECT COUNT(*) as total,
-                   COUNT(DISTINCT DATE(data_ativacao)) as dias
+                   COUNT(DISTINCT DATE(data)) as dias
             FROM ixcprovedor.cliente_contrato
-            WHERE id_vendedor_ativ=%s AND data_ativacao>=%s AND status='A'
+            WHERE id_vendedor_ativ=%s AND data>=%s AND status='A'
         """, (vid, d2026))
         r = cur.fetchone()
         total_vendas = int(r["total"] or 0)
@@ -968,7 +966,7 @@ async def vendedor_perfil(
                    SUM(status_internet='A') as retidos
             FROM ixcprovedor.cliente_contrato
             WHERE id_vendedor_ativ=%s
-              AND data_ativacao>=%s AND data_ativacao<=%s AND status='A'
+              AND data>=%s AND data<=%s AND status='A'
         """, (vid, d2026, d90))
         r = cur.fetchone()
         total_90  = int(r["total"] or 0)
@@ -984,7 +982,7 @@ async def vendedor_perfil(
                    COUNT(DISTINCT CASE WHEN f.status='A' AND f.data_vencimento<CURDATE() THEN cc.id END) as inad
             FROM ixcprovedor.cliente_contrato cc
             LEFT JOIN ixcprovedor.fn_areceber f ON f.id_contrato=cc.id
-            WHERE cc.id_vendedor_ativ=%s AND cc.data_ativacao>=%s AND cc.status='A'
+            WHERE cc.id_vendedor_ativ=%s AND cc.data>=%s AND cc.status='A'
         """, (vid, d90))
         r = cur.fetchone()
         total_adim = int(r["total"] or 0)
@@ -1062,7 +1060,7 @@ async def vendedor_detalhe(
                     AND o.id_assunto=%s AND o.status=%s
                 LEFT JOIN ixcprovedor.funcionarios f ON f.id=o.id_tecnico
                 WHERE cc.id_vendedor_ativ=%s
-                  AND cc.data_ativacao>=%s AND cc.data_ativacao<=%s
+                  AND cc.data>=%s AND cc.data<=%s
                   AND cc.status='A'
                 ORDER BY o.data_abertura DESC
             """, (assunto, os_status, vid, de, _ate))
@@ -1082,7 +1080,7 @@ async def vendedor_detalhe(
                 JOIN ixcprovedor.fn_areceber f ON f.id_contrato=cc.id
                     AND f.status='A' AND f.data_vencimento < CURDATE()
                 WHERE cc.id_vendedor_ativ=%s
-                  AND cc.data_ativacao>=%s AND cc.status='A'
+                  AND cc.data>=%s AND cc.status='A'
                 GROUP BY cc.id HAVING MAX(DATEDIFF(CURDATE(),f.data_vencimento)) >= {dias_min}
                 ORDER BY dias_atraso DESC
             """, (vid, de))
@@ -1098,3 +1096,105 @@ async def vendedor_detalhe(
         return v
 
     return {"itens": [{k:sv(val) for k,val in dict(r).items()} for r in rows]}
+
+
+# ── SYNC IXC MANUAL (botão no painel) ────────────────────────
+@router.post("/sync-ixc")
+async def sync_ixc_manual(user=Depends(requer_backoffice())):
+    """Dispara sincronização manual de contratos e planos do IXC."""
+    import subprocess
+    base = str(Path(__file__).resolve().parent.parent.parent)
+    try:
+        subprocess.Popen(
+            ["venv/bin/python", "-m", "app.bootstrap.cron_sync_contratos"],
+            cwd=base, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        subprocess.Popen(
+            ["venv/bin/python", "-m", "app.bootstrap.cron_sync_planos_vendedores"],
+            cwd=base, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+        return {"ok": True, "msg": "Sync iniciado em background."}
+    except Exception as e:
+        return {"ok": False, "msg": str(e)}
+
+
+# ── RESUMO TV — dados direto do IXC para o painel TV ─────────
+@router.get("/resumo-tv")
+async def resumo_tv(user=Depends(requer_backoffice())):
+    """
+    KPIs para o Painel TV — dados direto do IXC.
+    Total leads = contratos criados hoje.
+    Ativados = status_internet='A' hoje.
+    Aguard. Assinatura = status_internet='AA' hoje.
+    """
+    from datetime import date
+    hoje = date.today().strftime("%Y-%m-%d")
+    try:
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT
+                    COUNT(*) AS total,
+                    SUM(cc.status_internet='A')  AS ativados,
+                    SUM(cc.status_internet='AA') AS aguard_assinatura,
+                    SUM(cc.status='P')           AS pendentes
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
+                WHERE cc.data >= %s
+                  AND cc.id_vendedor_ativ > 0
+                  AND cc.id_vendedor_ativ != 29
+            """, (hoje,))
+            t = cur.fetchone()
+
+            # Últimas ativações do dia
+            cur.execute("""
+                SELECT c.razao, v.nome AS vendedor,
+                       cc.data AS data_cadastro,
+                       cc.status_internet,
+                       o.id_assunto AS tipo_os,
+                       f.funcionario AS tecnico,
+                       o.data_fechamento AS data_instalacao
+                FROM ixcprovedor.cliente_contrato cc
+                JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
+                LEFT JOIN ixcprovedor.vendedor v ON v.id = cc.id_vendedor_ativ
+                LEFT JOIN ixcprovedor.su_oss_chamado o
+                    ON o.id_contrato_kit = cc.id
+                    AND o.id_assunto IN (227,110,75,15)
+                LEFT JOIN ixcprovedor.funcionarios f ON f.id = o.id_tecnico
+                WHERE cc.data >= %s
+                  AND cc.id_vendedor_ativ > 0
+                  AND cc.id_vendedor_ativ != 29
+                ORDER BY cc.id DESC LIMIT 15
+            """, (hoje,))
+            atividades = cur.fetchall()
+
+        def sv(v):
+            if v is None: return None
+            if hasattr(v, 'isoformat'): return str(v)
+            if hasattr(v, '__class__') and v.__class__.__name__ == 'Decimal': return float(v)
+            return v
+
+        def fmt_row(r):
+            d = {}
+            for k, val in dict(r).items():
+                d[k] = sv(val)
+            # Garantir data_cadastro como string YYYY-MM-DD para o JS
+            if d.get('data_cadastro') and not isinstance(d['data_cadastro'], str):
+                d['data_cadastro'] = str(d['data_cadastro'])[:10]
+            if d.get('data_instalacao') and not isinstance(d['data_instalacao'], str):
+                d['data_instalacao'] = str(d['data_instalacao'])[:10]
+            return d
+
+        return {
+            "totais": {
+                "total":            int(t["total"] or 0),
+                "ativados":         int(t["ativados"] or 0),
+                "aguard_assinatura":int(t["aguard_assinatura"] or 0),
+                "pendentes":        int(t["pendentes"] or 0),
+                "reprovados":       0,
+            },
+            "atividades": [fmt_row(r) for r in atividades],
+        }
+    except Exception as e:
+        log.error(f"resumo-tv: {e}")
+        return {"totais": {"total":0,"ativados":0,"aguard_assinatura":0,"pendentes":0,"reprovados":0}, "atividades": []}

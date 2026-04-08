@@ -22,7 +22,7 @@ def verificar_senha(s, h): return hash_senha(s) == h
 def criar_token(user_id, login, nivel, ixc_funcionario_id=None):
     return jwt.encode({"sub": str(user_id), "login": login, "nivel": nivel,
         "ixc_funcionario_id": ixc_funcionario_id,
-        "exp": datetime.utcnow() + timedelta(hours=12)}, SECRET, algorithm=ALGO)
+        "exp": datetime.utcnow() + timedelta(days=30)}, SECRET, algorithm=ALGO)
 
 def get_current_user(c: HTTPAuthorizationCredentials = Depends(bearer)):
     if not c: raise HTTPException(401, "Token não fornecido.")
