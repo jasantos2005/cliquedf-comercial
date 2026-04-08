@@ -513,17 +513,17 @@ tbody tr:hover td{background:var(--surf2);}
         <span class="ni-label">Automacoes</span>
       </div>
       <div class="sb-section">Upgrade</div>
-      <div class="nav-item" onclick="navTo('upgrade-base')" id="ni-upgrade-base">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+      <div class="ni" id="ni-upgrade-base" onclick="navTo('upgrade-base')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
         <span class="ni-label">A Realizar</span>
       </div>
-      <div class="nav-item" onclick="navTo('upgrade-log')" id="ni-upgrade-log">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      <div class="ni" id="ni-upgrade-log" onclick="navTo('upgrade-log')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
         <span class="ni-label">Realizados</span>
       </div>
       <div class="sb-section">Admin</div>
-      <div class="nav-item" onclick="navTo('usuarios')" id="ni-usuarios">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <div class="ni" id="ni-usuarios" onclick="navTo('usuarios')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span class="ni-label">Usuários</span>
       </div>
       <div class="ni" id="ni-permissoes" onclick="navTo('permissoes')">
@@ -942,30 +942,10 @@ tbody tr:hover td{background:var(--surf2);}
         <div id="perm-content"></div>
       </div>
 
-    </div><!-- /content -->
-  </div><!-- /main -->
-</div><!-- /shell -->
-
-<!-- TV OVERLAY -->
-<div id="tv-overlay">
-  <!-- Header fixo -->
-  <div class="tv-hd">
-    <div class="tv-title">Hub<span style="color:var(--cyan)">Comercial</span> · Painel TV</div>
-    <div style="display:flex;align-items:center;gap:16px;">
-      <!-- Indicadores de tela (dots) -->
-      <div id="tv-dots" style="display:flex;gap:6px;align-items:center;"></div>
-      <div class="tv-time" id="tv-time">—</div>
-      <button class="tv-close" onclick="fecharTV()">✕ Fechar</button>
-    </div>
-  </div>
-  <!-- Container das telas — só uma visível por vez -->
-  <div id="tv-screens" style="flex:1;overflow:hidden;"></div>
-</div>
-
 <!-- UPGRADE: A REALIZAR -->
-<div id="page-upgrade-base" class="page" style="display:none;">
+<div id="page-upgrade-base" class="page">
   <!-- KPIs -->
-  <div class="kpi-grid" id="upg-kpis" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px;"></div>
+  <div class="kpi-row" id="upg-kpis" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px;"></div>
   <!-- Filtros -->
   <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
     <input id="upg-busca" type="text" placeholder="Buscar cliente, telefone..." oninput="filtrarUpgrade()"
@@ -1010,9 +990,9 @@ tbody tr:hover td{background:var(--surf2);}
 </div>
 
 <!-- UPGRADE: REALIZADOS -->
-<div id="page-upgrade-log" class="page" style="display:none;">
+<div id="page-upgrade-log" class="page">
   <!-- KPIs receita -->
-  <div class="kpi-grid" id="upg-log-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;"></div>
+  <div class="kpi-row" id="upg-log-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;"></div>
   <!-- Filtros -->
   <div style="display:flex;gap:10px;margin-bottom:16px;">
     <select id="upg-log-tipo" onchange="carregarUpgradeLog()"
@@ -1050,6 +1030,25 @@ tbody tr:hover td{background:var(--surf2);}
       </table>
     </div>
   </div>
+</div>
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /shell -->
+
+<!-- TV OVERLAY -->
+<div id="tv-overlay">
+  <!-- Header fixo -->
+  <div class="tv-hd">
+    <div class="tv-title">Hub<span style="color:var(--cyan)">Comercial</span> · Painel TV</div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <!-- Indicadores de tela (dots) -->
+      <div id="tv-dots" style="display:flex;gap:6px;align-items:center;"></div>
+      <div class="tv-time" id="tv-time">—</div>
+      <button class="tv-close" onclick="fecharTV()">✕ Fechar</button>
+    </div>
+  </div>
+  <!-- Container das telas — só uma visível por vez -->
+  <div id="tv-screens" style="flex:1;overflow:hidden;"></div>
 </div>
 
 <!-- MODAIS -->
@@ -1298,7 +1297,8 @@ const PAGE_TITLES = {
     'vend-produtividade': 'Vendedores — Produtividade',
     'vend-perfil': 'Vendedores — Perfil',
   financeiro: 'Financeiro', cancelamentos: 'Cancelamentos',
-  usuarios: 'Usuários', permissoes: 'Permissões por Grupo'
+  usuarios: 'Usuários', permissoes: 'Permissões por Grupo',
+  'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados'
 };
 
 function navTo(page) {
@@ -1306,7 +1306,8 @@ function navTo(page) {
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById(`page-${page}`);
   if (pg) pg.classList.add('active');
-  const ni = document.getElementById(`ni-${page.split('-')[0]}`);
+  const niId = ['upgrade-base','upgrade-log','aud-fila','aud-ixc','sem-os','vendas-lista','vendas-hub','vendas-cidades'].includes(page) ? `ni-${page}` : `ni-${page.split('-')[0]}`;
+  const ni = document.getElementById(niId);
   if (ni) ni.classList.add('active');
   document.getElementById('tb-title').textContent = PAGE_TITLES[page] || page;
   const loaders = {
