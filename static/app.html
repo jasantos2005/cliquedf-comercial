@@ -1207,7 +1207,7 @@ function _upgAppFecharModal() {
 
 async function _upgAppSalvar() {
   if (!_upgApp.cliente) return;
-  const tk = localStorage.getItem('hc_v_token') || _sGet('hc_v_token');
+  const tk = localStorage.getItem('hc_token') || _sGet('hc_token');
   if (!tk) { toast('Sessão inválida.','err'); return; }
 
   const negStatus = document.getElementById('upg-app-neg-status').value;
@@ -1254,7 +1254,7 @@ async function _upgAppSalvar() {
 
 // Helper fetch autenticado para o app vendedor
 async function apiVend(path, opts={}) {
-  const tk = localStorage.getItem('hc_v_token') || _sGet('hc_v_token');
+  const tk = localStorage.getItem('hc_token') || _sGet('hc_token');
   const r = await fetch(path, {headers:{Authorization:'Bearer '+tk,...(opts.headers||{})},...opts});
   const d = await r.json();
   if (!r.ok) throw new Error(d.detail||String(r.status));

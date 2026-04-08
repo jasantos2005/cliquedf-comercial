@@ -17,7 +17,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
-from app.services.auth import requer_backoffice, requer_supervisor
+from app.services.auth import requer_backoffice, requer_supervisor, requer_vendedor
 from app.services.ixc_db import ixc_select, ixc_select_one, ixc_conn
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -47,7 +47,7 @@ async def listar_base(
     busca:    str = Query(""),
     pagina:   int = Query(1, ge=1),
     db=Depends(get_db),
-    user=Depends(requer_backoffice())
+    user=Depends(requer_vendedor())
 ):
     """
     Lista clientes da base de upgrade com filtros.
@@ -87,7 +87,7 @@ async def listar_base(
 # ── Detalhe de um cliente ─────────────────────────────────────
 
 @router.get("/base/{id}")
-async def detalhe_base(id: int, db=Depends(get_db), user=Depends(requer_backoffice())):
+async def detalhe_base(id: int, db=Depends(get_db), user=Depends(requer_vendedor())):
     """Retorna os dados completos de um cliente da base de upgrade."""
     row = db.execute("SELECT * FROM hc_upgrades_base WHERE id=?", (id,)).fetchone()
     if not row: raise HTTPException(404, "Não encontrado.")
@@ -116,7 +116,7 @@ async def atualizar_negociacao(
     id: int,
     payload: NegociacaoPayload,
     db=Depends(get_db),
-    user=Depends(requer_backoffice())
+    user=Depends(requer_vendedor())
 ):
     """Atualiza o status de negociação de um cliente."""
     status_validos = {"nao_contatado", "em_contato", "negociando", "confirmado", "recusou"}
@@ -138,7 +138,7 @@ async def atualizar_negociacao(
 # ── Planos disponíveis no IXC ─────────────────────────────────
 
 @router.get("/planos")
-async def listar_planos_ixc(user=Depends(requer_backoffice())):
+async def listar_planos_ixc(user=Depends(requer_vendedor())):
     """
     Busca planos ativos do IXC para seleção no modal de upgrade.
     Retorna id, nome e valor de cada plano.
@@ -174,7 +174,7 @@ class UpgradePayload(BaseModel):
 async def realizar_upgrade(
     payload: UpgradePayload,
     db=Depends(get_db),
-    user=Depends(requer_backoffice())
+    user=Depends(requer_vendedor())
 ):
     """
     Registra o upgrade no log e atualiza o id_vd_contrato no IXC.
@@ -306,7 +306,7 @@ async def historico_upgrades(
     cidade: str = Query(""),
     pagina: int = Query(1, ge=1),
     db=Depends(get_db),
-    user=Depends(requer_backoffice())
+    user=Depends(requer_vendedor())
 ):
     """Histórico paginado de todos os upgrades realizados."""
     pp = 50
@@ -338,7 +338,7 @@ async def historico_upgrades(
 # ── KPIs / Resumo ─────────────────────────────────────────────
 
 @router.get("/resumo")
-async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_backoffice())):
+async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_vendedor())):
     """
     KPIs do menu upgrade:
     - Total de clientes na base
