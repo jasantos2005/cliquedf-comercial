@@ -3198,12 +3198,12 @@ async function carregarUpgradeBase() {
     const r = await api('/api/upgrade/resumo');
     const b = r.base; const l = r.log;
     document.getElementById('upg-kpis').innerHTML = `
-      <div class="kpi" style="--ac:var(--cyan)"><div class="kv">${b.total}</div><div class="kl">Total na base</div></div>
-      <div class="kpi" style="--ac:var(--muted)"><div class="kv">${b.nao_contatado}</div><div class="kl">Não contatado</div></div>
-      <div class="kpi" style="--ac:var(--amber)"><div class="kv">${b.em_contato + b.negociando}</div><div class="kl">Em negociação</div></div>
-      <div class="kpi" style="--ac:var(--green)"><div class="kv">${b.confirmado}</div><div class="kl">Confirmados</div></div>
-      <div class="kpi" style="--ac:var(--red)"><div class="kv">${b.recusou}</div><div class="kl">Recusaram</div></div>
-      <div class="kpi" style="--ac:var(--purple)"><div class="kv">${l.total}</div><div class="kl">Upgrades feitos</div></div>
+      <div class="kpi" style="--ac:var(--cyan);cursor:pointer;" onclick="_upgFiltrarStatus('todos')"><div class="kv">${b.total}</div><div class="kl">Total na base</div></div>
+      <div class="kpi" style="--ac:var(--muted);cursor:pointer;" onclick="_upgFiltrarStatus('nao_contatado')"><div class="kv">${b.nao_contatado}</div><div class="kl">Não contatado</div></div>
+      <div class="kpi" style="--ac:var(--amber);cursor:pointer;" onclick="_upgFiltrarStatus('em_contato')"><div class="kv">${b.em_contato + b.negociando}</div><div class="kl">Em negociação</div></div>
+      <div class="kpi" style="--ac:var(--green);cursor:pointer;" onclick="_upgFiltrarStatus('confirmado')"><div class="kv">${b.confirmado}</div><div class="kl">Confirmados</div></div>
+      <div class="kpi" style="--ac:var(--red);cursor:pointer;" onclick="_upgFiltrarStatus('recusou')"><div class="kv">${b.recusou}</div><div class="kl">Recusaram</div></div>
+      <div class="kpi" style="--ac:var(--purple);cursor:pointer;" onclick="_upgFiltrarStatus('todos')"><div class="kv">${l.total}</div><div class="kl">Upgrades feitos</div></div>
     `;
     // Preencher filtro de cidades
     const selC = document.getElementById('upg-cidade');
@@ -3369,21 +3369,31 @@ function atualizarPreviewUpgrade() {
   prev.style.border = '1px solid rgba(0,229,160,.25)';
 }
 
+function _upgFiltrarStatus(status) {
+  const sel = document.getElementById('upg-status-neg');
+  if (sel) sel.value = status;
+  _carregarTabelaUpgrade(1);
+}
+
 async function salvarNegociacao() {
   if (!_upgClienteAtivo) return;
+  const tk = localStorage.getItem('hc_p_token');
+  if (!tk) { toast('Sessão inválida.', 'err'); return; }
   try {
-    await api(`/api/upgrade/base/${_upgClienteAtivo.id}/negociacao`, {
+    const r = await fetch(`/api/upgrade/base/${_upgClienteAtivo.id}/negociacao`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
       body: JSON.stringify({
         status_negociacao: document.getElementById('upg-neg-status').value,
         obs_negociacao:    document.getElementById('upg-obs').value,
       })
     });
+    const d = await r.json();
+    if (!r.ok) { toast('Erro: ' + (d.detail||r.status), 'err'); return; }
     fecharModal('modal-upgrade');
     toast('Negociação salva!', 'ok');
     _carregarTabelaUpgrade(_upgPagina);
-  } catch(e) { toast('Erro ao salvar.', 'err'); }
+  } catch(e) { toast('Erro ao salvar.', 'err'); console.error(e); }
 }
 
 async function aplicarUpgrade() {
