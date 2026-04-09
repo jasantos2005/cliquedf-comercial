@@ -12,7 +12,7 @@ from app.services.credito_service import consultar_cpf
 DB_PATH          = BASE_DIR / "hub_comercial.db"
 TELEGRAM_TOKEN   = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-BASE_URL         = os.getenv("BASE_URL","https://comercial.iatechhub.cloud")
+BASE_URL         = os.getenv("BASE_URL","https://comercial.iatechhub.com.br")
 IXC_URL          = os.getenv("IXC_API_URL","")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

@@ -76,7 +76,7 @@ async def gerar_link(id: int, db=Depends(get_db), user=Depends(requer_backoffice
     db.commit()
 
     import os
-    base_url = os.getenv("BASE_URL", "https://comercial.iatechhub.cloud")
+    base_url = os.getenv("BASE_URL", "https://comercial.iatechhub.com.br")
     link = f"{base_url}/assinar/{tk['token']}"
     log.info(f"Link assinatura gerado para #{id} por {user['login']}")
     return {"link": link, "expira_em": tk["expira_em"], "cliente": p["razao"]}

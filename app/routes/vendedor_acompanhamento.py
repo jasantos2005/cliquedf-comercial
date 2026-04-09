@@ -122,7 +122,7 @@ async def leads(
         LIMIT 100
     """, params).fetchall()
 
-    base_url = os.getenv("BASE_URL","https://comercial.iatechhub.cloud")
+    base_url = os.getenv("BASE_URL","https://comercial.iatechhub.com.br")
     result = []
     for r in rows:
         d = dict(r)
@@ -375,7 +375,7 @@ async def reenviar_link(id: int, db=Depends(get_db), user=Depends(requer_vendedo
     else:
         token = p["token_assinatura"]
 
-    base_url = os.getenv("BASE_URL","https://comercial.iatechhub.cloud")
+    base_url = os.getenv("BASE_URL","https://comercial.iatechhub.com.br")
     link = f"{base_url}/assinar/{token}"
     cel  = (p["telefone_celular"] or "").replace(" ","").replace("(","").replace(")","").replace("-","")
     wpp  = f"https://wa.me/55{cel}?text=Olá! Segue o link para assinatura do seu contrato Cliquedf: {link}"
