@@ -108,7 +108,7 @@ class AprovarPayload(BaseModel):
 async def aprovar(id:int, payload:AprovarPayload, db=Depends(get_db), user=Depends(requer_supervisor())):
     p = db.execute("SELECT status FROM hc_precadastros WHERE id=?",(id,)).fetchone()
     if not p: raise HTTPException(404,"Não encontrado.")
-    if p["status"] not in("pendente","reprovado","em_auditoria"): raise HTTPException(400,f"Status '{p['status']}' não permite aprovação.")
+    if p["status"] not in("pendente","reprovado","em_auditoria","aguard_correcao"): raise HTTPException(400,f"Status '{p['status']}' não permite aprovação.")
     db.execute("UPDATE hc_precadastros SET status='aprovado',atualizado_em=datetime('now','-3 hours') WHERE id=?",(id,))
     db.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes)VALUES(?,99,'MANUAL','Aprovação manual','ok',?)",
         (id,f"Aprovado por {user['login']} — {payload.justificativa}"))
@@ -129,6 +129,34 @@ async def reprovar(id:int, payload:ReprovarPayload, db=Depends(get_db), user=Dep
         (id,f"Reprovado por {user['login']} — {payload.motivo}"))
     db.commit()
     return {"ok":True,"status":"reprovado"}
+
+@router.post("/{id}/devolver")
+async def devolver_correcao(id:int, db=Depends(get_db), user=Depends(requer_supervisor())):
+    """
+    Devolve o cadastro para o vendedor corrigir.
+    Status: aguard_correcao — aparece no app do vendedor com botão Corrigir.
+    """
+    p = db.execute("SELECT status, razao, id_vendedor_hub FROM hc_precadastros WHERE id=?", (id,)).fetchone()
+    if not p: raise HTTPException(404, "Não encontrado.")
+    if p["status"] in ("ativado","assinado"): raise HTTPException(400, "Não é possível devolver cadastro já ativado.")
+    db.execute("UPDATE hc_precadastros SET status='aguard_correcao',atualizado_em=datetime('now','-3 hours') WHERE id=?", (id,))
+    db.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes)VALUES(?,99,'DEVOLVER','Devolvido para correção','pendente',?)",
+        (id, f"Devolvido por {user['login']} para correção pelo vendedor"))
+    db.commit()
+    # Notificar Telegram
+    try:
+        import os, requests as _req
+        from dotenv import load_dotenv
+        load_dotenv(str(BASE / ".env"))
+        token   = os.getenv("TELEGRAM_TOKEN","")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID","")
+        if token and chat_id:
+            _req.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id,
+                      "text": f"🔄 *CORREÇÃO SOLICITADA*\n\n👤 *Cliente:* {p['razao']}\n👨‍💼 *Por:* {user['login']}\n\n_O vendedor precisa corrigir o cadastro no app._",
+                      "parse_mode": "Markdown"}, timeout=5)
+    except: pass
+    return {"ok": True, "status": "aguard_correcao"}
 
 @router.post("/{id}/reauditar")
 async def reauditar(id:int, db=Depends(get_db), user=Depends(requer_backoffice())):

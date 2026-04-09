@@ -77,3 +77,62 @@ async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:
 async def meus_cadastros(db=Depends(get_db),user=Depends(requer_vendedor())):
     rows=db.execute("""SELECT p.id,p.protocolo,p.status,p.razao,p.cnpj_cpf,p.plano_nome,p.cidade_nome,p.uf_sigla,p.criado_em,p.atualizado_em,(SELECT GROUP_CONCAT(a.legenda,' | ')FROM hc_auditoria_log a WHERE a.precadastro_id=p.id AND a.resultado IN('reprovado','pendente')ORDER BY a.id DESC LIMIT 3)AS motivo_auditoria FROM hc_precadastros p WHERE p.id_vendedor_hub=? ORDER BY p.criado_em DESC LIMIT 50""",(int(user["sub"]),)).fetchall()
     return {"cadastros":[dict(r) for r in rows]}
+
+# ── CORRIGIR PRÉ-CADASTRO (devolvido pelo backoffice) ────────
+@router.put("/precadastro/{id}/corrigir")
+async def corrigir_precadastro(
+    id: int,
+    request: Request,
+    db=Depends(get_db),
+    user=Depends(requer_vendedor())
+):
+    """
+    Atualiza os dados de um pré-cadastro devolvido para correção.
+    Só o vendedor dono do cadastro pode corrigir.
+    Volta o status para 'enviado' automaticamente.
+    """
+    vid = int(user["sub"])
+    p = db.execute(
+        "SELECT id, status, id_vendedor_hub FROM hc_precadastros WHERE id=? AND id_vendedor_hub=?",
+        (id, vid)
+    ).fetchone()
+    if not p:
+        raise HTTPException(404, "Cadastro não encontrado.")
+    if p["status"] != "aguard_correcao":
+        raise HTTPException(400, f"Cadastro não está aguardando correção. Status: {p['status']}")
+
+    body = await request.json()
+    f = body.get("dados", body)  # aceita tanto {dados: {...}} quanto o objeto direto
+
+    db.execute("""
+        UPDATE hc_precadastros SET
+            tipo_pessoa=?, razao=?, cnpj_cpf=?, telefone_celular=?, whatsapp=?,
+            email=?, data_nascimento=?,
+            sexo=?, rg_orgao_emissor=?, nacionalidade=?,
+            cep=?, endereco=?, numero=?, bairro=?, complemento=?, referencia=?,
+            cidade_nome=?, uf_sigla=?, ixc_cidade_id=?,
+            ixc_plano_id=?, plano_nome=?, plano_valor=?, taxa_instalacao=?,
+            fidelidade=?, dia_vencimento=?, obs=?,
+            status='enviado',
+            atualizado_em=datetime('now','-3 hours')
+        WHERE id=? AND id_vendedor_hub=?
+    """, (
+        f.get("tipo_pessoa","F"), f.get("razao"), f.get("cnpj_cpf"),
+        f.get("telefone_celular"), f.get("whatsapp"),
+        f.get("email"), f.get("data_nascimento") or None,
+        f.get("sexo") or "", f.get("rg_orgao_emissor") or "", f.get("nacionalidade") or "Brasileiro",
+        f.get("cep"), f.get("endereco"), f.get("numero"),
+        f.get("bairro"), f.get("complemento"), f.get("referencia"),
+        f.get("cidade_nome"), f.get("uf_sigla"), f.get("ixc_cidade_id"),
+        f.get("ixc_plano_id"), f.get("plano_nome"), f.get("plano_valor"),
+        f.get("taxa_instalacao"), f.get("fidelidade"), f.get("dia_vencimento"), f.get("obs"),
+        id, vid
+    ))
+    # Registrar no log de auditoria
+    db.execute("""
+        INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes)
+        VALUES(?,99,'CORRECAO','Cadastro corrigido pelo vendedor','ok',?)
+    """, (id, f"Corrigido por {user['login']} e reenviado para auditoria"))
+    db.commit()
+
+    return {"ok": True, "status": "enviado", "msg": "Cadastro corrigido e enviado para auditoria!"}

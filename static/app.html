@@ -71,6 +71,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .b-aprovado,.b-assinado{background:rgba(0,229,160,.1);color:var(--green);}
 .b-pendente{background:rgba(255,184,63,.1);color:var(--amber);}
 .b-reprovado,.b-erro_ativacao{background:rgba(255,77,106,.1);color:var(--red);}
+.b-aguard_correcao{background:rgba(245,166,35,.1);color:var(--amber);}
 .b-ativado{background:rgba(0,212,255,.1);color:var(--cyan);}
 .b-assinatura_pendente{background:rgba(167,139,250,.12);color:var(--purple);}
 .b-em_dia{background:rgba(0,229,160,.1);color:var(--green);}
@@ -191,6 +192,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
         <div class="ftab" onclick="filtroLead('em_auditoria',this)">Auditoria</div>
         <div class="ftab" onclick="filtroLead('pendente',this)">Pendente</div>
         <div class="ftab" onclick="filtroLead('reprovado',this)">Reprovado</div>
+        <div class="ftab" onclick="filtroLead('aguard_correcao',this)">Corrigir</div>
         <div class="ftab" onclick="filtroLead('assinatura_pendente',this)">Assinatura</div>
         <div class="ftab" onclick="filtroLead('ativado',this)">Ativado</div>
       </div>
@@ -470,6 +472,11 @@ async function carregarLeads(status='todos'){
           <button class="btn btn-outline btn-sm" onclick="reenviarLink(${c.id})" style="width:100%;font-size:12px;">🔗 Reenviar link</button>
           <button class="btn btn-wpp btn-sm" id="wpp-${c.id}" style="width:100%;font-size:12px;" disabled>Enviar WhatsApp</button>
         </div>`:''}
+        ${c.status==='aguard_correcao'?`
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:var(--amber);margin-bottom:8px;">⚠ O backoffice solicitou correção neste cadastro.</div>
+          <button class="btn btn-cyan" onclick="abrirCorrecao(${c.id})" style="width:100%;font-size:13px;">✏ Corrigir cadastro</button>
+        </div>`:''}
       </div>
     `).join('');
   }catch(e){el.innerHTML='<div class="empty"><p>Erro ao carregar.</p></div>';}
@@ -479,6 +486,68 @@ function filtroLead(status,el){
   document.querySelectorAll('#filter-leads .ftab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
   carregarLeads(status);
+}
+
+async function abrirCorrecao(id) {
+  /**
+   * Carrega os dados do pré-cadastro e abre o formulário preenchido.
+   * Vendedor corrige e reenvia — status volta para 'enviado' automaticamente.
+   */
+  try {
+    const r = await api(`/api/vendedor/leads`);
+    const lead = (r.leads||[]).find(l => l.id === id);
+    if (!lead) { toast('Cadastro não encontrado.', 'err'); return; }
+
+    // Preencher formDados com os dados existentes
+    formDados = {
+      id_precadastro: id,   // ID para atualizar (não criar novo)
+      tipo_pessoa:    lead.tipo_pessoa || 'F',
+      razao:          lead.razao || '',
+      cnpj_cpf:       lead.cnpj_cpf || '',
+      telefone_celular: lead.telefone_celular || '',
+      whatsapp:       lead.whatsapp || '',
+      email:          lead.email || '',
+      data_nascimento:lead.data_nascimento || '',
+      sexo:           lead.sexo || '',
+      rg_orgao_emissor: lead.rg_orgao_emissor || '',
+      nacionalidade:  lead.nacionalidade || 'Brasileiro',
+      cep:            lead.cep || '',
+      endereco:       lead.endereco || '',
+      numero:         lead.numero || '',
+      bairro:         lead.bairro || '',
+      complemento:    lead.complemento || '',
+      referencia:     lead.referencia || '',
+      cidade_nome:    lead.cidade_nome || '',
+      uf_sigla:       lead.uf_sigla || '',
+      ixc_cidade_id:  lead.ixc_cidade_id || '',
+      ixc_plano_id:   lead.ixc_plano_id || '',
+      plano_nome:     lead.plano_nome || '',
+      plano_valor:    lead.plano_valor || 0,
+      taxa_instalacao:lead.taxa_instalacao || 0,
+      fidelidade:     lead.fidelidade || 0,
+      dia_vencimento: lead.dia_vencimento || '',
+      obs:            lead.obs || '',
+      canal_venda:    lead.canal_venda || '',
+      viabilidade_status: lead.viabilidade_status || 'ok',
+      viabilidade_nivel:  lead.viabilidade_nivel || 0,
+    };
+
+    // Abrir formulário no passo 1 (endereço — mais comum para correção)
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('s-form').classList.add('active');
+    document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
+    formPasso = 1;
+    viabOk = true;  // endereço já verificado antes
+    document.getElementById('form-titulo').textContent = 'Corrigir cadastro';
+    renderFormPasso(1);
+
+    // Marcar que é uma correção (não novo cadastro)
+    window._corrigindoId = id;
+    toast('Formulário aberto para correção.', 'ok');
+  } catch(e) {
+    toast('Erro ao carregar dados.', 'err');
+    console.error(e);
+  }
 }
 
 async function reenviarLink(id){
@@ -985,7 +1054,12 @@ async function enviarCadastro(){
     if(formDocs.rg) fd.append('rg',formDocs.rg,'rg.jpg');
     if(formDocs.selfie) fd.append('selfie',formDocs.selfie,'selfie.jpg');
     if(formDocs.comp) fd.append('comp',formDocs.comp,'comp.jpg');
-    const r=await fetch(`${API}/api/vendedor/precadastro`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});
+    // Se for correção, atualiza o cadastro existente
+    const _isCorrecao = window._corrigindoId && formDados.id_precadastro;
+    const _url = _isCorrecao ? `${API}/api/vendedor/precadastro/${formDados.id_precadastro}/corrigir` : `${API}/api/vendedor/precadastro`;
+    const _method = _isCorrecao ? 'PUT' : 'POST';
+    window._corrigindoId = null;
+    const r=await fetch(_url,{method:_method,headers:{Authorization:`Bearer ${token}`},body:fd});
     const d=await r.json();
     if(!r.ok){toast(d.detail||'Erro ao enviar','err');return;}
     toast(`Enviado! Protocolo: ${d.protocolo}`,'ok');
@@ -1062,7 +1136,7 @@ function validCPF(cpf){
 
 function statusLabel(s){
   const m={enviado:'Enviado',em_auditoria:'Auditoria',aprovado:'Aprovado',pendente:'Pendente',
-    reprovado:'Reprovado',ativado:'Ativado',assinatura_pendente:'Assinatura',assinado:'Assinado',erro_ativacao:'Erro'};
+    reprovado:'Reprovado',ativado:'Ativado',assinatura_pendente:'Assinatura',assinado:'Assinado',erro_ativacao:'Erro',aguard_correcao:'Corrigir'};
   return m[s]||s;
 }
 

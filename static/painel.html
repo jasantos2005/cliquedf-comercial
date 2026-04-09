@@ -165,6 +165,7 @@ tbody tr:hover td{background:var(--surf2);}
 .b-ok,.b-aprovado,.b-ativado,.b-assinado{background:rgba(0,229,160,.1);color:var(--green);}
 .b-pend,.b-pendente,.b-enviado,.b-em_auditoria{background:rgba(255,184,63,.1);color:var(--amber);}
 .b-rep,.b-reprovado,.b-erro_ativacao{background:rgba(255,77,106,.1);color:var(--red);}
+.b-aguard_correcao{background:rgba(245,166,35,.1);color:var(--amber);}
 .b-assinatura_pendente{background:rgba(167,139,250,.1);color:var(--purple);}
 .b-cyan,.b-P{background:rgba(0,212,255,.1);color:var(--cyan);}
 .b-A{background:rgba(0,229,160,.1);color:var(--green);}
@@ -1572,8 +1573,9 @@ async function abrirModalAud(id) {
           <span class="badge b-${a.resultado}" style="font-size:10px;">${a.resultado}</span>
         </div>`).join('')}` : '<div style="color:var(--green);font-size:12px;">✓ Sem problemas na auditoria</div>'}
       <div class="btn-grp" style="margin-top:16px;">
-        ${['pendente','reprovado','em_auditoria'].includes(p.status)?`<button class="btn btn-green" onclick="fecharModal('modal-aud-detalhe');abrirModalAprovar(${id})">✓ Aprovar</button>`:''}
+        ${['pendente','reprovado','em_auditoria','aguard_correcao'].includes(p.status)?`<button class="btn btn-green" onclick="fecharModal('modal-aud-detalhe');abrirModalAprovar(${id})">✓ Aprovar</button>`:''}
         ${!['ativado','assinado'].includes(p.status)?`<button class="btn btn-red" onclick="fecharModal('modal-aud-detalhe');abrirModalReprovar(${id})">✗ Reprovar</button>`:''}
+        ${['pendente','reprovado','em_auditoria'].includes(p.status)?`<button class="btn btn-outline" style="color:var(--amber);border-color:var(--amber);" onclick="fecharModal('modal-aud-detalhe');devolverCorrecao(${id})">↩ Devolver para correção</button>`:''}
         ${p.status==='aprovado'?`<button class="btn btn-cyan" onclick="fecharModal('modal-aud-detalhe');gerarLink(${id})">🔗 Gerar link</button>`:''}
         <button class="btn btn-outline" onclick="fecharModal('modal-aud-detalhe');reauditar(${id})">↻ Reauditar</button>
       </div>
@@ -1655,6 +1657,21 @@ async function consultarSerasa(id, cpf) {
     const cor = nivel==='baixo'?'var(--green)':nivel==='medio'?'var(--amber)':'var(--red)';
     el.innerHTML = `<div class="serasa-box ${cls}"><div style="font-weight:700;color:${cor};">${risco.label||nivel} — ${r.ocorrencias} ocorrência(s)</div><div style="font-size:11px;color:var(--text3);margin-top:3px;">R$ ${fmtVal(r.valor_total||0)} · ${r.msg}</div></div>`;
   } catch (e) { el.innerHTML = '<div style="font-size:11px;color:var(--red);">Erro ao consultar.</div>'; }
+}
+
+async function devolverCorrecao(id) {
+  if (!confirm('Devolver este cadastro para o vendedor corrigir?')) return;
+  const tk = localStorage.getItem('hc_p_token');
+  try {
+    const r = await fetch(`/api/auditoria/${id}/devolver`, {
+      method: 'POST',
+      headers: {'Authorization': 'Bearer ' + tk}
+    });
+    const d = await r.json();
+    if (!r.ok) { toast('Erro: ' + (d.detail||r.status), 'err'); return; }
+    toast('Cadastro devolvido para correção!', 'ok');
+    carregarAuditoria(audStatusFiltro);
+  } catch(e) { toast('Erro ao devolver.', 'err'); console.error(e); }
 }
 
 function abrirModalAprovar(id) { _audId = id; document.getElementById('ma-just').value = ''; document.getElementById('modal-aprovar').classList.add('show'); }
@@ -3151,7 +3168,7 @@ function ixcInternetClass(s) {
 }
 function statusLabel(s) {
   const m = { enviado:'Enviado',em_auditoria:'Auditoria',aprovado:'Aprovado',pendente:'Pendente',
-    reprovado:'Reprovado',ativado:'Ativado',assinatura_pendente:'Assinatura',assinado:'Assinado',erro_ativacao:'Erro' };
+    reprovado:'Reprovado',ativado:'Ativado',assinatura_pendente:'Assinatura',assinado:'Assinado',erro_ativacao:'Erro',aguard_correcao:'Correção' };
   return m[s] || s;
 }
 function situacaoLabel(s) {
