@@ -2,7 +2,7 @@
 import sqlite3, json, uuid, logging
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, Query, Request
 from app.services.auth import requer_vendedor
 from app.services.ixc_db import ixc_select, ixc_select_one
 
