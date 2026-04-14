@@ -1027,20 +1027,30 @@ async function onDoc(input,tipo){
     slot.style.border='1px solid var(--green)';
     ic.textContent='✅'; sub.textContent=`${Math.round(comp.size/1024)}KB`;
     document.getElementById('err-docs').style.display='none';
-  }catch(e){ic.textContent=tipo==='rg'?'📄':tipo==='selfie'?'🤳':'🏠';sub.textContent='Erro. Tente novamente.';}
+  }catch(e){ic.textContent=tipo==='rg'?'📄':tipo==='selfie'?'🤳':'🏠';sub.textContent='Erro. Tente novamente.';console.error('onDoc:',e);}
 }
 
 async function comprimir(file){
   return new Promise((res,rej)=>{
     const reader=new FileReader();
-    reader.onload=e=>{const img=new Image();img.onload=()=>{
-      const MAX=900,c=document.createElement('canvas');
-      let w=img.width,h=img.height;
-      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
-      c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
-      c.toBlob(b=>res(new File([b],'foto.jpg',{type:'image/jpeg'})),'image/jpeg',.75);
-    };img.onerror=rej;img.src=e.target.result;};
-    reader.onerror=rej;reader.readAsDataURL(file);
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=900,c=document.createElement('canvas');
+        let w=img.width,h=img.height;
+        if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+        c.width=w;c.height=h;
+        const ctx=c.getContext('2d');
+        ctx.fillStyle='#ffffff';
+        ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        c.toBlob(b=>res(new File([b],'foto.jpg',{type:'image/jpeg'})),'image/jpeg',.75);
+      };
+      img.onerror=rej;
+      img.src=e.target.result;
+    };
+    reader.onerror=rej;
+    reader.readAsDataURL(file);
   });
 }
 

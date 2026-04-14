@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HubRetenção</title>
+<style>
+:root{--bg:#0d0f14;--surface:#151920;--surface2:#1c2230;--border:#252d3d;--accent:#e8521a;--accent2:#ff6b35;--text:#e8eaf0;--muted:#6b7590;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--blue:#3b82f6;--r:10px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.wrap{max-width:1100px;margin:0 auto;padding:20px}
+.tabs{display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:5px;margin-bottom:20px;width:fit-content}
+.tab{padding:8px 20px;border-radius:7px;font-size:.85rem;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:all .2s}
+.tab.active{background:var(--accent);color:#fff}
+.search-box{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;margin-bottom:20px}
+.search-row{display:flex;gap:10px}
+input[type=text]{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;padding:11px 16px;outline:none;transition:border .2s}
+input[type=text]:focus{border-color:var(--accent)}
+input::placeholder{color:var(--muted)}
+.btn{padding:11px 24px;border-radius:8px;font-size:.9rem;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent2)}
+.btn-green{background:var(--green);color:#000}.btn-green:hover{opacity:.85}
+.btn-outline{background:transparent;color:var(--accent2);border:1px solid var(--accent);font-size:.78rem;padding:6px 14px;border-radius:7px}
+.hint{font-size:.78rem;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.card-head{padding:10px 16px;background:var(--surface2);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
+.card-body{padding:14px 16px}
+.ficha-head{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px 24px;margin-bottom:14px}
+.nome{font-size:1.3rem;font-weight:800;margin-bottom:4px}
+.meta{font-size:.82rem;color:var(--muted);margin-top:2px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:.75rem;font-weight:600;background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.score-badge{display:flex;flex-direction:column;align-items:center;padding:16px 20px;border-radius:var(--r);min-width:100px;text-align:center}
+.score-badge.alto{background:rgba(239,68,68,.15);border:2px solid #ef4444}
+.score-badge.medio{background:rgba(245,158,11,.15);border:2px solid #f59e0b}
+.score-badge.baixo{background:rgba(34,197,94,.15);border:2px solid #22c55e}
+.score-num{font-size:2.2rem;font-weight:900;line-height:1}
+.alto .score-num{color:var(--red)}.medio .score-num{color:var(--yellow)}.baixo .score-num{color:var(--green)}
+.score-faixa{font-size:.78rem;font-weight:800;margin-top:2px}
+.alto .score-faixa{color:var(--red)}.medio .score-faixa{color:var(--yellow)}.baixo .score-faixa{color:var(--green)}
+.bars{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.bar{background:var(--surface2);border-radius:6px;padding:8px 12px}
+.bar-label{font-size:.7rem;color:var(--muted);margin-bottom:5px}
+.bar-track{height:6px;border-radius:3px;background:var(--border);overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .6s}
+.bar-val{font-size:.75rem;font-weight:700;margin-top:4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.full{grid-column:1/-1}
+.motivo{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:.85rem;line-height:1.4}
+.motivo:last-child{border-bottom:none;padding-bottom:0}
+.script-box{background:rgba(232,82,26,.08);border:1px solid rgba(232,82,26,.3);border-radius:8px;padding:12px 14px;font-size:.88rem;line-height:1.6;color:#ffd0be}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{text-align:left;padding:6px 8px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--border)}
+td{padding:7px 8px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.status-os{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:700}
+.status-os.A{background:rgba(239,68,68,.15);color:var(--red)}.status-os.F{background:rgba(34,197,94,.15);color:var(--green)}
+.fat-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:.83rem}
+.fat-row:last-child{border-bottom:none}
+.fat-badge{padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:700}
+.fat-badge.v{background:rgba(239,68,68,.2);color:var(--red)}.fat-badge.ok{background:rgba(34,197,94,.15);color:var(--green)}
+.acao-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px 24px;margin-bottom:20px}
+.acao-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+label{display:block;font-size:.75rem;color:var(--muted);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;padding:9px 12px;outline:none;font-family:inherit}
+textarea{resize:vertical;min-height:70px}
+select:focus,textarea:focus{border-color:var(--accent)}
+.fila-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+.fstat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.fstat-num{font-size:1.8rem;font-weight:900;line-height:1}
+.fstat-num.r{color:var(--red)}.fstat-num.y{color:var(--yellow)}.fstat-num.g{color:var(--green)}
+.fstat-label{font-size:.75rem;color:var(--muted);margin-top:3px}
+.filtros{display:flex;gap:8px;margin-bottom:16px}
+.filtros button{padding:7px 16px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:.82rem;font-weight:600;cursor:pointer;transition:all .15s}
+.filtros button.active{border-color:var(--accent);color:var(--accent2);background:rgba(232,82,26,.1)}
+.fila-lista{display:flex;flex-direction:column;gap:10px}
+.fcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:center;cursor:pointer;transition:border-color .15s}
+.fcard:hover{border-color:var(--accent)}
+.fscore{font-size:1.5rem;font-weight:900;text-align:center}
+.fscore.alto{color:var(--red)}.fscore.medio{color:var(--yellow)}
+.fnome{font-weight:700;font-size:.92rem}
+.fsub{font-size:.78rem;color:var(--muted);margin-top:3px}
+.fmots{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.fmot{font-size:.68rem;padding:2px 7px;border-radius:20px;font-weight:600;background:var(--surface2);color:var(--muted);border:1px solid var(--border);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:.88rem}
+.loading{text-align:center;padding:30px;color:var(--muted)}
+.fonte-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.68rem;font-weight:700;background:rgba(59,130,246,.15);color:var(--blue);border:1px solid rgba(59,130,246,.3);margin-left:8px}
+.lista-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
+.lc-title{padding:12px 20px;background:var(--surface2);font-size:.82rem;color:var(--muted);border-bottom:1px solid var(--border)}
+.lc-item{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.lc-item:last-child{border-bottom:none}
+.lc-item:hover{background:var(--surface2)}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 20px;font-size:.88rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;transition:opacity .3s}
+.toast.ok{border-color:var(--green);color:var(--green)}.toast.err{border-color:var(--red);color:var(--red)}
+#view-fila{display:none}
+#ficha-container{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <div>
+      <div style="font-size:1.3rem;font-weight:800">🎯 Hub<span style="color:#ff6b35">Retenção</span></div>
+      <div style="font-size:.75rem;color:var(--muted)">Previsão de cancelamento · Ficha de risco do cliente</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showView('busca')">🔍 Buscar Cliente</button>
+    <button class="tab" onclick="showView('fila');carregarFila()">📋 Fila de Risco</button>
+  </div>
+
+  <!-- BUSCA -->
+  <div id="view-busca">
+    <div class="search-box">
+      <div class="search-row">
+        <input type="text" id="inp" placeholder="CPF, ID do contrato ou nome do cliente..." onkeydown="if(event.key==='Enter')buscar()">
+        <button class="btn btn-primary" onclick="buscar()">Buscar</button>
+      </div>
+      <div class="hint">Aceita CPF com ou sem máscara · ID numérico do contrato · Nome parcial</div>
+    </div>
+
+    <div class="lista-box" id="lista-box" style="display:none"></div>
+    <div id="load" class="loading" style="display:none">Buscando...</div>
+
+    <div id="ficha-container">
+      <div class="ficha-head">
+        <div>
+          <div class="nome" id="fc-nome">—</div>
+          <div class="meta">
+            <span id="fc-cpf">—</span> &nbsp;·&nbsp; Contrato <strong id="fc-cid" style="color:var(--accent2)">—</strong>
+            <span class="fonte-badge" id="fc-fonte">—</span>
+          </div>
+          <div class="tags" id="fc-tags"></div>
+          <div class="bars" id="fc-bars"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+          <div class="score-badge" id="fc-badge">
+            <div class="score-num" id="fc-score">—</div>
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Risco</div>
+            <div class="score-faixa" id="fc-faixa">—</div>
+          </div>
+          <button class="btn btn-outline" onclick="recalc()">↻ Recalcular</button>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-head">⚠️ Fatores de Risco</div>
+          <div class="card-body" id="fc-motivos">—</div>
+        </div>
+        <div class="card">
+          <div class="card-head">💰 Faturas em Aberto</div>
+          <div class="card-body" id="fc-faturas">—</div>
+        </div>
+        <div class="card full">
+          <div class="card-head">💬 Script Sugerido</div>
+          <div class="card-body"><div class="script-box" id="fc-script">—</div></div>
+        </div>
+        <div class="card full" style="padding:0">
+          <div class="card-head">🔧 Últimas OS</div>
+          <div id="fc-os"></div>
+        </div>
+      </div>
+
+      <div class="acao-box">
+        <div style="font-size:.9rem;font-weight:700">✅ Registrar Resultado da Ligação</div>
+        <div class="acao-grid">
+          <div><label>Resultado</label>
+            <select id="acao-res">
+              <option value="">Selecione...</option>
+              <option value="reteve">✅ Cliente retido</option>
+              <option value="cancelou">❌ Cancelou mesmo assim</option>
+              <option value="reagendou">📅 Reagendar ligação</option>
+              <option value="abriu_os">🔧 Abriu OS técnica</option>
+              <option value="sem_resposta">📵 Sem resposta</option>
+              <option value="reclamacao">😤 Registrou reclamação</option>
+            </select>
+          </div>
+          <div><label>Observações</label>
+            <textarea id="acao-obs" placeholder="Detalhes da ligação..."></textarea>
+          </div>
+        </div>
+        <button class="btn btn-green" style="margin-top:14px" onclick="salvarAcao()">Salvar Resultado</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILA -->
+  <div id="view-fila">
+    <div class="fila-stats">
+      <div class="fstat"><div class="fstat-num r" id="st-alto">—</div><div class="fstat-label">🔴 Alto Risco</div></div>
+      <div class="fstat"><div class="fstat-num y" id="st-medio">—</div><div class="fstat-label">🟡 Médio Risco</div></div>
+      <div class="fstat"><div class="fstat-num g" id="st-baixo">—</div><div class="fstat-label">🟢 Baixo Risco</div></div>
+    </div>
+    <div class="filtros">
+      <button class="active" onclick="filtrar('alto',this)">🔴 Alto</button>
+      <button onclick="filtrar('medio',this)">🟡 Médio</button>
+      <button onclick="filtrar('todos',this)">📋 Todos</button>
+    </div>
+    <div id="fila-load" class="loading" style="display:none">Carregando...</div>
+    <div class="fila-lista" id="fila-lista"></div>
+  </div>
+</div>
+
+<script>
+let fichaAtual = null;
+let filaFiltro = 'alto';
+
+function api(path, opts={}) {
+  const t = localStorage.getItem('hc_p_token') || localStorage.getItem('hc_token') || '';
+  return fetch(path, {
+    ...opts,
+    headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+t, ...(opts.headers||{})}
+  }).then(r => r.json());
+}
+
+function showView(v) {
+  document.getElementById('view-busca').style.display = v==='busca' ? '' : 'none';
+  document.getElementById('view-fila').style.display  = v==='fila'  ? '' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&v==='busca')||(i===1&&v==='fila')));
+}
+
+async function buscar() {
+  const q = document.getElementById('inp').value.trim();
+  if (!q) return;
+  document.getElementById('lista-box').style.display = 'none';
+  document.getElementById('ficha-container').style.display = 'none';
+  document.getElementById('load').style.display = 'block';
+  try {
+    const d = await api('/api/retencao/buscar?q='+encodeURIComponent(q));
+    document.getElementById('load').style.display = 'none';
+    if (d.detail) { toast('Não encontrado','err'); return; }
+    if (d.tipo === 'lista') renderLista(d.opcoes);
+    else renderFicha(d);
+  } catch(e) { document.getElementById('load').style.display='none'; toast('Erro na busca','err'); }
+}
+
+function renderLista(ops) {
+  const b = document.getElementById('lista-box');
+  b.innerHTML = `<div class="lc-title">${ops.length} contratos — selecione:</div>`;
+  ops.forEach(o => {
+    const d = document.createElement('div');
+    d.className = 'lc-item';
+    d.innerHTML = `<div><div style="font-weight:600">${o.nome}</div><div style="font-size:.8rem;color:var(--muted)">${o.cpf||'—'}</div></div><div style="color:var(--accent2);font-weight:700">#${o.contrato_id}</div>`;
+    d.onclick = () => abrirId(o.contrato_id);
+    b.appendChild(d);
+  });
+  b.style.display = 'block';
+}
+
+async function abrirId(id) {
+  document.getElementById('lista-box').style.display = 'none';
+  document.getElementById('load').style.display = 'block';
+  try {
+    const d = await api('/api/retencao/ficha/'+id);
+    document.getElementById('load').style.display = 'none';
+    renderFicha({...d, fonte:'tempo_real'});
+  } catch(e) { document.getElementById('load').style.display='none'; toast('Erro','err'); }
+}
+
+async function recalc() {
+  if (!fichaAtual) return;
+  const d = await api('/api/retencao/ficha/'+fichaAtual.ixc_contrato_id);
+  renderFicha({...d, fonte:'tempo_real'});
+  toast('Recalculado!','ok');
+}
+
+function renderFicha(d) {
+  fichaAtual = d;
+  const faixa = d.faixa || 'baixo';
+  document.getElementById('fc-nome').textContent = d.cliente_nome||'—';
+  document.getElementById('fc-cpf').textContent = d.cpf||'—';
+  document.getElementById('fc-cid').textContent = d.ixc_contrato_id;
+  document.getElementById('fc-fonte').textContent = d.fonte==='cache' ? '⚡ cache' : '🔄 tempo real';
+  document.getElementById('fc-tags').innerHTML = `
+    <span class="tag">📍 ${d.cidade||'—'}${d.bairro?' · '+d.bairro:''}</span>
+    <span class="tag">📡 ${d.plano_nome||'—'} · R$ ${(d.plano_valor||0).toFixed(2)}</span>
+    <span class="tag">${{A:'Ativo',S:'Suspenso',P:'Pendente'}[d.status_contrato]||d.status_contrato}</span>
+    <span class="tag">🏠 ${d.meses_casa||0} meses</span>
+    <span class="tag" style="color:var(--muted);font-size:.68rem">atualizado ${d.calculado_em||'—'}</span>`;
+  const b = document.getElementById('fc-badge');
+  b.className = 'score-badge '+faixa;
+  document.getElementById('fc-score').textContent = d.score||0;
+  document.getElementById('fc-faixa').textContent = faixa==='alto'?'🔴 ALTO':faixa==='medio'?'🟡 MÉDIO':'🟢 BAIXO';
+  document.getElementById('fc-bars').innerHTML = `
+    <div class="bar"><div class="bar-label">Financeiro</div><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,(d.pts_financeiro||0)/35*100)}%;background:var(--red)"></div></div><div class="bar-val" style="color:var(--red)">${d.pts_financeiro||0}/35</div></div>
+    <div class="bar"><div class="bar-label">Técnico</div><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,(d.pts_tecnico||0)/30*100)}%;background:var(--yellow)"></div></div><div class="bar-val" style="color:var(--yellow)">${d.pts_tecnico||0}/30</div></div>
+    <div class="bar"><div class="bar-label">Comportamental</div><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,(d.pts_comportamental||0)/20*100)}%;background:var(--blue)"></div></div><div class="bar-val" style="color:var(--blue)">${d.pts_comportamental||0}/20</div></div>
+    <div class="bar"><div class="bar-label">Contextual</div><div class="bar-track"><div class="bar-fill" style="width:${Math.min(100,(d.pts_contextual||0)/15*100)}%;background:var(--green)"></div></div><div class="bar-val" style="color:var(--green)">${d.pts_contextual||0}/15</div></div>`;
+  const mots = d.motivos||[];
+  document.getElementById('fc-motivos').innerHTML = mots.length ? mots.map(m=>`<div class="motivo">${m}</div>`).join('') : '<div style="color:var(--green)">✅ Sem fatores de risco</div>';
+  document.getElementById('fc-script').textContent = d.script_sugerido||'—';
+  const fats = d.faturas_abertas||[];
+  document.getElementById('fc-faturas').innerHTML = fats.length ? fats.map(f=>{
+    const v = new Date(f.data_vencimento) < new Date();
+    return `<div class="fat-row"><div><div style="font-weight:700">R$ ${parseFloat(f.valor||0).toFixed(2)}</div><div style="font-size:.78rem;color:var(--muted)">Vence: ${(f.data_vencimento||'').substring(0,10)}</div></div><span class="fat-badge ${v?'v':'ok'}">${v?'Vencida':'A vencer'}</span></div>`;
+  }).join('') : '<div style="color:var(--green)">✅ Sem faturas em aberto</div>';
+  const oss = d.ultimas_os||[];
+  document.getElementById('fc-os').innerHTML = oss.length ? `<table><thead><tr><th>#</th><th>Assunto</th><th>Abertura</th><th>Fechamento</th><th>Status</th></tr></thead><tbody>${oss.map(o=>`<tr><td style="color:var(--muted)">${o.id}</td><td>${o.assunto_texto||'—'}</td><td>${(o.data_abertura||'').substring(0,10)}</td><td>${(o.data_fechamento||'—').substring?.(0,10)||'—'}</td><td><span class="status-os ${o.status}">${o.status==='A'?'Aberta':'Fechada'}</span></td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nenhuma OS</div>';
+  document.getElementById('ficha-container').style.display = 'block';
+  document.getElementById('acao-res').value = '';
+  document.getElementById('acao-obs').value = '';
+  document.getElementById('ficha-container').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function salvarAcao() {
+  if (!fichaAtual) return;
+  const res = document.getElementById('acao-res').value;
+  if (!res) { toast('Selecione o resultado','err'); return; }
+  await api('/api/retencao/acao', {method:'POST', body:JSON.stringify({
+    ixc_contrato_id: fichaAtual.ixc_contrato_id,
+    cliente_nome: fichaAtual.cliente_nome,
+    score_momento: fichaAtual.score,
+    resultado: res,
+    obs: document.getElementById('acao-obs').value
+  })});
+  toast('Salvo!','ok');
+  document.getElementById('acao-res').value='';
+  document.getElementById('acao-obs').value='';
+}
+
+async function carregarFila() {
+  try {
+    const s = await api('/api/retencao/stats');
+    document.getElementById('st-alto').textContent  = s.totais?.alto_risco||0;
+    document.getElementById('st-medio').textContent = s.totais?.medio_risco||0;
+    document.getElementById('st-baixo').textContent = s.totais?.baixo_risco||0;
+  } catch(e){}
+  filtrar(filaFiltro);
+}
+
+async function filtrar(faixa, btn) {
+  filaFiltro = faixa;
+  if (btn) { document.querySelectorAll('.filtros button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+  document.getElementById('fila-load').style.display='block';
+  document.getElementById('fila-lista').innerHTML='';
+  try {
+    const rows = await api('/api/retencao/fila?faixa='+faixa);
+    document.getElementById('fila-load').style.display='none';
+    if (!rows.length) { document.getElementById('fila-lista').innerHTML='<div class="empty">Nenhum cliente nesta faixa</div>'; return; }
+    document.getElementById('fila-lista').innerHTML = rows.map(r=>`
+      <div class="fcard" onclick="irBusca(${r.ixc_contrato_id})">
+        <div class="fscore ${r.faixa}">${r.score}</div>
+        <div>
+          <div class="fnome">${r.cliente_nome}</div>
+          <div class="fsub">${r.cidade||'—'} · ${r.plano_nome||'—'} · R$ ${parseFloat(r.plano_valor||0).toFixed(2)}</div>
+          <div class="fmots">${(r.motivos||[]).slice(0,3).map(m=>`<span class="fmot">${m.replace(/^[^\w]+/,'').substring(0,40)}</span>`).join('')}</div>
+        </div>
+        <button class="btn btn-primary" style="font-size:.8rem;padding:8px 14px" onclick="event.stopPropagation();irBusca(${r.ixc_contrato_id})">Ver ficha</button>
+      </div>`).join('');
+  } catch(e) { document.getElementById('fila-load').style.display='none'; }
+}
+
+function irBusca(id) {
+  showView('busca');
+  document.getElementById('inp').value = String(id);
+  abrirId(id);
+}
+
+function toast(msg, tipo='ok') {
+  const t = document.createElement('div');
+  t.className='toast '+tipo; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 2800);
+}
+</script>
+</body>
+</html>

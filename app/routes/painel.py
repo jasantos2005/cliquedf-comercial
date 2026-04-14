@@ -1200,3 +1200,25 @@ async def resumo_tv(user=Depends(requer_backoffice())):
     except Exception as e:
         log.error(f"resumo-tv: {e}")
         return {"totais": {"total":0,"ativados":0,"aguard_assinatura":0,"pendentes":0,"reprovados":0}, "atividades": []}
+
+
+# ── ENDPOINT TESTE FOTO ───────────────────────────────────────
+from fastapi import UploadFile, File as FastAPIFile
+@router.post("/teste-foto", include_in_schema=False)
+async def teste_foto(foto: UploadFile = FastAPIFile(...)):
+    import io
+    from PIL import Image as _Img
+    from pathlib import Path
+    raw = await foto.read()
+    img = _Img.open(io.BytesIO(raw)).convert('RGB')
+    MAX = 1200
+    w, h = img.size
+    if w > MAX or h > MAX:
+        ratio = min(MAX/w, MAX/h)
+        img = img.resize((int(w*ratio), int(h*ratio)), _Img.LANCZOS)
+    dest = Path("/opt/automacoes/cliquedf/comercial/uploads/teste_foto.jpg")
+    dest.parent.mkdir(exist_ok=True)
+    img.save(str(dest), 'JPEG', quality=75)
+    kb = dest.stat().st_size // 1024
+    return {"ok": True, "width": img.width, "height": img.height,
+            "kb": kb, "url": "/uploads/teste_foto.jpg"}

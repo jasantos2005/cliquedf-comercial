@@ -67,7 +67,36 @@ async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:
     async def salvar(file,tipo):
         if not file: return
         ext=Path(file.filename or "").suffix or ".jpg"; dest=pasta/f"{tipo}{ext}"
-        dest.write_bytes(await file.read()); kb=dest.stat().st_size//1024
+        raw = await file.read()
+        try:
+            from PIL import Image as _Img, ImageEnhance as _IE
+            import io as _io
+            img = _Img.open(_io.BytesIO(raw))
+            # Converter para RGB com fundo branco
+            bg = _Img.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'RGBA':
+                bg.paste(img, mask=img.split()[3])
+            else:
+                bg.paste(img.convert('RGB'))
+            img = bg
+            # Corrigir brilho se imagem estiver escura
+            pixels = list(img.getdata())
+            media = sum(sum(p) for p in pixels[:200]) / (200 * 3)
+            if media < 80:  # imagem escura — aumentar brilho
+                img = _IE.Brightness(img).enhance(3.0)
+                img = _IE.Contrast(img).enhance(1.2)
+            # Redimensionar
+            MAX = 1200
+            w, h = img.size
+            if w > MAX or h > MAX:
+                ratio = min(MAX/w, MAX/h)
+                img = img.resize((int(w*ratio), int(h*ratio)), _Img.LANCZOS)
+            buf = _io.BytesIO()
+            img.save(buf, 'JPEG', quality=80)
+            dest.write_bytes(buf.getvalue())
+        except Exception:
+            dest.write_bytes(raw)
+        kb = dest.stat().st_size // 1024
         cur.execute("INSERT INTO hc_precadastro_docs(precadastro_id,tipo,arquivo,tamanho_kb)VALUES(?,?,?,?)",(pid,tipo,f"uploads/{pid}/{tipo}{ext}",kb)); db.commit()
     await salvar(rg,"rg_frente"); await salvar(selfie,"selfie_doc"); await salvar(comp,"comp_residencia")
     log.info(f"Pré-cadastro #{pid} protocolo={protocolo}")

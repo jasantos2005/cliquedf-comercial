@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste de Foto</title>
+<style>
+body{background:#111;color:#fff;font-family:sans-serif;padding:16px;max-width:480px;margin:auto}
+h2{color:#00d4aa;margin-bottom:16px}
+.box{background:#1e1e1e;border-radius:12px;padding:16px;margin-bottom:16px}
+label{display:block;background:#00d4aa;color:#000;padding:12px;border-radius:8px;text-align:center;font-weight:700;cursor:pointer;margin-bottom:10px}
+input[type=file]{display:none}
+img{width:100%;border-radius:8px;margin-top:8px;display:none}
+.info{font-size:12px;color:#888;margin-top:4px}
+.badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-top:6px}
+.ok{background:rgba(0,212,170,.2);color:#00d4aa}
+.err{background:rgba(255,77,106,.2);color:#ff4d6d}
+</style>
+</head>
+<body>
+<h2>Teste de Foto</h2>
+<div class="box">
+  <label for="f1">📷 Câmera traseira</label>
+  <input type="file" id="f1" accept="image/*" capture="environment" onchange="testar(this,'r1','i1')">
+  <div id="r1"></div><img id="i1">
+</div>
+<div class="box">
+  <label for="f2">🤳 Selfie</label>
+  <input type="file" id="f2" accept="image/*" capture="user" onchange="testar(this,'r2','i2')">
+  <div id="r2"></div><img id="i2">
+</div>
+<div class="box">
+  <label for="f3">🖼 Galeria</label>
+  <input type="file" id="f3" accept="image/*" onchange="testar(this,'r3','i3')">
+  <div id="r3"></div><img id="i3">
+</div>
+<script>
+function testar(input, resId, imgId) {
+  const file = input.files[0];
+  if (!file) return;
+  const res = document.getElementById(resId);
+  const imgEl = document.getElementById(imgId);
+  res.innerHTML = '<div class="info">Processando...</div>';
+  imgEl.style.display = 'none';
+
+  const origKB = Math.round(file.size / 1024);
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const origW = img.width, origH = img.height;
+      const MAX = 900;
+      let w = img.width, h = img.height;
+      if(w>h){if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}}
+      else{if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}}
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      c.toBlob(b => {
+        const processedKB = Math.round(b.size / 1024);
+        imgEl.src = URL.createObjectURL(b);
+        imgEl.style.display = 'block';
+        const isOk = processedKB > 5;
+        res.innerHTML = `
+          <div class="info">Original: ${origW}x${origH}px · ${origKB}KB</div>
+          <div class="info">Processado: ${w}x${h}px · ${processedKB}KB</div>
+          <span class="badge ${isOk?'ok':'err'}">${isOk?'✓ Imagem OK':'✗ Imagem com problema'}</span>
+        `;
+      }, 'image/jpeg', 0.75);
+    };
+    img.onerror = () => res.innerHTML = '<span class="badge err">✗ Erro ao carregar</span>';
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+</script>
+</body>
+</html>

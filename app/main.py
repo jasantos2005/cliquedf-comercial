@@ -14,7 +14,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 app = FastAPI(title="Hub Comercial", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-from app.routes import auth, vendedor, vendedor_acompanhamento, auditoria, painel, assinatura, admin, upgrade, upgrade
+from app.routes import auth, vendedor, vendedor_acompanhamento, auditoria, painel, assinatura, admin, upgrade
+from app.routes.retencao import router as retencao_router, init_retencao_tables
 app.include_router(auth.router,       prefix="/api/auth",       tags=["Auth"])
 app.include_router(vendedor.router,   prefix="/api/vendedor",   tags=["Vendedor"])
 app.include_router(vendedor_acompanhamento.router, prefix="/api/vendedor", tags=["Vendedor"])
@@ -48,4 +49,5 @@ async def health():
     return {"status":"ok","operacao":os.getenv("OPERACAO","HubComercial"),"versao":"1.0.0"}
 app.include_router(admin.router,       prefix="/api/admin",       tags=["Admin"])
 app.include_router(upgrade.router,     prefix="/api/upgrade",     tags=["Upgrade"])
-app.include_router(upgrade.router,     prefix="/api/upgrade",     tags=["Upgrade"])
+app.include_router(retencao_router)
+init_retencao_tables()
