@@ -69,6 +69,7 @@ def run():
         SELECT id_contrato_kit, COUNT(*) AS total
         FROM su_oss_chamado
         WHERE id_contrato_kit IN ({ids_str}) AND status = 'A'
+          AND id_assunto IN (20, 21, 16, 94, 113, 226, 248)
           AND DATEDIFF(CURDATE(), data_abertura) > 7
         GROUP BY id_contrato_kit
     """)
@@ -79,7 +80,8 @@ def run():
         SELECT id_contrato_kit, COUNT(*) AS total
         FROM su_oss_chamado
         WHERE id_contrato_kit IN ({ids_str})
-          AND data_abertura >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+          AND id_assunto IN (20, 21, 16, 94, 113, 226, 248)
+          AND data_abertura >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
         GROUP BY id_contrato_kit
     """)
     os_mes = {str(r["id_contrato_kit"]): int(r["total"]) for r in os_mes_rows}
@@ -170,7 +172,7 @@ def run():
         pts_comp = min(pts_comp, 20)
         pts_ctx  = min(pts_ctx, 15)
         score = max(0, min(100, pts_fin + pts_tec + pts_comp + pts_ctx + bonus))
-        faixa = "alto" if score >= 70 else ("medio" if score >= 40 else "baixo")
+        faixa = "alto" if score >= 40 else ("medio" if score >= 20 else "baixo")
 
         if not [m for m in motivos if not m.startswith("✅")]:
             script = "✅ Cliente sem fatores de risco. Ligação de relacionamento."

@@ -163,6 +163,14 @@ select:focus,textarea:focus{border-color:var(--accent)}
           <div class="card-head">💰 Faturas em Aberto</div>
           <div class="card-body" id="fc-faturas">—</div>
         </div>
+        <div class="card">
+          <div class="card-head">📡 Conexão</div>
+          <div class="card-body" id="fc-conexao">—</div>
+        </div>
+        <div class="card">
+          <div class="card-head">📊 Consumo 30 dias</div>
+          <div class="card-body" id="fc-consumo">—</div>
+        </div>
         <div class="card full">
           <div class="card-head">💬 Script Sugerido</div>
           <div class="card-body"><div class="script-box" id="fc-script">—</div></div>
@@ -174,17 +182,16 @@ select:focus,textarea:focus{border-color:var(--accent)}
       </div>
 
       <div class="acao-box">
-        <div style="font-size:.9rem;font-weight:700">✅ Registrar Resultado da Ligação</div>
+        <div style="font-size:.9rem;font-weight:700">✅ Registrar Resultado do Contato</div>
         <div class="acao-grid">
           <div><label>Resultado</label>
             <select id="acao-res">
               <option value="">Selecione...</option>
               <option value="reteve">✅ Cliente retido</option>
-              <option value="cancelou">❌ Cancelou mesmo assim</option>
-              <option value="reagendou">📅 Reagendar ligação</option>
+              <option value="cancelou">❌ Cancelou</option>
               <option value="abriu_os">🔧 Abriu OS técnica</option>
-              <option value="sem_resposta">📵 Sem resposta</option>
               <option value="reclamacao">😤 Registrou reclamação</option>
+              <option value="sem_resposta">📵 Sem resposta</option>
             </select>
           </div>
           <div><label>Observações</label>
@@ -244,6 +251,16 @@ select:focus,textarea:focus{border-color:var(--accent)}
         <div class="os-tipo-icon">🤝</div>
         <div class="os-tipo-label">Retenção</div>
         <div class="os-tipo-desc">Atendimento de retenção</div>
+      </div>
+      <div class="os-tipo" id="os-tipo-20" onclick="selecionarTipoOS(20)">
+        <div class="os-tipo-icon">🚫</div>
+        <div class="os-tipo-label">Sem Acesso</div>
+        <div class="os-tipo-desc">Cliente sem conexão</div>
+      </div>
+      <div class="os-tipo" id="os-tipo-21" onclick="selecionarTipoOS(21)">
+        <div class="os-tipo-icon">🐢</div>
+        <div class="os-tipo-label">Internet Lenta</div>
+        <div class="os-tipo-desc">Velocidade abaixo do contratado</div>
       </div>
     </div>
     <div style="margin-bottom:12px">
@@ -348,7 +365,44 @@ function renderFicha(d) {
     return `<div class="fat-row"><div><div style="font-weight:700">R$ ${parseFloat(f.valor||0).toFixed(2)}</div><div style="font-size:.78rem;color:var(--muted)">Vence: ${(f.data_vencimento||'').substring(0,10)}</div></div><span class="fat-badge ${v?'v':'ok'}">${v?'Vencida':'A vencer'}</span></div>`;
   }).join('') : '<div style="color:var(--green)">✅ Sem faturas em aberto</div>';
   const oss = d.ultimas_os||[];
-  document.getElementById('fc-os').innerHTML = oss.length ? `<table><thead><tr><th>#</th><th>Assunto</th><th>Abertura</th><th>Fechamento</th><th>Técnico</th><th>Status</th></tr></thead><tbody>${oss.map(o=>`<tr style="cursor:${o.status==='F'?'pointer':'default'}" onclick="${o.status==='F'?'abrirDetalhesOS('+JSON.stringify(o)+')':''}"><td style="color:var(--muted)">${o.id}</td><td>${o.assunto_texto||'—'}</td><td>${(o.data_abertura||'').substring(0,10)}</td><td>${(o.data_fechamento||'—').substring?.(0,10)||'—'}</td><td>${o.tecnico_nome||'—'}</td><td><span class="status-os ${o.status}">${o.status==='A'?'Aberta':'Fechada'}</span></td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nenhuma OS de internet lenta, sem acesso ou manutenção</div>';
+  window._osData = oss;
+  (function(){
+    if(!oss.length){ document.getElementById('fc-os').innerHTML='<div class="empty">Nenhuma OS de internet lenta, sem acesso ou manutenção</div>'; return; }
+    let rows = oss.map(function(o,i){
+      var clk = o.status==='F' ? 'onclick="abrirDetalhesOS('+i+')" style="cursor:pointer"' : '';
+      return '<tr '+clk+'><td style="color:var(--muted)">'+o.id+'</td><td>'+(o.assunto_texto||'—')+'</td><td>'+(o.data_abertura||'').substring(0,10)+'</td><td>'+((o.data_fechamento||'—').substring(0,10)||'—')+'</td><td>'+(o.tecnico_nome||'—')+'</td><td><span class="status-os '+o.status+'">'+(o.status==='A'?'Aberta':'Fechada')+'</span></td></tr>';
+    }).join('');
+    document.getElementById('fc-os').innerHTML='<table><thead><tr><th>#</th><th>Assunto</th><th>Abertura</th><th>Fechamento</th><th>Técnico</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  })();
+  // Card Conexao
+  (function(){
+    var cx = d.conexao;
+    if (!cx || cx.login === null) {
+      document.getElementById('fc-conexao').innerHTML = '<div style="color:var(--muted);font-size:.85rem">Sem dados de conexão</div>';
+      document.getElementById('fc-consumo').innerHTML = '<div style="color:var(--muted);font-size:.85rem">Sem dados de consumo</div>';
+      return;
+    }
+    var online = cx.online;
+    var statusColor = online ? 'var(--green)' : 'var(--red)';
+    var statusIcon  = online ? '🟢' : '🔴';
+    var statusLabel = online ? 'Online agora' : 'Offline';
+    document.getElementById('fc-conexao').innerHTML = [
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Status</span><span style="color:'+statusColor+';font-weight:700;font-size:.9rem">'+statusIcon+' '+statusLabel+'</span></div>',
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Login PPPoE</span><span style="font-family:monospace;font-size:.8rem">'+(cx.login||'—')+'</span></div>',
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Última conexão</span><span style="font-size:.82rem">'+(cx.ultima_conexao||'—')+'</span></div>',
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Última desconexão</span><span style="font-size:.82rem">'+(cx.ultima_desconexao||'—')+'</span></div>',
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Quedas registradas</span><span style="font-weight:700;color:'+(cx.quedas>3?'var(--red)':cx.quedas>0?'var(--yellow)':'var(--green)')+'">'+cx.quedas+'</span></div>',
+      cx.motivo_desconexao ? '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Motivo desconexão</span><span style="font-size:.78rem;color:var(--muted)">'+cx.motivo_desconexao+'</span></div>' : ''
+    ].join('');
+    var downGB = (cx.consumo_down_30d / 1073741824).toFixed(2);
+    var upGB   = (cx.consumo_up_30d   / 1073741824).toFixed(2);
+    var totalGB = (parseFloat(downGB) + parseFloat(upGB)).toFixed(2);
+    document.getElementById('fc-consumo').innerHTML = [
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Download</span><span style="font-weight:700;color:var(--blue)">'+downGB+' GB</span></div>',
+      '<div class="fat-row"><span style="color:var(--muted);font-size:.78rem">Upload</span><span style="font-weight:700;color:var(--green)">'+upGB+' GB</span></div>',
+      '<div class="fat-row" style="border-bottom:none"><span style="color:var(--muted);font-size:.78rem">Total</span><span style="font-weight:800;font-size:.92rem">'+totalGB+' GB</span></div>'
+    ].join('');
+  })();
   document.getElementById('ficha-container').style.display = 'block';
   document.getElementById('acao-res').value = '';
   document.getElementById('acao-obs').value = '';
@@ -418,7 +472,7 @@ function toast(msg, tipo='ok') {
 
 function fecharModal(id) { document.getElementById(id).style.display='none'; }
 
-function abrirDetalhesOS(o) {
+function abrirDetalhesOS(i) { var o = window._osData[i];
   document.getElementById('modal-os-body').innerHTML = `
     <div style="display:grid;gap:10px;font-size:.88rem">
       <div style="display:flex;justify-content:space-between">

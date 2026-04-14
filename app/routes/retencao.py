@@ -177,7 +177,7 @@ def calcular_score_contrato(contrato_id: int) -> dict:
     pts_comp = min(pts_comp, 20)
     pts_ctx  = min(pts_ctx, 15)
     score = max(0, min(100, pts_fin + pts_tec + pts_comp + pts_ctx + bonus))
-    faixa = "alto" if score >= 70 else ("medio" if score >= 40 else "baixo")
+    faixa = "alto" if score >= 40 else ("medio" if score >= 20 else "baixo")
 
     if not [m for m in motivos if not m.startswith("✅")]:
         script = "✅ Cliente sem fatores de risco. Ligacao de relacionamento."
@@ -190,6 +190,23 @@ def calcular_score_contrato(contrato_id: int) -> dict:
     else:
         script = "📋 Retencao preventiva: escute o cliente e ofereça beneficio surpresa."
 
+
+    # Dados de conexao
+    rad = ixc_select_one(
+        "SELECT id, login, online, ultima_conexao_inicial, ultima_conexao_final,"
+        " tempo_conectado, count_desconexao, motivo_desconexao, download_atual, upload_atual"
+        " FROM radusuarios WHERE id_contrato = %s LIMIT 1",
+        (contrato_id,)
+    )
+    consumo = None
+    if rad:
+        consumo = ixc_select_one(
+            "SELECT SUM(consumo) AS total_down, SUM(consumo_upload) AS total_up"
+            " FROM radusuarios_consumo"
+            " WHERE id_login = %s AND data >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
+            (rad['id'],)
+        )
+
     ultimas_os = ixc_select("""
         SELECT o.id, o.data_abertura, o.data_fechamento, o.status,
                a.assunto AS assunto_texto,
@@ -199,7 +216,7 @@ def calcular_score_contrato(contrato_id: int) -> dict:
         LEFT JOIN su_oss_assunto a ON a.id = o.id_assunto
         LEFT JOIN funcionarios f ON f.id = o.id_tecnico
         WHERE o.id_contrato_kit = %s
-          AND o.id_assunto IN (20, 21, 16, 226)
+          AND o.id_assunto IN (20, 21, 16, 94, 113, 226, 248)
         ORDER BY o.data_abertura DESC LIMIT 10
     """, (contrato_id,))
 
@@ -231,7 +248,31 @@ def calcular_score_contrato(contrato_id: int) -> dict:
         "motivos":         motivos,
         "script_sugerido": script,
         "ultimas_os":      [dict(o) for o in ultimas_os],
+        "conexao": {
+            "login":             rad["login"] if rad else None,
+            "online":            rad["online"] == "S" if rad else False,
+            "ultima_conexao":    str(rad["ultima_conexao_inicial"])[:16] if rad and rad["ultima_conexao_inicial"] else None,
+            "ultima_desconexao": str(rad["ultima_conexao_final"])[:16] if rad and rad["ultima_conexao_final"] else None,
+            "tempo_conectado":   rad["tempo_conectado"] if rad else None,
+            "quedas":            int(rad["count_desconexao"] or 0) if rad else 0,
+            "motivo_desconexao": rad["motivo_desconexao"] if rad else None,
+            "download_atual":    rad["download_atual"] if rad else None,
+            "upload_atual":      rad["upload_atual"] if rad else None,
+            "consumo_down_30d":  int(consumo["total_down"] or 0) if consumo else 0,
+            "consumo_up_30d":    int(consumo["total_up"] or 0) if consumo else 0,
+        },
         "faturas_abertas": [dict(f) for f in faturas],
+        "conexao": {
+            "login":             rad["login"] if rad else None,
+            "online":            rad["online"] == "S" if rad else False,
+            "ultima_conexao":    str(rad["ultima_conexao_inicial"])[:16] if rad and rad["ultima_conexao_inicial"] else None,
+            "ultima_desconexao": str(rad["ultima_conexao_final"])[:16] if rad and rad["ultima_conexao_final"] else None,
+            "tempo_conectado":   rad["tempo_conectado"] if rad else None,
+            "quedas":            int(rad["count_desconexao"] or 0) if rad else 0,
+            "motivo_desconexao": rad["motivo_desconexao"] if rad else None,
+            "consumo_down_30d":  int(consumo["total_down"] or 0) if consumo else 0,
+            "consumo_up_30d":    int(consumo["total_up"] or 0) if consumo else 0,
+        },
         "calculado_em":    datetime.now().strftime("%d/%m/%Y %H:%M"),
     }
 
@@ -300,7 +341,34 @@ def buscar_cliente(q: str):
         try:
             calc_em = datetime.strptime(cache["calculado_em"], "%d/%m/%Y %H:%M")
             if (datetime.now() - calc_em).total_seconds() < 86400:
+                # conexao sempre em tempo real (nao salva no cache)
+                _cx_rad = ixc_select_one(
+                    "SELECT id, login, online, ultima_conexao_inicial, ultima_conexao_final,"
+                    " tempo_conectado, count_desconexao, motivo_desconexao"
+                    " FROM radusuarios WHERE id_contrato = %s LIMIT 1",
+                    (contrato_id,)
+                )
+                _cx_consumo = None
+                if _cx_rad:
+                    _cx_consumo = ixc_select_one(
+                        "SELECT SUM(consumo) AS total_down, SUM(consumo_upload) AS total_up"
+                        " FROM radusuarios_consumo"
+                        " WHERE id_login = %s AND data >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)",
+                        (_cx_rad['id'],)
+                    )
+                _conexao_live = {
+                    "login":             _cx_rad["login"] if _cx_rad else None,
+                    "online":            _cx_rad["online"] == "S" if _cx_rad else False,
+                    "ultima_conexao":    str(_cx_rad["ultima_conexao_inicial"])[:16] if _cx_rad and _cx_rad["ultima_conexao_inicial"] else None,
+                    "ultima_desconexao": str(_cx_rad["ultima_conexao_final"])[:16] if _cx_rad and _cx_rad["ultima_conexao_final"] else None,
+                    "tempo_conectado":   _cx_rad["tempo_conectado"] if _cx_rad else None,
+                    "quedas":            int(_cx_rad["count_desconexao"] or 0) if _cx_rad else 0,
+                    "motivo_desconexao": _cx_rad["motivo_desconexao"] if _cx_rad else None,
+                    "consumo_down_30d":  int(_cx_consumo["total_down"] or 0) if _cx_consumo else 0,
+                    "consumo_up_30d":    int(_cx_consumo["total_up"] or 0) if _cx_consumo else 0,
+                } if _cx_rad else None
                 return {"tipo": "ficha", "fonte": "cache", **dict(cache),
+                        "conexao": _conexao_live,
                         "motivos": json.loads(cache["motivos"] or "[]"),
                         "ultimas_os": [], "faturas_abertas": []}
         except Exception:
