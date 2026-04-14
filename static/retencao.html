@@ -92,6 +92,16 @@ select:focus,textarea:focus{border-color:var(--accent)}
 .lc-item:hover{background:var(--surface2)}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 20px;font-size:.88rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;transition:opacity .3s}
 .toast.ok{border-color:var(--green);color:var(--green)}.toast.err{border-color:var(--red);color:var(--red)}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto}
+.modal-title{font-size:1rem;font-weight:800;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.2rem}
+.os-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.os-tipo{background:var(--surface2);border:2px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;text-align:center;transition:all .2s}
+.os-tipo:hover,.os-tipo.selected{border-color:var(--accent);background:rgba(232,82,26,.08)}
+.os-tipo-icon{font-size:1.8rem;margin-bottom:8px}
+.os-tipo-label{font-size:.85rem;font-weight:700}
+.os-tipo-desc{font-size:.72rem;color:var(--muted);margin-top:4px}
 #view-fila{display:none}
 #ficha-container{display:none}
 </style>
@@ -181,7 +191,10 @@ select:focus,textarea:focus{border-color:var(--accent)}
             <textarea id="acao-obs" placeholder="Detalhes da ligação..."></textarea>
           </div>
         </div>
-        <button class="btn btn-green" style="margin-top:14px" onclick="salvarAcao()">Salvar Resultado</button>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-green" onclick="salvarAcao()">Salvar Resultado</button>
+          <button class="btn btn-primary" onclick="abrirModalOS()">📋 Abrir OS no IXC</button>
+        </div>
       </div>
     </div>
   </div>
@@ -200,6 +213,44 @@ select:focus,textarea:focus{border-color:var(--accent)}
     </div>
     <div id="fila-load" class="loading" style="display:none">Carregando...</div>
     <div class="fila-lista" id="fila-lista"></div>
+  </div>
+</div>
+
+<!-- MODAL: Detalhes da OS -->
+<div class="modal-bg" id="modal-os" style="display:none" onclick="if(event.target===this)fecharModal('modal-os')">
+  <div class="modal">
+    <div class="modal-title">
+      <span>🔧 Detalhes da OS</span>
+      <button class="modal-close" onclick="fecharModal('modal-os')">✕</button>
+    </div>
+    <div id="modal-os-body"></div>
+  </div>
+</div>
+
+<!-- MODAL: Abrir OS -->
+<div class="modal-bg" id="modal-abrir-os" style="display:none" onclick="if(event.target===this)fecharModal('modal-abrir-os')">
+  <div class="modal">
+    <div class="modal-title">
+      <span>📋 Abrir Ordem de Serviço</span>
+      <button class="modal-close" onclick="fecharModal('modal-abrir-os')">✕</button>
+    </div>
+    <div class="os-grid">
+      <div class="os-tipo" id="os-tipo-20" onclick="selecionarTipoOS(20)">
+        <div class="os-tipo-icon">🔧</div>
+        <div class="os-tipo-label">Manutenção</div>
+        <div class="os-tipo-desc">Problema técnico no link</div>
+      </div>
+      <div class="os-tipo" id="os-tipo-248" onclick="selecionarTipoOS(248)">
+        <div class="os-tipo-icon">🤝</div>
+        <div class="os-tipo-label">Retenção</div>
+        <div class="os-tipo-desc">Atendimento de retenção</div>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>Observação</label>
+      <textarea id="os-obs" placeholder="Descreva o motivo da OS..." style="margin-top:5px"></textarea>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="confirmarAbrirOS()">Gerar OS no IXC</button>
   </div>
 </div>
 
@@ -297,7 +348,7 @@ function renderFicha(d) {
     return `<div class="fat-row"><div><div style="font-weight:700">R$ ${parseFloat(f.valor||0).toFixed(2)}</div><div style="font-size:.78rem;color:var(--muted)">Vence: ${(f.data_vencimento||'').substring(0,10)}</div></div><span class="fat-badge ${v?'v':'ok'}">${v?'Vencida':'A vencer'}</span></div>`;
   }).join('') : '<div style="color:var(--green)">✅ Sem faturas em aberto</div>';
   const oss = d.ultimas_os||[];
-  document.getElementById('fc-os').innerHTML = oss.length ? `<table><thead><tr><th>#</th><th>Assunto</th><th>Abertura</th><th>Fechamento</th><th>Status</th></tr></thead><tbody>${oss.map(o=>`<tr><td style="color:var(--muted)">${o.id}</td><td>${o.assunto_texto||'—'}</td><td>${(o.data_abertura||'').substring(0,10)}</td><td>${(o.data_fechamento||'—').substring?.(0,10)||'—'}</td><td><span class="status-os ${o.status}">${o.status==='A'?'Aberta':'Fechada'}</span></td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nenhuma OS</div>';
+  document.getElementById('fc-os').innerHTML = oss.length ? `<table><thead><tr><th>#</th><th>Assunto</th><th>Abertura</th><th>Fechamento</th><th>Técnico</th><th>Status</th></tr></thead><tbody>${oss.map(o=>`<tr style="cursor:${o.status==='F'?'pointer':'default'}" onclick="${o.status==='F'?'abrirDetalhesOS('+JSON.stringify(o)+')':''}"><td style="color:var(--muted)">${o.id}</td><td>${o.assunto_texto||'—'}</td><td>${(o.data_abertura||'').substring(0,10)}</td><td>${(o.data_fechamento||'—').substring?.(0,10)||'—'}</td><td>${o.tecnico_nome||'—'}</td><td><span class="status-os ${o.status}">${o.status==='A'?'Aberta':'Fechada'}</span></td></tr>`).join('')}</tbody></table>` : '<div class="empty">Nenhuma OS de internet lenta, sem acesso ou manutenção</div>';
   document.getElementById('ficha-container').style.display = 'block';
   document.getElementById('acao-res').value = '';
   document.getElementById('acao-obs').value = '';
@@ -363,6 +414,74 @@ function toast(msg, tipo='ok') {
   t.className='toast '+tipo; t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 2800);
+}
+
+function fecharModal(id) { document.getElementById(id).style.display='none'; }
+
+function abrirDetalhesOS(o) {
+  document.getElementById('modal-os-body').innerHTML = `
+    <div style="display:grid;gap:10px;font-size:.88rem">
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">OS #</span><strong>${o.id}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Assunto</span><strong>${o.assunto_texto||'—'}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Abertura</span><strong>${(o.data_abertura||'').substring(0,10)}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Fechamento</span><strong>${(o.data_fechamento||'').substring(0,10)}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:var(--muted)">Técnico</span><strong>${o.tecnico_nome||'Não atribuído'}</strong>
+      </div>
+      <div style="margin-top:8px">
+        <div style="color:var(--muted);margin-bottom:6px;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em">Solução registrada</div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;line-height:1.6;color:${o.solucao?'var(--text)':'var(--muted)'}">
+          ${o.solucao||'Nenhuma solução registrada'}
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-os').style.display='flex';
+}
+
+let osTipoSelecionado = null;
+function selecionarTipoOS(id) {
+  osTipoSelecionado = id;
+  document.querySelectorAll('.os-tipo').forEach(el => el.classList.remove('selected'));
+  document.getElementById('os-tipo-'+id)?.classList.add('selected');
+}
+
+function abrirModalOS() {
+  if (!fichaAtual) return;
+  osTipoSelecionado = null;
+  document.querySelectorAll('.os-tipo').forEach(el => el.classList.remove('selected'));
+  document.getElementById('os-obs').value = '';
+  document.getElementById('modal-abrir-os').style.display='flex';
+}
+
+async function confirmarAbrirOS() {
+  if (!fichaAtual) return;
+  if (!osTipoSelecionado) { toast('Selecione o tipo de OS','err'); return; }
+  const obs = document.getElementById('os-obs').value;
+  try {
+    const r = await api('/api/retencao/abrir-os', {
+      method: 'POST',
+      body: JSON.stringify({
+        ixc_contrato_id: fichaAtual.ixc_contrato_id,
+        ixc_cliente_id: fichaAtual.ixc_cliente_id,
+        id_assunto: osTipoSelecionado,
+        mensagem: obs || (osTipoSelecionado===248 ? 'OS de retenção gerada pelo HubRetenção' : 'OS de manutenção gerada pelo HubRetenção')
+      })
+    });
+    if (r.ok) {
+      toast('OS #'+r.os_id+' gerada com sucesso!','ok');
+      fecharModal('modal-abrir-os');
+    } else {
+      toast('Erro: '+(r.detail||'falha ao gerar OS'),'err');
+    }
+  } catch(e) { toast('Erro ao gerar OS','err'); }
 }
 </script>
 </body>

@@ -192,11 +192,15 @@ def calcular_score_contrato(contrato_id: int) -> dict:
 
     ultimas_os = ixc_select("""
         SELECT o.id, o.data_abertura, o.data_fechamento, o.status,
-               a.assunto AS assunto_texto
+               a.assunto AS assunto_texto,
+               o.mensagem_resposta AS solucao,
+               f.funcionario AS tecnico_nome
         FROM su_oss_chamado o
         LEFT JOIN su_oss_assunto a ON a.id = o.id_assunto
+        LEFT JOIN funcionarios f ON f.id = o.id_tecnico
         WHERE o.id_contrato_kit = %s
-        ORDER BY o.data_abertura DESC LIMIT 5
+          AND o.id_assunto IN (20, 21, 16, 226)
+        ORDER BY o.data_abertura DESC LIMIT 10
     """, (contrato_id,))
 
     faturas = ixc_select("""
@@ -368,3 +372,31 @@ def registrar_acao(data: AcaoInput):
     db.commit()
     db.close()
     return {"ok": True}
+
+from app.services.ixc_db import ixc_insert
+from datetime import datetime as _dt
+
+class AbrirOSInput(BaseModel):
+    ixc_contrato_id: int
+    ixc_cliente_id: int
+    id_assunto: int
+    mensagem: Optional[str] = ""
+
+@router.post("/abrir-os")
+def abrir_os(data: AbrirOSInput):
+    agora = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
+    sql = """
+        INSERT INTO ixcprovedor.su_oss_chamado (
+            id_cliente, id_contrato_kit, id_assunto, status, id_filial,
+            data_abertura, mensagem, id_tecnico, setor,
+            origem_cadastro, ultima_atualizacao
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+    params = (
+        data.ixc_cliente_id, data.ixc_contrato_id, data.id_assunto,
+        "A", 1, agora, data.mensagem, 0, "27", "W", agora
+    )
+    os_id = ixc_insert(sql, params)
+    if not os_id:
+        raise HTTPException(500, "Falha ao gerar OS no IXC")
+    return {"ok": True, "os_id": os_id}
