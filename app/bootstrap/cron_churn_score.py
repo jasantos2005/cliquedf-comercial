@@ -69,7 +69,7 @@ def run():
         SELECT id_contrato_kit, COUNT(*) AS total
         FROM su_oss_chamado
         WHERE id_contrato_kit IN ({ids_str}) AND status = 'A'
-          AND id_assunto IN (20, 21, 16, 94, 113, 226, 248)
+          AND id_assunto IN (20, 21, 16, 94, 113, 248)
           AND DATEDIFF(CURDATE(), data_abertura) > 7
         GROUP BY id_contrato_kit
     """)
@@ -80,7 +80,7 @@ def run():
         SELECT id_contrato_kit, COUNT(*) AS total
         FROM su_oss_chamado
         WHERE id_contrato_kit IN ({ids_str})
-          AND id_assunto IN (20, 21, 16, 94, 113, 226, 248)
+          AND id_assunto IN (20, 21, 16, 94, 113, 248)
           AND data_abertura >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)
         GROUP BY id_contrato_kit
     """)

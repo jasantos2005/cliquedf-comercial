@@ -216,7 +216,7 @@ def calcular_score_contrato(contrato_id: int) -> dict:
         LEFT JOIN su_oss_assunto a ON a.id = o.id_assunto
         LEFT JOIN funcionarios f ON f.id = o.id_tecnico
         WHERE o.id_contrato_kit = %s
-          AND o.id_assunto IN (20, 21, 16, 94, 113, 226, 248)
+          AND o.id_assunto IN (20, 21, 16, 94, 113, 248)
         ORDER BY o.data_abertura DESC LIMIT 10
     """, (contrato_id,))
 

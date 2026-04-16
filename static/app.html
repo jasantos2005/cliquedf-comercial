@@ -145,11 +145,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .os-ok{color:var(--green);}
 .os-warn{color:var(--amber);}
 .os-open{color:var(--red);}
+
+/* THEME TOGGLE */
+#theme-btn{position:fixed;top:12px;right:56px;z-index:999;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surf2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;}
+body.light-mode{--bg:#f0f2f7;--surf:#ffffff;--surf2:#e8ebf2;--border:#d0d6e4;--text:#1a1f2e;--muted:#5a6480;--radius:14px;}
+body.light-mode #header,body.light-mode #bnav{background:var(--surf);}
+body.light-mode .card,body.light-mode .kpi{background:var(--surf);}
+body.light-mode .field input,body.light-mode #login-screen{background:var(--surf);}
+
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
+<button id="theme-btn" onclick="toggleTheme()" title="Alternar tema">☀️</button>
 <div id="login-screen">
   <div class="login-logo">Hub<span style="color:#fff">Com</span></div>
   <div class="login-sub">Acesso para vendedores</div>
@@ -1350,6 +1359,19 @@ function toast(msg,tipo=''){
   el.textContent=msg; el.className=`show ${tipo}`;
   clearTimeout(window._tt);window._tt=setTimeout(()=>el.className='',3000);
 }
+
+// THEME TOGGLE
+(function(){
+  var m = localStorage.getItem('hc_theme');
+  if(m === 'light') document.body.classList.add('light-mode');
+  document.getElementById('theme-btn').textContent = m === 'light' ? '🌙' : '☀️';
+})();
+function toggleTheme(){
+  var light = document.body.classList.toggle('light-mode');
+  localStorage.setItem('hc_theme', light ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = light ? '🌙' : '☀️';
+}
+
 </script>
 </body>
 </html>

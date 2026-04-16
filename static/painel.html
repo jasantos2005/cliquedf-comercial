@@ -386,6 +386,14 @@ tbody tr:hover td{background:var(--surf2);}
 .mini-chart{display:flex;align-items:flex-end;gap:4px;height:50px;}
 .mc-bar{flex:1;border-radius:3px 3px 0 0;min-height:3px;position:relative;cursor:default;}
 .mc-bar:hover{opacity:.8;}
+
+/* THEME TOGGLE */
+#theme-btn{position:fixed;top:12px;right:16px;z-index:9999;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surf2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;}
+body.light-mode{--bg:#f0f2f7;--surf:#ffffff;--surf2:#e8ebf2;--surf3:#dde1ec;--border:#cdd3e0;--text:#1a1f2e;--text2:#3a4060;--text3:#5a6480;}
+body.light-mode .card,body.light-mode .kpi{background:var(--surf);}
+body.light-mode .topbar,body.light-mode .sidebar,body.light-mode .modal-box{background:var(--surf);}
+body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
+
 </style>
 </head>
 <body>
@@ -3487,6 +3495,24 @@ async function carregarUpgradeLog() {
   }
 }
 
+function toggleTheme() {
+  const body = document.body;
+  const btn = document.getElementById('theme-btn');
+  body.classList.toggle('light-mode');
+  const isLight = body.classList.contains('light-mode');
+  btn.textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem('hc_theme', isLight ? 'light' : 'dark');
+}
+
+// Restaurar tema salvo
+(function() {
+  if (localStorage.getItem('hc_theme') === 'light') {
+    document.body.classList.add('light-mode');
+    const btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = '🌙';
+  }
+})();
+
 function toast(msg, tipo = '') {
   const el = document.getElementById('toast');
   el.textContent = msg; el.className = `show ${tipo}`;
@@ -3495,5 +3521,6 @@ function toast(msg, tipo = '') {
 </script>
 
 
+<button id="theme-btn" onclick="toggleTheme()" title="Alternar tema">☀️</button>
 </body>
 </html>

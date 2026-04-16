@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HubRetenção</title>
+<title>HubRetenção v2</title>
 <style>
 :root{--bg:#0d0f14;--surface:#151920;--surface2:#1c2230;--border:#252d3d;--accent:#e8521a;--accent2:#ff6b35;--text:#e8eaf0;--muted:#6b7590;--green:#22c55e;--yellow:#f59e0b;--red:#ef4444;--blue:#3b82f6;--r:10px}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -92,6 +92,12 @@ select:focus,textarea:focus{border-color:var(--accent)}
 .lc-item:hover{background:var(--surface2)}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 20px;font-size:.88rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;transition:opacity .3s}
 .toast.ok{border-color:var(--green);color:var(--green)}.toast.err{border-color:var(--red);color:var(--red)}
+.chk-item{display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;transition:background .15s;border:1px solid transparent}
+.chk-item:hover{background:var(--surface2)}
+.chk-item.checked{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.3)}
+.chk-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0;margin-top:2px}
+.chk-item label{cursor:pointer;font-size:.85rem;line-height:1.4}
+.chk-section{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 0 6px}
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
 .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto}
 .modal-title{font-size:1rem;font-weight:800;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
@@ -102,7 +108,7 @@ select:focus,textarea:focus{border-color:var(--accent)}
 .os-tipo-icon{font-size:1.8rem;margin-bottom:8px}
 .os-tipo-label{font-size:.85rem;font-weight:700}
 .os-tipo-desc{font-size:.72rem;color:var(--muted);margin-top:4px}
-#view-fila{display:none}
+.view-hidden{display:none}
 #ficha-container{display:none}
 </style>
 </head>
@@ -207,7 +213,7 @@ select:focus,textarea:focus{border-color:var(--accent)}
   </div>
 
   <!-- FILA -->
-  <div id="view-fila">
+  <div id="view-fila" class="view-hidden">
     <div class="fila-stats">
       <div class="fstat"><div class="fstat-num r" id="st-alto">—</div><div class="fstat-label">🔴 Alto Risco</div></div>
       <div class="fstat"><div class="fstat-num y" id="st-medio">—</div><div class="fstat-label">🟡 Médio Risco</div></div>
@@ -217,6 +223,7 @@ select:focus,textarea:focus{border-color:var(--accent)}
       <button class="active" onclick="filtrar('alto',this)">🔴 Alto</button>
       <button onclick="filtrar('medio',this)">🟡 Médio</button>
       <button onclick="filtrar('todos',this)">📋 Todos</button>
+      <button id="btn-ocultar-bloq" onclick="toggleBloqueados(this)" style="margin-left:auto">🔒 Ocultar Bloqueados</button>
     </div>
     <div id="fila-load" class="loading" style="display:none">Carregando...</div>
     <div class="fila-lista" id="fila-lista"></div>
@@ -236,38 +243,53 @@ select:focus,textarea:focus{border-color:var(--accent)}
 
 <!-- MODAL: Abrir OS -->
 <div class="modal-bg" id="modal-abrir-os" style="display:none" onclick="if(event.target===this)fecharModal('modal-abrir-os')">
-  <div class="modal">
+  <div class="modal" style="max-width:560px">
     <div class="modal-title">
-      <span>📋 Abrir Ordem de Serviço</span>
+      <span id="modal-os-titulo">📋 Abrir Ordem de Serviço</span>
       <button class="modal-close" onclick="fecharModal('modal-abrir-os')">✕</button>
     </div>
-    <div class="os-grid">
-      <div class="os-tipo" id="os-tipo-16" onclick="selecionarTipoOS(16)">
-        <div class="os-tipo-icon">🔧</div>
-        <div class="os-tipo-label">Manutenção</div>
-        <div class="os-tipo-desc">Problema técnico no link</div>
+
+    <!-- PASSO 1: Selecionar tipo -->
+    <div id="os-passo1">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:12px">Selecione o tipo de OS:</div>
+      <div class="os-grid">
+        <div class="os-tipo" id="os-tipo-16" onclick="selecionarTipoOS(16)">
+          <div class="os-tipo-icon">🔧</div>
+          <div class="os-tipo-label">Manutenção</div>
+          <div class="os-tipo-desc">Problema técnico</div>
+        </div>
+        <div class="os-tipo" id="os-tipo-248" onclick="selecionarTipoOS(248)">
+          <div class="os-tipo-icon">🤝</div>
+          <div class="os-tipo-label">Retenção</div>
+          <div class="os-tipo-desc">Atendimento de retenção</div>
+        </div>
+        <div class="os-tipo" id="os-tipo-20" onclick="selecionarTipoOS(20)">
+          <div class="os-tipo-icon">🚫</div>
+          <div class="os-tipo-label">Sem Acesso</div>
+          <div class="os-tipo-desc">Cliente sem conexão</div>
+        </div>
+        <div class="os-tipo" id="os-tipo-21" onclick="selecionarTipoOS(21)">
+          <div class="os-tipo-icon">🐢</div>
+          <div class="os-tipo-label">Internet Lenta</div>
+          <div class="os-tipo-desc">Velocidade abaixo do contratado</div>
+        </div>
       </div>
-      <div class="os-tipo" id="os-tipo-248" onclick="selecionarTipoOS(248)">
-        <div class="os-tipo-icon">🤝</div>
-        <div class="os-tipo-label">Retenção</div>
-        <div class="os-tipo-desc">Atendimento de retenção</div>
+      <button class="btn btn-primary" style="width:100%;margin-top:4px" onclick="irPassoChecklist()">Próximo →</button>
+    </div>
+
+    <!-- PASSO 2: Checklist -->
+    <div id="os-passo2" style="display:none">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Marque os itens verificados com o cliente:</div>
+      <div id="os-checklist-itens"></div>
+      <div style="margin-top:14px">
+        <label>Observação adicional</label>
+        <textarea id="os-obs" placeholder="Informações complementares..." style="margin-top:5px"></textarea>
       </div>
-      <div class="os-tipo" id="os-tipo-20" onclick="selecionarTipoOS(20)">
-        <div class="os-tipo-icon">🚫</div>
-        <div class="os-tipo-label">Sem Acesso</div>
-        <div class="os-tipo-desc">Cliente sem conexão</div>
-      </div>
-      <div class="os-tipo" id="os-tipo-21" onclick="selecionarTipoOS(21)">
-        <div class="os-tipo-icon">🐢</div>
-        <div class="os-tipo-label">Internet Lenta</div>
-        <div class="os-tipo-desc">Velocidade abaixo do contratado</div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="btn btn-outline" onclick="voltarPasso1()">← Voltar</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmarAbrirOS()">✅ Gerar OS no IXC</button>
       </div>
     </div>
-    <div style="margin-bottom:12px">
-      <label>Observação</label>
-      <textarea id="os-obs" placeholder="Descreva o motivo da OS..." style="margin-top:5px"></textarea>
-    </div>
-    <button class="btn btn-primary" style="width:100%" onclick="confirmarAbrirOS()">Gerar OS no IXC</button>
   </div>
 </div>
 
@@ -280,12 +302,19 @@ function api(path, opts={}) {
   return fetch(path, {
     ...opts,
     headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+t, ...(opts.headers||{})}
-  }).then(r => r.json());
+  }).then(r => {
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  });
 }
 
 function showView(v) {
-  document.getElementById('view-busca').style.display = v==='busca' ? '' : 'none';
-  document.getElementById('view-fila').style.display  = v==='fila'  ? '' : 'none';
+  const busca = document.getElementById('view-busca');
+  const fila  = document.getElementById('view-fila');
+  busca.style.display = v==='busca' ? 'block' : 'none';
+  fila.style.display  = v==='fila'  ? 'block' : 'none';
+  fila.classList.remove('view-hidden');
+  busca.classList.remove('view-hidden');
   document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&v==='busca')||(i===1&&v==='fila')));
 }
 
@@ -441,20 +470,29 @@ async function filtrar(faixa, btn) {
   document.getElementById('fila-load').style.display='block';
   document.getElementById('fila-lista').innerHTML='';
   try {
-    const rows = await api('/api/retencao/fila?faixa='+faixa);
+    let rows = await api('/api/retencao/fila?faixa='+faixa);
     document.getElementById('fila-load').style.display='none';
     if (!rows.length) { document.getElementById('fila-lista').innerHTML='<div class="empty">Nenhum cliente nesta faixa</div>'; return; }
+    if (ocultarBloqueados) rows = rows.filter(r => r.status_contrato !== 'S');
     document.getElementById('fila-lista').innerHTML = rows.map(r=>`
-      <div class="fcard" onclick="irBusca(${r.ixc_contrato_id})">
+      <div class="fcard" onclick="abrirFichaFila(${r.ixc_contrato_id})">
         <div class="fscore ${r.faixa}">${r.score}</div>
-        <div>
-          <div class="fnome">${r.cliente_nome}</div>
-          <div class="fsub">${r.cidade||'—'} · ${r.plano_nome||'—'} · R$ ${parseFloat(r.plano_valor||0).toFixed(2)}</div>
-          <div class="fmots">${(r.motivos||[]).slice(0,3).map(m=>`<span class="fmot">${m.replace(/^[^\w]+/,'').substring(0,40)}</span>`).join('')}</div>
+        <div style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="fnome">${r.cliente_nome}</div>
+            <div style="font-size:.72rem;color:var(--muted);white-space:nowrap;margin-left:8px">#${r.ixc_contrato_id}</div>
+          </div>
+          <div class="fsub">${r.cidade||'—'} · ${r.plano_nome||'—'} · R$ ${parseFloat(r.plano_valor||0).toFixed(2)} · ${r.meses_casa||0} meses</div>
+          <div class="fmots">${(r.motivos||[]).slice(0,4).map(m=>`<span class="fmot">${m.substring(0,45)}</span>`).join('')}</div>
         </div>
-        <button class="btn btn-primary" style="font-size:.8rem;padding:8px 14px" onclick="event.stopPropagation();irBusca(${r.ixc_contrato_id})">Ver ficha</button>
+        <button class="btn btn-primary" style="font-size:.8rem;padding:8px 14px;white-space:nowrap" onclick="event.stopPropagation();abrirFichaFila(${r.ixc_contrato_id})">
+          Ver análise →
+        </button>
       </div>`).join('');
-  } catch(e) { document.getElementById('fila-load').style.display='none'; }
+  } catch(e) {
+    document.getElementById('fila-load').style.display='none';
+    document.getElementById('fila-lista').innerHTML='<div class="empty">Erro: '+e.message+'</div>';
+  }
 }
 
 function irBusca(id) {
@@ -463,11 +501,38 @@ function irBusca(id) {
   abrirId(id);
 }
 
+async function abrirFichaFila(id) {
+  // Abre ficha na aba de busca com scroll automatico
+  showView('busca');
+  document.getElementById('inp').value = String(id);
+  document.getElementById('lista-box').style.display = 'none';
+  document.getElementById('ficha-container').style.display = 'none';
+  document.getElementById('load').style.display = 'block';
+  window.scrollTo({top:0, behavior:'smooth'});
+  try {
+    const d = await api('/api/retencao/ficha/'+id);
+    document.getElementById('load').style.display = 'none';
+    renderFicha({...d, fonte:'tempo_real'});
+  } catch(e) {
+    document.getElementById('load').style.display = 'none';
+    toast('Erro ao carregar ficha','err');
+  }
+}
+
 function toast(msg, tipo='ok') {
   const t = document.createElement('div');
   t.className='toast '+tipo; t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>t.remove(),300); }, 2800);
+}
+
+let ocultarBloqueados = false;
+function toggleBloqueados(btn) {
+  ocultarBloqueados = !ocultarBloqueados;
+  btn.style.borderColor = ocultarBloqueados ? 'var(--accent)' : 'var(--border)';
+  btn.style.color = ocultarBloqueados ? 'var(--accent2)' : 'var(--muted)';
+  btn.style.background = ocultarBloqueados ? 'rgba(232,82,26,.1)' : 'var(--surface)';
+  filtrar(filaFiltro);
 }
 
 function fecharModal(id) { document.getElementById(id).style.display='none'; }
@@ -500,7 +565,106 @@ function abrirDetalhesOS(i) { var o = window._osData[i];
   document.getElementById('modal-os').style.display='flex';
 }
 
+
+const CHECKLISTS = {
+  20: {
+    label: '🚫 Sem Acesso',
+    itens: [
+      'Rádio/ONU do cliente está offline no sistema',
+      'Cliente está bloqueado por inadimplência',
+      'Houve queda de energia recentemente',
+      'Roteador está ligado (verificar luzes)',
+      'Orientado a desligar e religar o roteador (2 min)',
+      'Outros dispositivos também estão sem acesso',
+      'Cabo conectado corretamente',
+      'Problema persiste após reiniciar — técnico necessário',
+    ]
+  },
+  21: {
+    label: '🐢 Internet Lenta',
+    itens: [
+      'Cliente está próximo do roteador',
+      'Lentidão em todos os dispositivos',
+      'Lentidão apenas em um dispositivo',
+      'Cliente usando Wi-Fi (não cabo)',
+      'Teste de velocidade realizado (fast.com)',
+      'Franquia de internet verificada no sistema',
+      'Muitos dispositivos conectados simultaneamente',
+      'Orientado a reiniciar o roteador',
+      'Problema persiste após reiniciar — técnico necessário',
+    ]
+  },
+  16: {
+    label: '🔧 Manutenção',
+    itens: [
+      'Barreira interna (fiação dentro da residência)',
+      'Sem sinal na TV',
+      'Problema no app / streaming',
+      'Equipamento com defeito',
+      'Histórico de OS anteriores verificado',
+      'Endereço confirmado para visita técnica',
+      'Melhor horário para visita confirmado',
+      'Descrição detalhada do problema registrada',
+    ]
+  },
+  248: {
+    label: '🤝 Retenção',
+    itens: [
+      'Motivo do cancelamento identificado',
+      'Tempo de cliente verificado',
+      'Histórico de problemas verificado',
+      'Oferta de desconto apresentada',
+      'Oferta de upgrade de plano apresentada',
+      'Cliente aceitou proposta de retenção',
+      'Cliente recusou — motivo registrado',
+      'Encaminhado para cancelamento formal',
+    ]
+  },
+  248: {
+    label: '🤝 Retenção',
+    itens: [
+      'Motivo do cancelamento identificado',
+      'Tempo de cliente verificado',
+      'Histórico de problemas verificado',
+      'Oferta de desconto apresentada',
+      'Oferta de upgrade de plano apresentada',
+      'Cliente aceitou proposta de retenção',
+      'Cliente recusou — motivo registrado',
+      'Encaminhado para cancelamento formal',
+    ]
+  }
+};
+
 let osTipoSelecionado = null;
+
+function irPassoChecklist() {
+  if (!osTipoSelecionado) { toast('Selecione o tipo de OS','err'); return; }
+  const chk = CHECKLISTS[osTipoSelecionado];
+  if (!chk) { toast('Tipo não encontrado','err'); return; }
+  // Renderiza checklist
+  document.getElementById('os-checklist-itens').innerHTML =
+    chk.itens.map((item, i) => `
+      <div class="chk-item" id="chk-wrap-${i}" onclick="toggleChk(${i})">
+        <input type="checkbox" id="chk-${i}" onchange="toggleChk(${i})">
+        <label for="chk-${i}">${item}</label>
+      </div>`).join('');
+  document.getElementById('modal-os-titulo').textContent = chk.label;
+  document.getElementById('os-passo1').style.display = 'none';
+  document.getElementById('os-passo2').style.display = 'block';
+}
+
+function toggleChk(i) {
+  const cb = document.getElementById('chk-'+i);
+  const wrap = document.getElementById('chk-wrap-'+i);
+  cb.checked = !cb.checked;
+  wrap.classList.toggle('checked', cb.checked);
+}
+
+function voltarPasso1() {
+  document.getElementById('os-passo1').style.display = 'block';
+  document.getElementById('os-passo2').style.display = 'none';
+  document.getElementById('modal-os-titulo').textContent = '📋 Abrir Ordem de Serviço';
+}
 function selecionarTipoOS(id) {
   osTipoSelecionado = id;
   document.querySelectorAll('.os-tipo').forEach(el => el.classList.remove('selected'));
@@ -518,7 +682,22 @@ function abrirModalOS() {
 async function confirmarAbrirOS() {
   if (!fichaAtual) return;
   if (!osTipoSelecionado) { toast('Selecione o tipo de OS','err'); return; }
-  const obs = document.getElementById('os-obs').value;
+  const chk = CHECKLISTS[osTipoSelecionado];
+  // Coletar itens marcados
+  const marcados = chk ? chk.itens.filter((_,i) => {
+    const cb = document.getElementById('chk-'+i);
+    return cb && cb.checked;
+  }) : [];
+  const obs = document.getElementById('os-obs').value.trim();
+  // Montar corpo da OS
+  let corpo = '';
+  if (marcados.length) {
+    corpo += '=== CHECKLIST DE ATENDIMENTO ===\n';
+    marcados.forEach(item => { corpo += '✅ ' + item + '\n'; });
+    corpo += '\n';
+  }
+  if (obs) corpo += '=== OBSERVAÇÕES ===\n' + obs;
+  if (!corpo) corpo = chk ? chk.label + ' - Gerado pelo HubRetenção' : 'OS gerada pelo HubRetenção';
   try {
     const r = await api('/api/retencao/abrir-os', {
       method: 'POST',
@@ -526,12 +705,16 @@ async function confirmarAbrirOS() {
         ixc_contrato_id: fichaAtual.ixc_contrato_id,
         ixc_cliente_id: fichaAtual.ixc_cliente_id,
         id_assunto: osTipoSelecionado,
-        mensagem: obs || (osTipoSelecionado===248 ? 'OS de retenção gerada pelo HubRetenção' : 'OS de manutenção gerada pelo HubRetenção')
+        mensagem: corpo
       })
     });
     if (r.ok) {
       toast('OS #'+r.os_id+' gerada com sucesso!','ok');
       fecharModal('modal-abrir-os');
+      // Reset
+      osTipoSelecionado = null;
+      document.querySelectorAll('.os-tipo').forEach(el=>el.classList.remove('selected'));
+      voltarPasso1();
     } else {
       toast('Erro: '+(r.detail||'falha ao gerar OS'),'err');
     }
