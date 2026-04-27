@@ -585,138 +585,14 @@ async def assinar(token: str, payload: AssinarPayload, db=Depends(get_db)):
 
 def _enviar_documentos(pid: int, ixc_cliente_id: int, ixc_contrato_id: int, pasta: Path):
     """
-    Envia os documentos do pré-cadastro para ixcprovedor.cliente_arquivos via API REST do IXC.
-    Também envia o PDF do contrato assinado.
-
-    Chamado com o ixc_cliente_id retornado por ativar_cliente() —
-    nunca rele o banco para obter este valor após a ativação.
+    Envia os documentos do pre-cadastro para ixcprovedor.cliente_arquivos via REST.
+    Usa base64 puro — unico formato aceito pelo IXC.
+    Arquivos: rg_frente.jpg, comp_residencia.jpg, selfie_doc.jpg, contrato_{id}.pdf
     """
-    import os, requests as _req, unicodedata as _ud, sqlite3 as _sq
-
-    IXC_URL   = os.getenv("IXC_API_URL",   "")
-    IXC_USER  = os.getenv("IXC_API_USER",  "")
-    IXC_TOKEN = os.getenv("IXC_API_TOKEN", "")
-
-    if not IXC_URL or not IXC_USER or not IXC_TOKEN:
-        log.warning(f"#{pid} Envio de docs ignorado — credenciais IXC não configuradas.")
-        return
-
-    # Ler documentos e dados do pré-cadastro do banco
+    from app.engines.ativacao_engine import enviar_documentos_ixc
     try:
-        _conn = _sq.connect(str(DB_PATH), check_same_thread=False)
-        _conn.row_factory = _sq.Row
-        pre = _conn.execute("SELECT * FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
-        docs = _conn.execute(
-            "SELECT tipo, arquivo FROM hc_precadastro_docs WHERE precadastro_id=?", (pid,)
-        ).fetchall()
-        _conn.close()
+        resultado = enviar_documentos_ixc(pid, ixc_cliente_id)
+        enviados  = sum(1 for r in resultado if r["sucesso"])
+        log.info(f"#{pid} _enviar_documentos: {enviados}/{len(resultado)} enviados ao IXC")
     except Exception as e:
-        log.error(f"#{pid} Erro ao ler docs do banco: {e}")
-        return
-
-    if not docs:
-        log.info(f"#{pid} Nenhum documento para enviar.")
-        return
-
-    import base64 as _b64e
-    auth = _b64e.b64encode(f"{IXC_USER}:{IXC_TOKEN}".encode()).decode()
-    headers_ixc = {
-        "Authorization": f"Basic {auth}",
-        "ixcsoft": "gravar",
-    }
-
-    # Prefixo do nome do arquivo com o primeiro nome do cliente
-    _razao = (pre["razao"] or "").split()[0].upper() if pre else ""
-    razao_curta = _ud.normalize("NFKD", _razao).encode("ascii", "ignore").decode("ascii")
-
-    # Enviar cada documento de identidade/selfie/comprovante
-    for doc in docs:
-        doc_path = BASE_DIR / doc["arquivo"]
-        if not doc_path.exists():
-            log.warning(f"#{pid} Arquivo não encontrado: {doc_path}")
-            continue
-
-        descricao = doc["tipo"].replace("_", " ").upper()
-        nome_arq  = f"{descricao} {razao_curta}{doc_path.suffix}"
-        mime = "application/octet-stream"
-
-        try:
-            with open(doc_path, "rb") as f_doc:
-                r = _req.post(
-                    f"{IXC_URL}/webservice/v1/cliente_arquivos",
-                    headers=headers_ixc,
-                    files={"arquivo": (nome_arq, f_doc, mime)},
-                    data={
-                        "id_cliente": str(ixc_cliente_id),
-                        "descricao":  descricao,
-                        "nome_arquivo": nome_arq,
-                    },
-                    timeout=15,
-                )
-            log.info(f"#{pid} doc {nome_arq} → status={r.status_code}")
-
-            # Corrigir nome_arquivo via MySQL direto (API IXC não aceita no multipart)
-            try:
-                import json as _json
-                resp_data = _json.loads(r.text)
-                new_id = resp_data.get("id")
-                if new_id:
-                    from app.services.ixc_db import ixc_conn
-                    with ixc_conn() as _ixc:
-                        with _ixc.cursor() as _cur:
-                            _cur.execute(
-                                "UPDATE ixcprovedor.cliente_arquivos SET nome_arquivo=%s WHERE id=%s",
-                                (nome_arq, new_id)
-                            )
-                        _ixc.commit()
-                    log.info(f"#{pid} nome_arquivo corrigido id={new_id} → {nome_arq}")
-            except Exception as _e:
-                log.warning(f"#{pid} Não corrigiu nome_arquivo: {_e}")
-
-        except Exception as e:
-            log.error(f"#{pid} Erro ao enviar {nome_arq}: {e}")
-
-    # Enviar PDF do contrato assinado
-    pdf_files = sorted(pasta.glob("contrato_*.pdf")) if pasta.exists() else []
-    if not pdf_files:
-        pdf_files = sorted(pasta.glob("*.pdf")) if pasta.exists() else []
-
-    if pdf_files and ixc_contrato_id:
-        pdf_path = pdf_files[-1]
-        descricao_pdf = f"Contrato ID.{ixc_contrato_id} com assinatura digital"
-        try:
-            with open(pdf_path, "rb") as f_pdf:
-                r = _req.post(
-                    f"{IXC_URL}/webservice/v1/cliente_arquivos",
-                    headers=headers_ixc,
-                    files={"arquivo": (pdf_path.name, f_pdf, "application/pdf")},
-                    data={
-                        "id_cliente":   str(ixc_cliente_id),
-                        "descricao":    descricao_pdf,
-                        "nome_arquivo": pdf_path.name,
-                        "local_arquivo": f"arquivos/{pdf_path.name}",
-                    },
-                    timeout=15,
-                )
-            log.info(f"#{pid} pdf {pdf_path.name} → status={r.status_code}")
-            # Corrigir nome_arquivo via MySQL — API IXC ignora o campo no multipart
-            try:
-                import json as _json
-                resp_data = _json.loads(r.text)
-                pdf_id = resp_data.get("id")
-                if pdf_id:
-                    from app.services.ixc_db import ixc_conn
-                    with ixc_conn() as _ixc:
-                        with _ixc.cursor() as _cur:
-                            _cur.execute(
-                                "UPDATE ixcprovedor.cliente_arquivos SET nome_arquivo=%s WHERE id=%s",
-                                (pdf_path.name, pdf_id)
-                            )
-                        _ixc.commit()
-                    log.info(f"#{pid} nome_arquivo PDF corrigido id={pdf_id} → {pdf_path.name}")
-            except Exception as _e:
-                log.warning(f"#{pid} Não corrigiu nome_arquivo PDF: {_e}")
-        except Exception as e:
-            log.error(f"#{pid} Erro ao enviar PDF: {e}")
-
-    log.info(f"#{pid} Envio de documentos para IXC cliente {ixc_cliente_id} concluído.")
+        log.error(f"#{pid} _enviar_documentos ERRO: {e}")
