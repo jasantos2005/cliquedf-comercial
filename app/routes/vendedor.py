@@ -30,6 +30,22 @@ async def cidade_por_ibge(ibge: str=Query(...), user=Depends(requer_vendedor()))
     row = ixc_select_one("SELECT id,nome,uf FROM ixcprovedor.cidade WHERE cod_ibge=%s LIMIT 1",(ibge,))
     return {"id": row["id"] if row else None, "nome": row["nome"] if row else None}
 
+@router.get("/cidade-por-cep")
+async def cidade_por_cep(cep: str=Query(...), user=Depends(requer_vendedor()), db=Depends(get_db)):
+    """Busca cidade pela faixa de CEP na tabela local hc_cidades."""
+    cep_num = cep.replace("-","").replace(".","").strip()
+    if len(cep_num) != 8:
+        raise HTTPException(400, "CEP inválido.")
+    row = db.execute("""
+        SELECT ixc_id as id, nome, uf_sigla
+        FROM hc_cidades
+        WHERE cep_inicio <= ? AND cep_fim >= ?
+        LIMIT 1
+    """, (cep_num, cep_num)).fetchone()
+    if not row:
+        return {"id": None, "nome": None, "uf_sigla": None}
+    return dict(row)
+
 @router.get("/viabilidade")
 async def verificar_viabilidade(cep:str=Query(...),endereco:str=Query(""),numero:str=Query(""),bairro:str=Query(""),cidade:str=Query(""),user=Depends(requer_vendedor())):
     c = cep.replace("-","").strip(); itens=[]
@@ -52,6 +68,96 @@ async def verificar_viabilidade(cep:str=Query(...),endereco:str=Query(""),numero
             itens+=["Cidade atendida, sem histórico neste bairro/CEP","Confirme com supervisor antes de prosseguir"]
             return {"status":"alerta","nivel":4,"itens":itens}
     return {"status":"bloqueado","nivel":0,"itens":["Nenhum cliente ativo nesta cidade","Região fora da área de atendimento"]}
+
+
+@router.get("/consultar-cpf/{cpf}")
+def consultar_cpf(cpf: str, user=Depends(requer_vendedor())):
+    """
+    Consulta CPF/CNPJ no IXC e retorna o cenário:
+    - livre: CPF não existe na base
+    - novo_contrato: cliente ativo, pode criar novo contrato
+    - ex_cliente_ok: ex-cliente sem dívidas, pode prosseguir
+    - bloqueado: ex-cliente com dívidas, não pode prosseguir
+    """
+    from app.services.ixc_db import ixc_conn
+    import re
+    cpf_limpo = re.sub(r'[^0-9]', '', cpf)
+    # Formatar com máscara para busca
+    if len(cpf_limpo) == 11:
+        cpf_fmt = f"{cpf_limpo[:3]}.{cpf_limpo[3:6]}.{cpf_limpo[6:9]}-{cpf_limpo[9:]}"
+    elif len(cpf_limpo) == 14:
+        cpf_fmt = f"{cpf_limpo[:2]}.{cpf_limpo[2:5]}.{cpf_limpo[5:8]}/{cpf_limpo[8:12]}-{cpf_limpo[12:]}"
+    else:
+        cpf_fmt = cpf_limpo
+
+    try:
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            # Buscar cliente por CPF (com ou sem máscara)
+            cur.execute("""
+                SELECT c.id, c.razao, c.ativo, c.cidade,
+                       ci.nome as cidade_nome,
+                       cc.status as contrato_status,
+                       cc.id as contrato_id
+                FROM cliente c
+                LEFT JOIN cidade ci ON ci.id = c.cidade
+                LEFT JOIN cliente_contrato cc ON cc.id_cliente = c.id AND cc.status = 'A'
+                WHERE c.cnpj_cpf IN (%s, %s)
+                ORDER BY c.id DESC LIMIT 5
+            """, (cpf_fmt, cpf_limpo))
+            clientes = cur.fetchall()
+
+            if not clientes:
+                return {"cenario": "livre", "msg": "CPF não encontrado na base. Pode prosseguir com o cadastro."}
+
+            # Pegar cliente mais recente
+            cli = clientes[0]
+
+            # Verificar se tem contrato ativo
+            tem_ativo = any(r["contrato_status"] == "A" for r in clientes)
+
+            if tem_ativo:
+                # Cenário 2: cliente ativo — novo contrato
+                contratos_ativos = [r for r in clientes if r["contrato_status"] == "A"]
+                return {
+                    "cenario": "novo_contrato",
+                    "msg": f"Cliente já cadastrado e ativo. Será criado apenas um novo contrato.",
+                    "ixc_cliente_id": cli["id"],
+                    "razao": cli["razao"],
+                    "cidade": cli["cidade_nome"] or "",
+                    "contratos_ativos": len(contratos_ativos)
+                }
+
+            # Cliente inativo — verificar dívidas
+            cur.execute("""
+                SELECT COUNT(*) as qtd, SUM(valor_aberto) as total
+                FROM fn_areceber
+                WHERE id_cliente = %s AND status = 'A' AND valor_aberto > 0
+            """, (cli["id"],))
+            divida = cur.fetchone()
+            tem_divida = divida and divida["qtd"] > 0 and float(divida["total"] or 0) > 0
+
+            if tem_divida:
+                return {
+                    "cenario": "bloqueado",
+                    "msg": f"Cliente com dívidas em aberto. Não é possível prosseguir.",
+                    "ixc_cliente_id": cli["id"],
+                    "razao": cli["razao"],
+                    "divida_qtd": int(divida["qtd"]),
+                    "divida_total": float(divida["total"] or 0)
+                }
+
+            # Ex-cliente sem dívidas
+            return {
+                "cenario": "ex_cliente_ok",
+                "msg": f"Ex-cliente encontrado sem dívidas. Pode prosseguir com novo cadastro.",
+                "ixc_cliente_id": cli["id"],
+                "razao": cli["razao"],
+                "cidade": cli["cidade_nome"] or ""
+            }
+
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao consultar CPF: {e}")
 
 @router.post("/precadastro")
 async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:UploadFile=File(None),comp:UploadFile=File(None),db=Depends(get_db),user=Depends(requer_vendedor())):
@@ -165,3 +271,23 @@ async def corrigir_precadastro(
     db.commit()
 
     return {"ok": True, "status": "enviado", "msg": "Cadastro corrigido e enviado para auditoria!"}
+
+
+# ── CIDADES PARA CACHE OFFLINE ────────────────────────────────
+@router.get("/cidades-cache")
+async def cidades_cache(user=Depends(requer_vendedor())):
+    from app.services.ixc_db import ixc_conn
+    try:
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT DISTINCT ci.id, ci.nome, ci.uf, u.sigla as uf_sigla
+                FROM ixcprovedor.cidade ci
+                JOIN ixcprovedor.cliente cl ON cl.cidade = ci.id
+                LEFT JOIN ixcprovedor.uf u ON u.id = ci.uf
+                WHERE cl.ativo = 'S'
+                ORDER BY ci.nome
+            """)
+            return {"cidades": [dict(r) for r in cur.fetchall()]}
+    except Exception as e:
+        raise HTTPException(500, str(e))

@@ -20,7 +20,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 
 /* HEADER */
-#header{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+#header{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 60px 12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .logo{font-size:17px;font-weight:800;letter-spacing:-.5px;}
 .logo span{color:var(--cyan);}
 .user-chip{background:var(--surf2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--muted);}
@@ -84,6 +84,11 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .score-wrap{margin-top:8px;}
 .score-label{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px;}
 .score-bar{height:4px;background:var(--border);border-radius:4px;overflow:hidden;}
+.offline-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;cursor:pointer;border:none;transition:all .2s;}
+.offline-badge.online{background:rgba(0,212,170,.12);color:#00d4aa;}
+.offline-badge.offline{background:rgba(255,77,106,.15);color:#ff4d6d;animation:pulse-off 1.5s infinite;}
+@keyframes pulse-off{0%,100%{opacity:1}50%{opacity:.6}}
+.sync-bar{background:rgba(245,166,35,.12);border-bottom:1px solid rgba(245,166,35,.3);padding:8px 16px;font-size:12px;color:#f5a623;display:none;align-items:center;justify-content:space-between;}
 .score-fill{height:100%;border-radius:4px;transition:width .6s ease;}
 
 /* FILTER TABS */
@@ -147,7 +152,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .os-open{color:var(--red);}
 
 /* THEME TOGGLE */
-#theme-btn{position:fixed;top:12px;right:56px;z-index:999;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surf2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;}
+#theme-btn{position:fixed;top:12px;right:16px;z-index:999;width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--surf2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:all .2s;}
 body.light-mode{--bg:#f0f2f7;--surf:#ffffff;--surf2:#e8ebf2;--border:#d0d6e4;--text:#1a1f2e;--muted:#5a6480;--radius:14px;}
 body.light-mode #header,body.light-mode #bnav{background:var(--surf);}
 body.light-mode .card,body.light-mode .kpi{background:var(--surf);}
@@ -174,7 +179,16 @@ body.light-mode .field input,body.light-mode #login-screen{background:var(--surf
 <div id="app" style="display:none;">
   <div id="header">
     <div class="logo">Hub<span>Com</span></div>
-    <div class="user-chip"><strong id="h-nome">—</strong></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button id="offline-btn" class="offline-badge online" onclick="toggleOfflineMode()">
+        <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+        <span id="offline-label">Online</span>
+      </button>
+      <div class="user-chip"><strong id="h-nome">—</strong></div>
+    </div>
+  </div>
+  <div id="sync-bar" class="sync-bar">
+    <span id="sync-msg">⚡ Cadastros offline aguardando sincronização</span>
   </div>
 
   <div id="content">
@@ -220,6 +234,17 @@ body.light-mode .field input,body.light-mode #login-screen{background:var(--surf
 
     <!-- MAIS: CANCELAMENTOS + EFICIÊNCIA + PERFIL -->
     <div id="s-mais" class="screen">
+      <div style="padding:4px 0 16px;">
+        <button onclick="abrirFormOffline()" 
+          style="width:100%;padding:14px;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;color:#f5a623;font-size:14px;font-weight:700;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px;">
+          ⚡ Cadastro Offline
+          <span style="font-size:11px;color:var(--text3);margin-left:auto;font-weight:400;">formulário único</span>
+        </button>
+      </div>
+      <div id="offline-lista-wrap" style="margin-bottom:16px;display:none;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px;color:var(--text);">Cadastros offline</div>
+        <div id="offline-lista"></div>
+      </div>
       <div class="sec-title">Minha eficiência</div>
       <div class="chart-wrap">
         <div class="chart-bars" id="chart-bars"><div class="empty" style="padding:10px;font-size:12px;">Carregando...</div></div>
@@ -313,7 +338,148 @@ body.light-mode .field input,body.light-mode #login-screen{background:var(--surf
     </div>
 
     <!-- FORMULÁRIO (novo cadastro) -->
-    <div id="s-form" class="screen" style="padding:0;">
+    <div id="s-form-offline" class="screen" style="padding:16px 16px 80px;">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;">
+    <button onclick="navTo('inicio')" style="background:none;border:none;color:var(--cyan);cursor:pointer;font-size:14px;">← Voltar</button>
+    <span style="font-size:16px;font-weight:700;">Novo Cadastro Offline</span>
+  </div>
+  <div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#f5a623;">
+    ⚡ Modo offline — dados salvos localmente e enviados ao sincronizar
+  </div>
+
+  <!-- ENDEREÇO -->
+  <div style="font-size:11px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Endereço</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">CEP *</label>
+      <input id="of-cep" type="text" placeholder="00000-000" maxlength="9"
+        style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;"
+        oninput="maskCep(this)" onblur="buscarCepOffline()">
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Número *</label>
+      <input id="of-numero" type="text" placeholder="123"
+        style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;">
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Endereço</label>
+    <input id="of-endereco" type="text" placeholder="Rua, Avenida..."
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Bairro</label>
+      <input id="of-bairro" type="text" placeholder="Bairro"
+        style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Cidade *</label>
+      <select id="of-cidade"
+        style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+        <option value="">Selecione</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- CLIENTE -->
+  <div style="font-size:11px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 10px;">Cliente</div>
+  <div style="margin-bottom:10px;">
+    <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Nome completo *</label>
+    <input id="of-nome" type="text" placeholder="Nome do cliente"
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">CPF *</label>
+      <input id="of-cpf" type="text" placeholder="000.000.000-00" maxlength="14"
+        style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;"
+        oninput="maskCpf(this)">
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Celular *</label>
+      <input id="of-cel" type="tel" placeholder="(00) 00000-0000" maxlength="15"
+        style="width:100%;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;"
+        oninput="maskFone(this)">
+    </div>
+  </div>
+  <div style="margin-bottom:10px;">
+    <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">E-mail</label>
+    <input id="of-email" type="email" placeholder="email@exemplo.com"
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+  </div>
+  <div style="margin-bottom:10px;">
+    <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Data de nascimento</label>
+    <input id="of-nasc" type="date"
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+  </div>
+
+  <!-- PLANO -->
+  <div style="font-size:11px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 10px;">Plano</div>
+  <div style="margin-bottom:10px;">
+    <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Plano *</label>
+    <select id="of-plano"
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+      <option value="">Selecione o plano</option>
+    </select>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Vencimento *</label>
+      <select id="of-venc"
+        style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+        <option value="">Dia</option>
+        <option value="5">Dia 5</option>
+        <option value="10">Dia 10</option>
+        <option value="15">Dia 15</option>
+        <option value="20">Dia 20</option>
+        <option value="25">Dia 25</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Canal</label>
+      <select id="of-canal"
+        style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
+        <option value="porta_a_porta">Porta a porta</option>
+        <option value="indicacao">Indicação</option>
+        <option value="midia_social">Mídia social</option>
+        <option value="outros">Outros</option>
+      </select>
+    </div>
+  </div>
+  <div style="margin-bottom:16px;">
+    <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Observação</label>
+    <textarea id="of-obs" rows="2" placeholder="Opcional..."
+      style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;resize:none;"></textarea>
+  </div>
+
+  <!-- DOCUMENTOS -->
+  <div style="font-size:11px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;">Documentos</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+    <div id="of-slot-rg" onclick="document.getElementById('of-input-rg').click()"
+      style="border:1.5px dashed var(--border);border-radius:10px;padding:14px 8px;text-align:center;cursor:pointer;font-size:11px;color:var(--text3);">
+      <div style="font-size:20px;margin-bottom:4px;">📄</div>RG *
+      <input type="file" id="of-input-rg" accept="image/*" capture="environment" style="display:none;" onchange="onDocOffline(this,'rg')">
+    </div>
+    <div id="of-slot-selfie" onclick="document.getElementById('of-input-selfie').click()"
+      style="border:1.5px dashed var(--border);border-radius:10px;padding:14px 8px;text-align:center;cursor:pointer;font-size:11px;color:var(--text3);">
+      <div style="font-size:20px;margin-bottom:4px;">🤳</div>Selfie *
+      <input type="file" id="of-input-selfie" accept="image/*" capture="user" style="display:none;" onchange="onDocOffline(this,'selfie')">
+    </div>
+    <div id="of-slot-comp" onclick="document.getElementById('of-input-comp').click()"
+      style="border:1.5px dashed var(--border);border-radius:10px;padding:14px 8px;text-align:center;cursor:pointer;font-size:11px;color:var(--text3);">
+      <div style="font-size:20px;margin-bottom:4px;">🏠</div>Comp.
+      <input type="file" id="of-input-comp" accept="image/*" capture="environment" style="display:none;" onchange="onDocOffline(this,'comp')">
+    </div>
+  </div>
+
+  <button onclick="enviarFormOffline()" id="of-btn-enviar"
+    style="width:100%;padding:14px;background:var(--cyan);color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;">
+    Salvar offline
+  </button>
+</div>
+
+<div id="s-form" class="screen" style="padding:0;">
       <div style="background:var(--surf);border-bottom:1px solid var(--border);padding:12px 16px;position:sticky;top:0;z-index:50;">
         <button style="background:none;border:none;color:var(--cyan);font-size:14px;cursor:pointer;display:flex;align-items:center;gap:4px;margin-bottom:8px;" onclick="navTo('inicio')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg> Cancelar
@@ -389,6 +555,7 @@ function mostrarApp(){
   document.getElementById('app').style.display='flex';
   document.getElementById('h-nome').textContent=usuario.nome.split(' ')[0];
   carregarPlanos();
+  cachearCidades();
   carregarInicio();
 }
 
@@ -413,11 +580,228 @@ function navTo(tela){
 }
 
 function navForm(){
+  if(modoOffline){ abrirFormOffline(); return; }
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('s-form').classList.add('active');
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
   formPasso=1; formDados={}; formDocs={rg:null,selfie:null,comp:null}; viabOk=false;
   renderFormPasso(1);
+}
+
+function abrirFormOffline(){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('s-form-offline').classList.add('active');
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  window._offlineDocs={rg:null,selfie:null,comp:null};
+  // Popular planos
+  const sel=document.getElementById('of-plano');
+  sel.innerHTML='<option value="">Selecione o plano</option>';
+  (planos||[]).forEach(p=>{
+    const opt=document.createElement('option');
+    opt.value=p.id; opt.dataset.nome=p.nome; opt.dataset.valor=p.valor||0;
+    opt.dataset.taxa=p.taxa_instalacao||0; opt.dataset.fid=p.fidelidade||0;
+    opt.textContent=p.nome+' — R$ '+fmtVal(p.valor||0)+'/mês';
+    sel.appendChild(opt);
+  });
+  // Popular cidades — do cache ou da lista fixa
+  const selC=document.getElementById('of-cidade');
+  selC.innerHTML='<option value="">Selecione</option>';
+  const cids=window._cidadesCache||[];
+  if(cids.length>0){
+    cids.sort((a,b)=>a.nome.localeCompare(b.nome)).forEach(ci=>{
+      const opt=document.createElement('option');
+      opt.value=ci.id; opt.dataset.nome=ci.nome; opt.dataset.uf=ci.uf_sigla;
+      opt.textContent=ci.nome+' — '+ci.uf_sigla;
+      selC.appendChild(opt);
+    });
+  } else {
+    // Lista fixa de fallback
+    const fixas=[
+      {id:1753,nome:'Aracaju',uf_sigla:'SE'},
+      {id:1651,nome:'Arapiraca',uf_sigla:'AL'},
+      {id:1758,nome:'Brejo Grande',uf_sigla:'SE'},
+      {id:1775,nome:'Ilha das Flores',uf_sigla:'SE'},
+      {id:1782,nome:'Japoatã',uf_sigla:'SE'},
+      {id:1783,nome:'Lagarto',uf_sigla:'SE'},
+      {id:1695,nome:'Maceió',uf_sigla:'AL'},
+      {id:1792,nome:'Neópolis',uf_sigla:'SE'},
+      {id:1798,nome:'Pacatuba',uf_sigla:'SE'},
+      {id:1721,nome:'Penedo',uf_sigla:'AL'},
+      {id:1722,nome:'Piaçabuçu',uf_sigla:'AL'},
+      {id:1806,nome:'Propriá',uf_sigla:'SE'},
+      {id:1813,nome:'Santana do São Francisco',uf_sigla:'SE'},
+    ];
+    fixas.forEach(ci=>{
+      const opt=document.createElement('option');
+      opt.value=ci.id; opt.dataset.nome=ci.nome; opt.dataset.uf=ci.uf_sigla;
+      opt.textContent=ci.nome+' — '+ci.uf_sigla;
+      selC.appendChild(opt);
+    });
+  }
+  // Limpar campos
+  ['of-cep','of-numero','of-endereco','of-bairro','of-nome','of-cpf',
+   'of-cel','of-email','of-nasc','of-obs'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.value='';
+  });
+  (function(){
+    var defs=[
+      {t:'rg',    icon:'📄',lbl:'RG *',    cap:'environment'},
+      {t:'selfie',icon:'🤳',lbl:'Selfie *',cap:'user'},
+      {t:'comp',  icon:'🏠',lbl:'Comp.',   cap:'environment'}
+    ];
+    defs.forEach(function(d){
+      var slot=document.getElementById('of-slot-'+d.t);
+      if(!slot)return;
+      slot.innerHTML='';
+      slot.style.borderColor='var(--border)';
+      slot.style.background='';
+      var div=document.createElement('div');
+      div.style.cssText='font-size:20px;margin-bottom:4px;';
+      div.textContent=d.icon;
+      var lbl=document.createElement('div');
+      lbl.textContent=d.lbl;
+      var inp=document.createElement('input');
+      inp.type='file';inp.id='of-input-'+d.t;
+      inp.accept='image/*';inp.setAttribute('capture',d.cap);
+      inp.style.display='none';
+      (function(tipo){inp.onchange=function(){onDocOffline(this,tipo);};})(d.t);
+      slot.appendChild(div);slot.appendChild(lbl);slot.appendChild(inp);
+      (function(tipo){slot.onclick=function(){document.getElementById('of-input-'+tipo).click();};})(d.t);
+    });
+  })();
+  document.getElementById('s-form-offline').scrollTop=0;
+  window.scrollTo(0,0);
+}
+
+async function buscarCepOffline(){
+  const cep=document.getElementById('of-cep')?.value.replace(/\D/g,'');
+  if(!cep||cep.length!==8) return;
+  try{
+    const rc=await api('/api/vendedor/cidade-por-cep?cep='+cep);
+    if(rc.id){
+      const sel=document.getElementById('of-cidade');
+      if(sel) sel.value=rc.id;
+    }
+  }catch(e){}
+  // Tentar ViaCEP para endereço
+  try{
+    const r=await fetch('https://viacep.com.br/ws/'+cep+'/json/');
+    const d=await r.json();
+    if(!d.erro){
+      if(document.getElementById('of-endereco'))document.getElementById('of-endereco').value=d.logradouro||'';
+      if(document.getElementById('of-bairro'))document.getElementById('of-bairro').value=d.bairro||'';
+    }
+  }catch(e){}
+}
+
+function onDocOffline(input,tipo){
+  const file=input.files[0]; if(!file) return;
+  if(!window._offlineDocs) window._offlineDocs={rg:null,selfie:null,comp:null};
+  window._offlineDocs[tipo]=file;
+  const slotId='of-slot-'+tipo;
+  const slot=document.getElementById(slotId);
+  if(slot){
+    const icon=tipo==='rg'?'📄':tipo==='selfie'?'🤳':'🏠';
+    const label=tipo==='rg'?'RG ✓':tipo==='selfie'?'Selfie ✓':'Comp. ✓';
+    slot.style.borderColor='var(--green)';
+    slot.style.background='rgba(0,212,170,.08)';
+    const inp2=document.createElement('input');
+    inp2.type='file';inp2.id='of-input-'+tipo;inp2.accept='image/*';inp2.style.display='none';
+    inp2.onchange=function(){onDocOffline(this,tipo);};
+    slot.innerHTML='<div style="font-size:20px;margin-bottom:4px;">'+icon+'</div>'+
+      '<div style="font-size:10px;color:var(--green);">'+label+'</div>'+
+      '<div style="font-size:10px;color:var(--text3);">'+Math.round(file.size/1024)+'KB</div>';
+    slot.appendChild(inp2);
+  }
+}
+
+function maskCpf(el){
+  let v=el.value.replace(/\D/g,'');
+  if(v.length>3)v=v.slice(0,3)+'.'+v.slice(3);
+  if(v.length>7)v=v.slice(0,7)+'.'+v.slice(7);
+  if(v.length>11)v=v.slice(0,11)+'-'+v.slice(11);
+  el.value=v.slice(0,14);
+}
+
+async function enviarFormOffline(){
+  const btn=document.getElementById('of-btn-enviar');
+  // Validar campos obrigatórios
+  const cidSel=document.getElementById('of-cidade');
+  const plaSel=document.getElementById('of-plano');
+  const cidOpt=cidSel?cidSel.options[cidSel.selectedIndex]:null;
+  const plaOpt=plaSel?plaSel.options[plaSel.selectedIndex]:null;
+
+  const erros=[];
+  if(!document.getElementById('of-cep')?.value) erros.push('CEP');
+  if(!document.getElementById('of-numero')?.value) erros.push('Número');
+  if(!cidSel?.value) erros.push('Cidade');
+  if(!document.getElementById('of-nome')?.value) erros.push('Nome');
+  if(!document.getElementById('of-cpf')?.value) erros.push('CPF');
+  if(!document.getElementById('of-cel')?.value) erros.push('Celular');
+  if(!plaSel?.value) erros.push('Plano');
+  if(!document.getElementById('of-venc')?.value) erros.push('Vencimento');
+  if(!window._offlineDocs?.rg) erros.push('RG');
+  if(!window._offlineDocs?.selfie) erros.push('Selfie');
+
+  if(erros.length){toast('Preencha: '+erros.join(', '),'err');return;}
+
+  btn.textContent='Salvando...'; btn.disabled=true;
+  try{
+    const db=await getIDB();
+    async function toB64(file){
+      if(!file)return null;
+      return new Promise(r=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(file);});
+    }
+    const dados={
+      cep:          document.getElementById('of-cep').value,
+      numero:       document.getElementById('of-numero').value,
+      endereco:     document.getElementById('of-endereco').value.trim(),
+      bairro:       document.getElementById('of-bairro').value.trim(),
+      ixc_cidade_id:parseInt(cidSel.value),
+      cidade_nome:  cidOpt.dataset.nome,
+      uf_sigla:     cidOpt.dataset.uf,
+      razao:        document.getElementById('of-nome').value.trim().toUpperCase(),
+      cnpj_cpf:     document.getElementById('of-cpf').value,
+      telefone_celular: document.getElementById('of-cel').value,
+      whatsapp:     document.getElementById('of-cel').value,
+      email:        document.getElementById('of-email').value.trim(),
+      data_nascimento: document.getElementById('of-nasc').value||null,
+      ixc_plano_id: parseInt(plaSel.value),
+      plano_nome:   plaOpt.dataset.nome,
+      plano_valor:  parseFloat(plaOpt.dataset.valor||0),
+      taxa_instalacao: parseFloat(plaOpt.dataset.taxa||0),
+      fidelidade:   parseFloat(plaOpt.dataset.fid||0),
+      dia_vencimento: document.getElementById('of-venc').value,
+      canal_venda:  document.getElementById('of-canal').value,
+      obs:          document.getElementById('of-obs').value.trim(),
+      viabilidade_status: 'pendente_offline',
+      viabilidade_nivel: 0,
+      viabilidade_obs: 'Cadastrado offline',
+      sexo:'', rg_orgao_emissor:'', nacionalidade:'Brasileiro',
+      tipo_pessoa:'F', complemento:'', referencia:''
+    };
+    const registro={
+      dados,
+      rg:    await toB64(window._offlineDocs.rg),
+      selfie:await toB64(window._offlineDocs.selfie),
+      comp:  await toB64(window._offlineDocs.comp),
+      salvadoEm:new Date().toISOString(),
+      status:'pendente'
+    };
+    const tx=db.transaction('cadastros','readwrite');
+    await new Promise((res,rej)=>{
+      const req=tx.objectStore('cadastros').add(registro);
+      req.onsuccess=res; req.onerror=rej;
+    });
+    await verificarPendentesOffline();
+    toast('Cadastro salvo! Será enviado ao sincronizar.','ok');
+    window._offlineDocs={rg:null,selfie:null,comp:null};
+    setTimeout(()=>navTo('leads'),1500);
+  }catch(e){
+    toast('Erro ao salvar: '+e.message,'err');
+    console.error(e);
+  }finally{btn.textContent='Salvar offline';btn.disabled=false;}
 }
 
 // ── INÍCIO ────────────────────────────────────────────────────
@@ -756,6 +1140,7 @@ function renderPasso1(){return`
 </div>
 <div id="viab-area"></div>
 <button id="btn-viab" class="btn btn-cyan" onclick="verificarViab()">Verificar viabilidade</button>
+<button id="btn-viab-skip" class="btn btn-outline" style="display:none;margin-top:6px;font-size:12px;" onclick="pularViabOffline()">⚡ Pular (modo offline)</button>
 <button id="btn-prox1" class="btn btn-cyan" style="display:none;margin-top:8px;" onclick="avancarPasso(2)">Próximo →</button>
 `;}
 
@@ -773,8 +1158,9 @@ function renderPasso2(){return`
 </div>
 <div style="margin-bottom:16px;">
   <label id="lbl-cpf" style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">CPF<span style="color:var(--red)">*</span></label>
-  <input id="f-cpf" type="tel" maxlength="14" placeholder="000.000.000-00" oninput="maskDoc(this)" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
+  <input id="f-cpf" type="tel" maxlength="14" placeholder="000.000.000-00" oninput="maskDoc(this);document.getElementById('alerta-cpf').style.display='none';formDados._ixc_cliente_existente=null;" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
   <div id="err-cpf" style="display:none;font-size:11px;color:var(--red);margin-top:4px;">CPF/CNPJ inválido</div>
+  <div id="alerta-cpf" style="display:none;margin-top:8px;border-radius:10px;padding:12px;font-size:.82rem"></div>
 </div>
 <div style="margin-bottom:16px;">
   <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Celular / WhatsApp<span style="color:var(--red)">*</span></label>
@@ -896,15 +1282,15 @@ function renderRevisao(){
 `;}
 
 // ── FORM HELPERS ──────────────────────────────────────────────
-function avancarPasso(prox){
-  if(!validarPasso(formPasso))return;
+async function avancarPasso(prox){
+  if(!await validarPasso(formPasso))return;
   coletarPasso(formPasso);
   renderFormPasso(prox);
 }
 
-function validarPasso(n){
+async function validarPasso(n){
   if(n===1){
-    if(!viabOk){toast('Verifique a viabilidade antes de continuar','err');return false;}
+    if(!viabOk && !modoOffline){toast('Verifique a viabilidade antes de continuar','err');return false;}
     if(!document.getElementById('f-cep').value.replace(/\D/g,'').length===8)return false;
     if(!document.getElementById('f-endereco').value.trim()){toast('Informe o logradouro','err');return false;}
     if(!document.getElementById('f-numero').value.trim()){toast('Informe o número','err');return false;}
@@ -919,6 +1305,32 @@ function validarPasso(n){
     if(tipo==='J'&&cpf.length!==14){document.getElementById('err-cpf').style.display='block';return false;}
     if(!document.getElementById('f-cel').value.replace(/\D/g,'').length>=10){toast('Celular inválido','err');return false;}
     if(!document.getElementById('f-nasc').value){document.getElementById('err-nasc').style.display='block';return false;}
+    // Consultar CPF no IXC
+    const _cpfEl = document.getElementById('f-cpf');
+    _cpfEl.disabled = true;
+    _cpfEl.style.opacity = '0.6';
+    try {
+      const _r = await api('/api/vendedor/consultar-cpf/'+document.getElementById('f-cpf').value);
+      _cpfEl.disabled = false; _cpfEl.style.opacity = '1';
+      if (_r.cenario === 'bloqueado') {
+        mostrarAlertaCPF('bloqueado', _r);
+        return false;
+      } else if (_r.cenario === 'novo_contrato') {
+        formDados._ixc_cliente_existente = _r.ixc_cliente_id;
+        formDados._razao_existente = _r.razao;
+        // Mostrar modal de confirmação — bloquear avanço até confirmar
+        const ok = await confirmarCPFDuplicado('novo_contrato', _r);
+        if (!ok) return false;
+      } else if (_r.cenario === 'ex_cliente_ok') {
+        formDados._ixc_cliente_existente = null;
+        const ok = await confirmarCPFDuplicado('ex_cliente_ok', _r);
+        if (!ok) return false;
+      } else {
+        formDados._ixc_cliente_existente = null;
+      }
+    } catch(e) {
+      _cpfEl.disabled = false; _cpfEl.style.opacity = '1';
+    }
   }
   if(n===3){
     if(!document.getElementById('f-plano').value){toast('Selecione um plano','err');return false;}
@@ -931,6 +1343,53 @@ function validarPasso(n){
   return true;
 }
 
+function confirmarCPFDuplicado(cenario, dados) {
+  return new Promise(resolve => {
+    const estilos = {
+      novo_contrato: {cor:'#3b82f6', bg:'rgba(59,130,246,.1)', borda:'rgba(59,130,246,.4)'},
+      ex_cliente_ok: {cor:'#f97316', bg:'rgba(249,115,22,.1)', borda:'rgba(249,115,22,.4)'}
+    };
+    const e = estilos[cenario];
+    const msgs = {
+      novo_contrato: `<b>ℹ️ Cliente já cadastrado</b><br><br><b>${dados.razao}</b> — ${dados.cidade}<br>${dados.contratos_ativos} contrato(s) ativo(s).<br><br>Será criado apenas um <b>novo contrato</b> para este cliente. Deseja prosseguir?`,
+      ex_cliente_ok: `<b>⚠️ Ex-cliente encontrado</b><br><br><b>${dados.razao}</b> — ${dados.cidade}<br>Sem dívidas em aberto.<br><br>Deseja prosseguir com o novo cadastro?`
+    };
+    // Criar modal
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.innerHTML = `
+      <div style="background:var(--surf);border-radius:16px;padding:24px;max-width:360px;width:100%;border:1px solid ${e.borda}">
+        <div style="font-size:.9rem;line-height:1.6;color:var(--text);margin-bottom:20px">${msgs[cenario]}</div>
+        <div style="display:grid;gap:8px">
+          <button id="btn-cpf-sim" style="padding:12px;border-radius:10px;border:none;background:${e.cor};color:#fff;font-weight:700;font-size:.9rem;cursor:pointer">✅ Sim, prosseguir</button>
+          <button id="btn-cpf-nao" style="padding:12px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-weight:600;font-size:.9rem;cursor:pointer">❌ Cancelar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    document.getElementById('btn-cpf-sim').onclick = () => { document.body.removeChild(overlay); resolve(true); };
+    document.getElementById('btn-cpf-nao').onclick = () => { document.body.removeChild(overlay); resolve(false); };
+  });
+}
+
+function mostrarAlertaCPF(cenario, dados) {
+  const el = document.getElementById('alerta-cpf');
+  if (!el) return;
+  const estilos = {
+    bloqueado: 'background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:#ef4444',
+    novo_contrato: 'background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.4);color:#3b82f6',
+    ex_cliente_ok: 'background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.4);color:#f97316'
+  };
+  const icones = { bloqueado: '🚫', novo_contrato: 'ℹ️', ex_cliente_ok: '⚠️' };
+  const msgs = {
+    bloqueado: `<b>${icones.bloqueado} Cliente bloqueado</b><br>${dados.razao}<br>Possui ${dados.divida_qtd} fatura(s) em aberto totalizando R$ ${(dados.divida_total||0).toFixed(2)}. Não é possível prosseguir.`,
+    novo_contrato: `<b>${icones.novo_contrato} Cliente já cadastrado</b><br>${dados.razao} · ${dados.cidade}<br>${dados.contratos_ativos} contrato(s) ativo(s). Será criado apenas um novo contrato para este cliente.`,
+    ex_cliente_ok: `<b>${icones.ex_cliente_ok} Ex-cliente encontrado</b><br>${dados.razao} · ${dados.cidade}<br>Sem dívidas em aberto. Pode prosseguir com o novo cadastro.`
+  };
+  el.style.display = 'block';
+  el.style.cssText += ';' + estilos[cenario];
+  el.innerHTML = msgs[cenario] || '';
+}
+
 function coletarPasso(n){
   if(n===1){
     formDados.cep=document.getElementById('f-cep').value;
@@ -938,7 +1397,10 @@ function coletarPasso(n){
     formDados.numero=document.getElementById('f-numero').value.trim();
     formDados.complemento=document.getElementById('f-comp2').value.trim();
     formDados.bairro=document.getElementById('f-bairro').value.trim();
-    formDados.cidade_nome=document.getElementById('f-cidade').value;
+    const _fCid=document.getElementById('f-cidade');
+    if(_fCid && _fCid.value) formDados.cidade_nome=_fCid.value;
+    if(_fCid && _fCid.dataset.ixcId) formDados.ixc_cidade_id=parseInt(_fCid.dataset.ixcId);
+    // Não sobrescrever ixc_cidade_id se já estiver preenchido no formDados
     formDados.uf_sigla=document.getElementById('f-uf').value;
     formDados.referencia=document.getElementById('f-ref').value.trim();
   }
@@ -1021,7 +1483,11 @@ async function verificarViab(){
       document.getElementById('btn-prox1').style.display='block';
       document.getElementById('btn-prox1').textContent=r.status==='alerta'?'Continuar mesmo assim →':'Próximo →';
       document.getElementById('btn-prox1').style.background=r.status==='alerta'?'var(--amber)':'var(--cyan)';}
-  }catch(e){toast('Erro ao verificar','err');btn.innerHTML='Verificar viabilidade';btn.disabled=false;}
+  }catch(e){
+    btn.innerHTML='Verificar viabilidade';btn.disabled=false;
+    if(modoOffline){ mostrarSeletorCidadeOffline(); }
+    else { toast('Erro ao verificar. Tente novamente.','err'); }
+  }
 }
 
 // DOCS
@@ -1065,6 +1531,7 @@ async function comprimir(file){
 
 // ENVIO
 async function enviarCadastro(){
+  if(modoOffline){ await salvarOfflineIDB(); return; }
   const btn=document.getElementById('btn-enviar');
   btn.innerHTML='<span class="spinner"></span>Enviando...'; btn.disabled=true;
   try{
@@ -1095,7 +1562,43 @@ async function api(path,opts={}){
 }
 
 async function carregarPlanos(){
-  try{const r=await api('/api/vendedor/planos');planos=r.planos||[];}catch(e){}
+  try{
+    const r=await api('/api/vendedor/planos');
+    planos=r.planos||[];
+    // Salvar no IndexedDB para uso offline
+    try{
+      const db=await getIDB();
+      const tx=db.transaction('planos','readwrite');
+      const st=tx.objectStore('planos');
+      planos.forEach(p=>st.put(p));
+    }catch(e){}
+  }catch(e){
+    // Offline — carregar do cache
+    try{
+      const db=await getIDB();
+      const tx=db.transaction('planos','readonly');
+      planos=await new Promise(res=>{const req=tx.objectStore('planos').getAll();req.onsuccess=e=>res(e.target.result);});
+    }catch(e2){}
+  }
+}
+
+async function cachearCidades(){
+  try{
+    const r=await api('/api/vendedor/cidades-cache');
+    const cids=r.cidades||[];
+    const db=await getIDB();
+    const tx=db.transaction('cidades','readwrite');
+    const st=tx.objectStore('cidades');
+    cids.forEach(c=>st.put(c));
+    window._cidadesCache=cids;
+  }catch(e){
+    // Offline — carregar do cache
+    try{
+      const db=await getIDB();
+      const tx=db.transaction('cidades','readonly');
+      window._cidadesCache=await new Promise(res=>{const req=tx.objectStore('cidades').getAll();req.onsuccess=e=>res(e.target.result);});
+    }catch(e2){}
+  }
 }
 
 function maskCep(el){
@@ -1115,11 +1618,22 @@ async function buscarCep(){
     if(document.getElementById('f-endereco'))document.getElementById('f-endereco').value=d.logradouro||'';
     if(document.getElementById('f-bairro'))document.getElementById('f-bairro').value=d.bairro||'';
     if(document.getElementById('f-uf'))document.getElementById('f-uf').value=d.uf||'';
-    if(document.getElementById('f-cidade')&&d.ibge){
-      try{const rc=await api(`/api/vendedor/cidade-por-ibge?ibge=${d.ibge}`);
-        if(document.getElementById('f-cidade'))document.getElementById('f-cidade').value=rc.nome||d.localidade;
+    // Buscar cidade pela faixa de CEP na tabela local
+    try{
+      const rc = await api(`/api/vendedor/cidade-por-cep?cep=${cep}`);
+      if(rc.id){
+        const fCid = document.getElementById('f-cidade');
+        if(fCid){fCid.value=rc.nome; fCid.dataset.ixcId=rc.id;}
+        if(document.getElementById('f-uf'))document.getElementById('f-uf').value=rc.uf_sigla;
         formDados.ixc_cidade_id=rc.id;
-      }catch{if(document.getElementById('f-cidade'))document.getElementById('f-cidade').value=d.localidade||'';}
+        formDados.cidade_nome=rc.nome;
+        formDados.uf_sigla=rc.uf_sigla;
+        window._cidadeSelecionada={id:rc.id,nome:rc.nome,uf:rc.uf_sigla};
+      } else if(d.localidade){
+        if(document.getElementById('f-cidade'))document.getElementById('f-cidade').value=d.localidade;
+      }
+    }catch(e){
+      if(document.getElementById('f-cidade'))document.getElementById('f-cidade').value=d.localidade||'';
     }
     viabOk=false;
     const vb=document.getElementById('btn-viab'),vp=document.getElementById('btn-prox1');
@@ -1353,6 +1867,271 @@ async function apiVend(path, opts={}) {
   if (!r.ok) throw new Error(d.detail||String(r.status));
   return d;
 }
+
+// ── MODO OFFLINE ─────────────────────────────────────────────
+let modoOffline = false;
+let _idb = null;
+
+function abrirIDB(){
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open('HubComercialOffline',1);
+    req.onupgradeneeded = e=>{
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains('cadastros'))
+        db.createObjectStore('cadastros',{keyPath:'id',autoIncrement:true});
+      if(!db.objectStoreNames.contains('cidades'))
+        db.createObjectStore('cidades',{keyPath:'id'});
+      if(!db.objectStoreNames.contains('planos'))
+        db.createObjectStore('planos',{keyPath:'id'});
+    };
+    req.onsuccess = e=>res(e.target.result);
+    req.onerror = e=>rej(e);
+  });
+}
+async function getIDB(){if(!_idb)_idb=await abrirIDB();return _idb;}
+
+function toggleOfflineMode(){
+  modoOffline=!modoOffline;
+  const btn=document.getElementById('offline-btn');
+  const lbl=document.getElementById('offline-label');
+  if(modoOffline){
+    btn.className='offline-badge offline';
+    lbl.textContent='Offline';
+    document.getElementById('btn-viab-skip').style.display='block';
+    toast('Modo offline ativado','');
+  }else{
+    btn.className='offline-badge online';
+    lbl.textContent='Online';
+    document.getElementById('btn-viab-skip').style.display='none';
+    verificarPendentesOffline();
+  }
+}
+
+function mostrarSeletorCidadeOffline(){
+  const cids = window._cidadesCache || [];
+  if(!cids.length){toast('Cache de cidades não disponível. Conecte-se primeiro.','err');return;}
+  const viabEl = document.getElementById('viab-result');
+  if(!viabEl) return;
+  const opts = cids.map(c=>`<option value="${c.id}" data-nome="${c.nome}" data-uf="${c.uf_sigla}">${c.nome} — ${c.uf_sigla}</option>`).join('');
+  viabEl.innerHTML=`
+    <div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:8px;padding:12px;">
+      <div style="font-size:12px;color:#f5a623;margin-bottom:8px;">⚡ Modo offline — selecione a cidade manualmente</div>
+      <select id="sel-cidade-offline" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;margin-bottom:8px;">
+        <option value="">Selecione a cidade</option>${opts}
+      </select>
+      <button onclick="confirmarCidadeOffline()" class="btn btn-cyan" style="width:100%;font-size:13px;">Confirmar cidade</button>
+    </div>`;
+}
+
+function confirmarCidadeOffline(){
+  const sel = document.getElementById('sel-cidade-offline');
+  if(!sel||!sel.value){toast('Selecione uma cidade','err');return;}
+  const opt = sel.options[sel.selectedIndex];
+  const cep = document.getElementById('f-cep')?.value||'';
+  const end = document.getElementById('f-endereco')?.value||'';
+  const num = document.getElementById('f-numero')?.value||'';
+  const bairro = document.getElementById('f-bairro')?.value||'';
+  // Preencher formDados com cidade selecionada
+  formDados.ixc_cidade_id = parseInt(sel.value);
+  formDados.cidade_nome   = opt.dataset.nome;
+  formDados.uf_sigla      = opt.dataset.uf;
+  window._cidadeSelecionada={id:parseInt(sel.value),nome:opt.dataset.nome,uf:opt.dataset.uf};
+  formDados.cep           = cep;
+  formDados.endereco      = end;
+  formDados.numero        = num;
+  formDados.bairro        = bairro;
+  formDados.viabilidade_status = 'pendente_offline';
+  formDados.viabilidade_nivel  = 0;
+  formDados.viabilidade_obs    = 'Verificação pendente — cadastrado offline';
+  viabOk = true;
+  // Preencher também os campos do DOM para coletarPasso(1) ler corretamente
+  const fCidade = document.getElementById('f-cidade');
+  const fUf     = document.getElementById('f-uf');
+  if(fCidade){fCidade.value=opt.dataset.nome; fCidade.dataset.ixcId=sel.value;}
+  if(fUf) fUf.value=opt.dataset.uf;
+  document.getElementById('viab-result').innerHTML=
+    '<div style="background:rgba(0,212,170,.08);border:1px solid rgba(0,212,170,.2);border-radius:8px;padding:10px;font-size:12px;color:var(--cyan);">'+
+    '✓ Cidade: '+opt.dataset.nome+' — '+opt.dataset.uf+'<br><small style="color:var(--text3);">Viabilidade será verificada ao sincronizar</small></div>';
+  toast('Cidade confirmada!','ok');
+}
+
+function pularViabOffline(){
+  viabOk=true;
+  formDados.viabilidade_status='pendente_offline';
+  formDados.viabilidade_nivel=0;
+  formDados.viabilidade_obs='Verificação pendente — cadastrado offline';
+  const viabEl = document.getElementById('viab-result');
+  if(viabEl) viabEl.innerHTML=
+    '<div style="background:rgba(245,166,35,.12);border:1px solid rgba(245,166,35,.3);border-radius:8px;padding:10px;font-size:12px;color:#f5a623;">'+
+    '⚡ Modo offline — viabilidade será verificada ao sincronizar</div>';
+  toast('Viabilidade pulada — será verificada ao sincronizar','');
+  coletarPasso(1);
+  setTimeout(()=>renderFormPasso(2), 800);
+}
+
+async function salvarOfflineIDB(){
+  // Restaurar cidade da variável global se necessário
+  if(window._cidadeSelecionada && !formDados.ixc_cidade_id){
+    formDados.ixc_cidade_id = window._cidadeSelecionada.id;
+    formDados.cidade_nome   = window._cidadeSelecionada.nome;
+    formDados.uf_sigla      = window._cidadeSelecionada.uf;
+  }
+  // Coletar apenas o passo atual (outros já foram coletados ao navegar)
+  try{ coletarPasso(formPasso); }catch(e){}
+  // Garantir cidade após coleta
+  if(window._cidadeSelecionada && !formDados.ixc_cidade_id){
+    formDados.ixc_cidade_id = window._cidadeSelecionada.id;
+    formDados.cidade_nome   = window._cidadeSelecionada.nome;
+    formDados.uf_sigla      = window._cidadeSelecionada.uf;
+  }
+  // Validar dados mínimos
+  console.log('formDados offline:', JSON.stringify({
+    cidade_nome: formDados.cidade_nome,
+    ixc_cidade_id: formDados.ixc_cidade_id,
+    razao: formDados.razao,
+    cnpj_cpf: formDados.cnpj_cpf,
+    formPasso: formPasso
+  }));
+  // Debug — mostrar o que está faltando
+  if(!formDados.cidade_nome||!formDados.ixc_cidade_id){
+    const msg = 'cidade_nome=' + (formDados.cidade_nome||'VAZIO') +
+                ' | ixc_cidade_id=' + (formDados.ixc_cidade_id||'VAZIO');
+    toast('Cidade ausente: ' + msg, 'err');
+    console.log('formDados completo:', formDados);
+    return;
+  }
+  if(!formDados.razao){toast('Preencha o nome do cliente','err');return;}
+  if(!formDados.cnpj_cpf){toast('Preencha o CPF','err');return;}
+  const btn=document.getElementById('btn-enviar');
+  btn.innerHTML='Salvando...'; btn.disabled=true;
+  try{
+    const db=await getIDB();
+    async function toB64(file){
+      if(!file)return null;
+      return new Promise(r=>{const rd=new FileReader();rd.onload=e=>r(e.target.result);rd.readAsDataURL(file);});
+    }
+    const registro={
+      dados:{...formDados},
+      rg:await toB64(formDocs.rg),
+      selfie:await toB64(formDocs.selfie),
+      comp:await toB64(formDocs.comp),
+      salvadoEm:new Date().toISOString(),
+      status:'pendente'
+    };
+    const tx=db.transaction('cadastros','readwrite');
+    await new Promise((res,rej)=>{const req=tx.objectStore('cadastros').add(registro);req.onsuccess=res;req.onerror=rej;});
+    await verificarPendentesOffline();
+    toast('Cadastro salvo! Será enviado quando voltar online.','ok');
+    formPasso=1;formDados={};formDocs={rg:null,selfie:null,comp:null};viabOk=false;
+    navTo('leads');
+  }catch(e){toast('Erro ao salvar: '+e.message,'err');console.error(e);}
+  finally{btn.innerHTML='Enviar para auditoria';btn.disabled=false;}
+}
+
+async function verificarPendentesOffline(){
+  try{
+    const db=await getIDB();
+    const tx=db.transaction('cadastros','readonly');
+    const all=await new Promise(res=>{const req=tx.objectStore('cadastros').getAll();req.onsuccess=e=>res(e.target.result);});
+    const pendentes=all.filter(r=>r.status==='pendente'||r.status==='sincronizando');
+    const bar=document.getElementById('sync-bar');
+    const msg=document.getElementById('sync-msg');
+    if(bar){
+      if(pendentes.length>0){
+        bar.style.display='flex';
+        msg.textContent='⚡ '+pendentes.length+' cadastro(s) offline aguardando sincronização';
+      } else { bar.style.display='none'; }
+    }
+    // Atualizar lista no menu Mais — apenas pendentes e erros
+    const wrap=document.getElementById('offline-lista-wrap');
+    const lista=document.getElementById('offline-lista');
+    if(wrap&&lista){
+      const visiveis=all.filter(r=>r.status==='pendente'||r.status==='sincronizando'||r.status==='erro');
+      if(visiveis.length>0){
+        wrap.style.display='block';
+        lista.innerHTML=visiveis.map(r=>{
+          const cor=r.status==='pendente'?'var(--amber)':r.status==='sincronizando'?'var(--cyan)':'var(--red)';
+          const label=r.status==='pendente'?'Aguardando sync':r.status==='sincronizando'?'Enviando...':'Erro ao enviar';
+          const nome=(r.dados&&r.dados.razao)||'—';
+          const cidade=(r.dados&&r.dados.cidade_nome)||'';
+          const plano=(r.dados&&r.dados.plano_nome)||'';
+          const dt=r.salvadoEm?new Date(r.salvadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+          return '<div style="background:var(--surf2);border-radius:10px;padding:12px;margin-bottom:8px;">'+
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">'+
+              '<div style="font-size:13px;font-weight:500;">'+esc(nome)+'</div>'+
+              '<span style="font-size:11px;font-weight:600;color:'+cor+';white-space:nowrap;margin-left:8px;">'+label+'</span>'+
+            '</div>'+
+            '<div style="font-size:11px;color:var(--text3);">'+esc(cidade)+(plano?' · '+esc(plano):'')+'</div>'+
+            '<div style="font-size:11px;color:var(--text3);">Salvo em: '+dt+'</div>'+
+            '</div>';
+        }).join('');
+      } else {
+        wrap.style.display='block';
+        lista.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0;">✓ Nenhum cadastro pendente</div>';
+      }
+    }
+  }catch(e){}
+}
+
+let _sincronizando = false;
+async function sincronizarOffline(auto=false){
+  if(_sincronizando) return;
+  _sincronizando = true;
+  try { await _sincronizarOfflineExec(auto); } finally { _sincronizando=false; }
+}
+async function _sincronizarOfflineExec(auto=false){
+  if(modoOffline){toast('Desative o modo offline antes de sincronizar','err');return;}
+  const db=await getIDB();
+  const all=await new Promise(res=>{const tx=db.transaction('cadastros','readonly');const req=tx.objectStore('cadastros').getAll();req.onsuccess=e=>res(e.target.result);});
+  const pendentes=all.filter(r=>r.status==='pendente');
+  if(!pendentes.length){toast('Nenhum cadastro pendente','');return;}
+  toast('Sincronizando '+pendentes.length+' cadastro(s)...','');
+  let ok=0,erros=0;
+  // Marcar todos como 'sincronizando' antes de enviar
+  for(const reg of pendentes){
+    const tx0=db.transaction('cadastros','readwrite');
+    tx0.objectStore('cadastros').put({...reg,status:'sincronizando'});
+  }
+  for(const reg of pendentes){
+    try{
+      function b64ToFile(b64,nome){
+        if(!b64)return null;
+        const arr=b64.split(','),mime=arr[0].match(/:(.*?);/)[1],bstr=atob(arr[1]),u8=new Uint8Array(bstr.length);
+        for(let i=0;i<bstr.length;i++)u8[i]=bstr.charCodeAt(i);
+        return new File([u8],nome,{type:mime});
+      }
+      const fd=new FormData();
+      fd.append('dados',JSON.stringify(reg.dados));
+      if(reg.rg)fd.append('rg',b64ToFile(reg.rg,'rg.jpg'),'rg.jpg');
+      if(reg.selfie)fd.append('selfie',b64ToFile(reg.selfie,'selfie.jpg'),'selfie.jpg');
+      if(reg.comp)fd.append('comp',b64ToFile(reg.comp,'comp.jpg'),'comp.jpg');
+      const r=await fetch(`${API}/api/vendedor/precadastro`,{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});
+      if(r.ok){
+        const tx2=db.transaction('cadastros','readwrite');
+        tx2.objectStore('cadastros').put({...reg,status:'sincronizado'});
+        ok++;
+      }else{erros++;}
+    }catch(e){
+      erros++;console.error(e);
+      // Voltar para pendente em caso de erro
+      try{
+        const txe=db.transaction('cadastros','readwrite');
+        txe.objectStore('cadastros').put({...reg,status:'pendente'});
+      }catch(e2){}
+    }
+  }
+  await verificarPendentesOffline();
+  toast('Sync: '+ok+' enviado(s)'+(erros>0?' | '+erros+' erro(s)':''),ok>0?'ok':'err');
+}
+
+window.addEventListener('load',()=>{
+  setTimeout(verificarPendentesOffline,1000);
+  setInterval(()=>{
+    if(!modoOffline && navigator.onLine) sincronizarOffline(true);
+  }, 120000);
+});
+window.addEventListener('online',()=>{if(!modoOffline){verificarPendentesOffline();toast('Conexão restaurada!','ok');}});
+window.addEventListener('offline',()=>{toast('Sem conexão detectada','err');});
 
 function toast(msg,tipo=''){
   const el=document.getElementById('toast');
