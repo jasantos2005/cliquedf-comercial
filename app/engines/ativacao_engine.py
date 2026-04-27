@@ -518,6 +518,18 @@ def ativar_cliente(precadastro_id: int) -> int:
             log.warning(f"#{precadastro_id} já ativado — cliente IXC {p['ixc_cliente_id']}")
             return int(p["ixc_cliente_id"])
 
+        # Bloqueia se cidade não foi resolvida
+        if not p.get("ixc_cidade_id"):
+            erro = f"ixc_cidade_id ausente — cidade '{p.get('cidade_nome')}' não encontrada no IXC"
+            log.error(f"#{precadastro_id} BLOQUEADO: {erro}")
+            conn.execute(
+                "UPDATE hc_precadastros SET status='erro_ativacao' WHERE id=?",
+                (precadastro_id,)
+            )
+            conn.commit()
+            _log_etapa(conn, precadastro_id, "validacao_cidade", False, erro=erro)
+            return 0
+
         # ── Etapa 1: INSERT cliente ───────────────────────────
         try:
             ixc_cli_id = inserir_cliente(p)
