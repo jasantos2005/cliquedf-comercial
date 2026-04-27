@@ -25,7 +25,7 @@ Motivo de inclusão do contrato (id_motivo_inclusao):
     OS 110 (Mudança de titularidade) → 6
     OS 75/15 (Reativação)          → 8
 """
-import sqlite3, os, logging, re
+import sqlite3, os, logging, re, base64, requests
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
@@ -404,6 +404,82 @@ def inserir_os_instalacao(p: dict, ixc_cliente_id: int, ixc_contrato_id: int) ->
     return ixc_insert(sql, params)
 
 
+
+# ── Etapa 4: Envio de documentos ao IXC ──────────────────────────────────────
+
+def enviar_documentos_ixc(precadastro_id: int, ixc_cliente_id: int) -> list:
+    """
+    Envia os documentos do pre-cadastro para ixcprovedor.cliente_arquivos via REST.
+    Arquivos: rg_frente.jpg, comp_residencia.jpg, selfie_doc.jpg, contrato_{id}.pdf
+    """
+    ixc_url   = os.getenv("IXC_URL",   "https://sistema.cliquedf.com.br")
+    ixc_user  = os.getenv("IXC_USER",  "64")
+    ixc_token = os.getenv("IXC_TOKEN", "90b12b22159c00f223eb3e0411f3f1999f68098d1a27127dbec670997ddd800c")
+
+    auth_b64 = base64.b64encode(f"{ixc_user}:{ixc_token}".encode()).decode()
+    headers  = {
+        "Authorization": f"Basic {auth_b64}",
+        "Content-Type":  "application/json",
+        "ixcsoft":       "gravar",
+    }
+    endpoint    = f"{ixc_url}/webservice/v1/cliente_arquivos"
+    uploads_dir = BASE_DIR / "uploads" / str(precadastro_id)
+
+    DOCS = [
+        ("rg_frente.jpg",                 "Documento de Identidade (RG/CNH)", "I"),
+        ("comp_residencia.jpg",            "Comprovante de Endereco",          "I"),
+        ("selfie_doc.jpg",                 "Selfie com Documento",             "I"),
+        (f"contrato_{precadastro_id}.pdf", "Contrato Assinado",                "D"),
+    ]
+
+    resultados = []
+
+    for nome_arquivo, descricao, classificacao in DOCS:
+        caminho = uploads_dir / nome_arquivo
+        if not caminho.exists():
+            log.info(f"enviar_documentos_ixc: {nome_arquivo} nao encontrado — pulando")
+            resultados.append({"arquivo": nome_arquivo, "sucesso": False, "ixc_id": None, "erro": "arquivo nao encontrado"})
+            continue
+
+        try:
+            with open(caminho, "rb") as f:
+                img_b64 = base64.b64encode(f.read()).decode()
+
+            payload = {
+                "id_cliente":            str(ixc_cliente_id),
+                "descricao":             descricao,
+                "classificacao_arquivo": classificacao,
+                "local_arquivo":         img_b64,
+                "nome_arquivo":          nome_arquivo,
+                "tipo":                  "imagem" if classificacao == "I" else "documento",
+            }
+
+            resp = requests.post(endpoint, headers=headers, json=payload, timeout=30)
+
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("type") == "success":
+                    ixc_id = int(data.get("id", 0))
+                    log.info(f"enviar_documentos_ixc: {nome_arquivo} OK — ID={ixc_id}")
+                    resultados.append({"arquivo": nome_arquivo, "sucesso": True, "ixc_id": ixc_id, "erro": None})
+                else:
+                    erro = data.get("message", "resposta sem type=success")
+                    log.warning(f"enviar_documentos_ixc: {nome_arquivo} erro IXC: {erro}")
+                    resultados.append({"arquivo": nome_arquivo, "sucesso": False, "ixc_id": None, "erro": erro})
+            else:
+                erro = f"HTTP {resp.status_code}"
+                log.warning(f"enviar_documentos_ixc: {nome_arquivo} {erro}")
+                resultados.append({"arquivo": nome_arquivo, "sucesso": False, "ixc_id": None, "erro": erro})
+
+        except Exception as e:
+            log.error(f"enviar_documentos_ixc: {nome_arquivo} excecao: {e}")
+            resultados.append({"arquivo": nome_arquivo, "sucesso": False, "ixc_id": None, "erro": str(e)})
+
+    enviados = sum(1 for r in resultados if r["sucesso"])
+    log.info(f"enviar_documentos_ixc: #{precadastro_id} — {enviados}/{len(DOCS)} enviados ao IXC")
+    return resultados
+
+
 # ── Função principal ──────────────────────────────────────────
 
 def ativar_cliente(precadastro_id: int) -> int:
@@ -500,6 +576,18 @@ def ativar_cliente(precadastro_id: int) -> int:
             _log_etapa(conn, precadastro_id, "insert_os", False, erro=str(e))
             log.error(f"#{precadastro_id} ERRO insert_os: {e}")
             # Cliente e contrato já criados — não revertemos, apenas logamos
+
+        # ── Etapa 4: Envio de documentos ─────────────────────
+        try:
+            docs = enviar_documentos_ixc(precadastro_id, ixc_cli_id)
+            enviados = sum(1 for d in docs if d["sucesso"])
+            _log_etapa(conn, precadastro_id, "enviar_documentos", True,
+                       ixc_id=ixc_cli_id,
+                       payload={"enviados": enviados, "total": len(docs), "detalhes": docs})
+            log.info(f"#{precadastro_id} documentos enviados: {enviados}/{len(docs)}")
+        except Exception as e:
+            _log_etapa(conn, precadastro_id, "enviar_documentos", False, erro=str(e))
+            log.error(f"#{precadastro_id} ERRO enviar_documentos: {e}")
 
         log.info(
             f"#{precadastro_id} ATIVADO — "
