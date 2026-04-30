@@ -197,11 +197,11 @@ async def ranking(
 
     rows = db.execute("""
         SELECT
-            u.id, u.nome,
+            u.id, u.nome, u.ixc_funcionario_id,
             COUNT(p.id) AS leads,
             SUM(p.status NOT IN ('reprovado')) AS validos,
             SUM(p.status IN ('assinado','ativado')) AS convertidos,
-            SUM(p.status='ativado') AS ativados,
+            SUM(p.status='ativado') AS ativados_hub,
             SUM(p.status='reprovado') AS reprovados,
             SUM(p.viabilidade_status='alerta') AS sem_viab
         FROM hc_usuarios u
@@ -211,26 +211,33 @@ async def ranking(
         JOIN hc_grupos g ON g.id = u.id_grupo
         WHERE u.ativo = 1
         GROUP BY u.id
-        ORDER BY ativados DESC, convertidos DESC
     """, (inicio,)).fetchall()
-
     resultado = []
     for i, r in enumerate(rows):
         d = dict(r)
+        ixc_id = d.get("ixc_funcionario_id")
+        ativados_ixc = 0
+        if ixc_id:
+            row_ixc = db.execute(
+                "SELECT COUNT(*) as t FROM hc_contratos_cache WHERE vendedor_id=? AND date(data_contrato)>=?",
+                (ixc_id, inicio)
+            ).fetchone()
+            ativados_ixc = int(row_ixc["t"] or 0) if row_ixc else 0
         leads = int(d["leads"] or 0)
-        ativ  = int(d["ativados"] or 0)
+        ativ  = ativados_ixc if ativados_ixc > 0 else int(d["ativados_hub"] or 0)
         conv  = int(d["convertidos"] or 0)
+        d["ativados"]       = ativ
         d["posicao"]        = i + 1
         d["taxa_conversao"] = round(conv / max(leads, 1) * 100, 1)
         d["taxa_ativacao"]  = round(ativ / max(leads, 1) * 100, 1)
-        # Score qualidade simplificado para o ranking
         d["score"] = min(100, round(
             (ativ * 40 / max(leads, 1)) +
             (conv * 30 / max(leads, 1)) +
             (max(0, leads - (d["reprovados"] or 0)) * 30 / max(leads, 1))
         ))
         resultado.append(d)
-
+    resultado.sort(key=lambda x: x["ativados"], reverse=True)
+    for i, d in enumerate(resultado): d["posicao"] = i + 1
     return {"periodo": periodo, "vendedores": resultado}
 
 
