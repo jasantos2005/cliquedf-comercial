@@ -64,7 +64,7 @@ def sincronizar():
                     c.cnpj_cpf,
                     ci.nome AS cidade_nome,
                     c.bairro,
-                    c.id_vendedor AS vendedor_id,
+                    cc.id_vendedor_ativ AS vendedor_id,
                     v.nome AS vendedor_nome,
                     cc.id_vd_contrato AS plano_id,
                     vc.nome AS plano_nome,
@@ -79,15 +79,15 @@ def sincronizar():
                 FROM ixcprovedor.cliente_contrato cc
                 JOIN ixcprovedor.cliente c ON c.id = cc.id_cliente
                 LEFT JOIN ixcprovedor.cidade ci ON ci.id = c.cidade
-                LEFT JOIN ixcprovedor.vendedor v ON v.id = c.id_vendedor
+                LEFT JOIN ixcprovedor.vendedor v ON v.id = cc.id_vendedor_ativ
                 LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id = cc.id_vd_contrato
                 LEFT JOIN ixcprovedor.su_oss_chamado o
                     ON o.id_cliente = c.id AND o.id_assunto = 227
                 LEFT JOIN ixcprovedor.funcionarios f ON f.id = o.id_tecnico
                 WHERE cc.data >= '2026-01-01'
-                  AND c.id_vendedor > 0
+                  AND cc.id_vendedor_ativ > 0
                 ORDER BY cc.id DESC
-                LIMIT 1000
+                LIMIT 2000
             """)
             rows = cur.fetchall()
 
