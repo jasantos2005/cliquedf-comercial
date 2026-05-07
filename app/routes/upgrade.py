@@ -72,7 +72,7 @@ async def listar_base(
     rows  = db.execute(f"""
         SELECT * FROM hc_upgrades_base
         WHERE {w}
-        ORDER BY cidade, plano_nome, cliente
+        ORDER BY CASE WHEN plano_anterior_nome IS NOT NULL THEN 0 ELSE 1 END, cidade, cliente
         LIMIT ? OFFSET ?
     """, params + [pp, offset]).fetchall()
 

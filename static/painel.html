@@ -1052,6 +1052,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
             <th>Cidade</th>
             <th>Plano Anterior → Atual</th>
             <th>Telefone</th>
+            <th style="text-align:center;">Diferença</th>
             <th>Status</th>
             <th>Ação</th>
           </tr>
@@ -3340,6 +3341,7 @@ async function _carregarTabelaUpgrade(pagina = 1) {
         <td>${esc(cl.cidade||'—')}</td>
         <td style="font-size:11px;">${cl.plano_anterior_nome ? esc(cl.plano_anterior_nome)+' → ' : ''}<span style="color:var(--cyan)">${esc(cl.plano_nome||'—')}</span></td>
         <td style="font-size:12px;color:var(--muted);">${esc(cl.telefone_celular||cl.telefone_residencial||'—')}</td>
+        <td style="text-align:center;font-weight:700;">${cl.plano_anterior_nome ? (() => { const d = 89.9 - 85; return '<span style="color:' + (d>0?'var(--green)':'var(--red)') + '">' + (d>0?'+':'') + 'R$ ' + d.toFixed(2).replace('.',',') + '</span>'; })() : '—'}</td>
         <td><span class="badge ${sn.c}">${sn.l}</span>${cl.operador_contato ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+esc(cl.operador_contato)+'</div>' : ''}</td>
         <td><button class="btn btn-cyan" style="padding:5px 12px;font-size:12px;" onclick="abrirModalUpgrade(${cl.id})">Abrir</button></td>
       </tr>`;
