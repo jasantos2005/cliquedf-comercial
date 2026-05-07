@@ -55,7 +55,7 @@ async def listar_base(
     """
     pp = 50
     offset = (pagina - 1) * pp
-    where, params = ["plano_anterior_nome IS NOT NULL"], []
+    where, params = ["plano_anterior_nome IS NOT NULL", "status_negociacao != 'cliente_ciente'"], []
 
     if cidade:
         where.append("cidade = ?"); params.append(cidade)
@@ -316,7 +316,7 @@ async def historico_upgrades(
     """Histórico paginado de todos os upgrades realizados."""
     pp = 50
     offset = (pagina - 1) * pp
-    where, params = ["plano_anterior_nome IS NOT NULL"], []
+    where, params = ["plano_anterior_nome IS NOT NULL", "status_negociacao != 'cliente_ciente'"], []
 
     if tipo != "todos":
         where.append("tipo_mudanca=?"); params.append(tipo)
