@@ -755,7 +755,7 @@ async function enviarFormOffline(){
     }
     const dados={
       cep:          document.getElementById('of-cep').value,
-      numero:       document.getElementById('of-numero').value,
+      numero:       (document.getElementById('of-numero').value||'').trim().toUpperCase().replace('S/N','SN'),
       endereco:     document.getElementById('of-endereco').value.trim(),
       bairro:       document.getElementById('of-bairro').value.trim(),
       ixc_cidade_id:parseInt(cidSel.value),
@@ -906,7 +906,7 @@ async function abrirCorrecao(id) {
       nacionalidade:  lead.nacionalidade || 'Brasileiro',
       cep:            lead.cep || '',
       endereco:       lead.endereco || '',
-      numero:         lead.numero || '',
+      numero:         (lead.numero||'').replace('S/N','SN').replace('s/n','SN') || '',
       bairro:         lead.bairro || '',
       complemento:    lead.complemento || '',
       referencia:     lead.referencia || '',
@@ -1293,7 +1293,8 @@ async function validarPasso(n){
     if(!viabOk && !modoOffline){toast('Verifique a viabilidade antes de continuar','err');return false;}
     if(!document.getElementById('f-cep').value.replace(/\D/g,'').length===8)return false;
     if(!document.getElementById('f-endereco').value.trim()){toast('Informe o logradouro','err');return false;}
-    if(!document.getElementById('f-numero').value.trim()){toast('Informe o número','err');return false;}
+    const _fn=document.getElementById('f-numero'); _fn.value=(_fn.value||'').trim().toUpperCase().replace('S/N','SN');
+    if(!_fn.value){toast('Informe o número','err');return false;}
     if(!document.getElementById('f-bairro').value.trim()){toast('Informe o bairro','err');return false;}
   }
   if(n===2){
