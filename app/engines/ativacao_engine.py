@@ -28,6 +28,19 @@ Motivo de inclusão do contrato (id_motivo_inclusao):
 import sqlite3, os, logging, re, base64, requests
 from datetime import datetime, date, timedelta
 from pathlib import Path
+
+def _get_usuario_ixc_id(ixc_vendedor_id: int) -> int:
+    """Retorna o usuario_ixc_id correspondente ao vendedor para o campo responsavel."""
+    try:
+        db_path = Path(__file__).resolve().parent.parent.parent / 'hub_comercial.db'
+        conn = sqlite3.connect(str(db_path))
+        row = conn.execute('SELECT usuario_ixc_id FROM hc_vendedores WHERE id=?', (ixc_vendedor_id,)).fetchone()
+        conn.close()
+        if row and row[0]:
+            return int(row[0])
+    except:
+        pass
+    return ixc_vendedor_id  # fallback: usa o proprio vendedor_id
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -242,7 +255,7 @@ def inserir_cliente(p: dict) -> int:
         "S", "S", "S",                      # participa_cobranca, cob_envia_email, cob_envia_sms
         "n",                                # contribuinte_icms
         "S", _hoje_brt(), 18,               # crm, crm_data_novo, id_candato_tipo=18 (Vendedor Externo)
-        p.get("ixc_vendedor_id") or 0,      # responsavel = mesmo vendedor
+        _get_usuario_ixc_id(p.get("ixc_vendedor_id") or 0),  # responsavel = usuario IXC do vendedor
         sexo_ixc,
         p.get("rg_orgao_emissor") or "",
         p.get("nacionalidade") or "Brasileiro",
