@@ -50,16 +50,16 @@ def sync_planos():
 def sync_vendedores():
     log.info("Sync vendedores...")
     rows = ixc_select("""
-        SELECT f.id, f.funcionario AS nome, u.nome AS login
-        FROM ixcprovedor.funcionarios f
-        LEFT JOIN ixcprovedor.usuarios u ON u.funcionario = f.id
-        WHERE f.ativo = 'S'
-        ORDER BY f.funcionario
+        SELECT id, nome
+        FROM ixcprovedor.vendedor
+        WHERE status = 'A'
+          AND id NOT IN (2, 21, 40, 29, 1)
+        ORDER BY nome
     """)
     conn = db(); conn.execute("DELETE FROM hc_vendedores")
     for r in rows:
         conn.execute("INSERT INTO hc_vendedores(id,nome,login_ixc,ativo)VALUES(?,?,?,1)",
-                     (r["id"], r["nome"], r.get("login")))
+                     (r["id"], r["nome"], None))
     conn.commit(); conn.close()
     log.info(f"[OK] {len(rows)} vendedores")
 
