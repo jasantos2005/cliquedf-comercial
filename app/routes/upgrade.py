@@ -55,7 +55,7 @@ async def listar_base(
     """
     pp = 50
     offset = (pagina - 1) * pp
-    where, params = ["1=1"], []
+    where, params = ["plano_anterior_nome IS NOT NULL"], []
 
     if cidade:
         where.append("cidade = ?"); params.append(cidade)
@@ -119,7 +119,7 @@ async def atualizar_negociacao(
     user=Depends(requer_vendedor())
 ):
     """Atualiza o status de negociação de um cliente."""
-    status_validos = {"nao_contatado", "em_contato", "negociando", "confirmado", "recusou"}
+    status_validos = {"nao_contatado", "em_contato", "negociando", "confirmado", "cliente_ciente", "recusou"}
     if payload.status_negociacao not in status_validos:
         raise HTTPException(400, f"Status inválido. Use: {status_validos}")
 
@@ -128,9 +128,10 @@ async def atualizar_negociacao(
 
     db.execute("""
         UPDATE hc_upgrades_base
-        SET status_negociacao=?, obs_negociacao=?
+        SET status_negociacao=?, obs_negociacao=?,
+            operador_contato=?, data_contato=datetime('now','-3 hours')
         WHERE id=?
-    """, (payload.status_negociacao, payload.obs_negociacao, id))
+    """, (payload.status_negociacao, payload.obs_negociacao, user["login"], id))
     db.commit()
 
     # Notificar Telegram para qualquer mudança de status
@@ -315,7 +316,7 @@ async def historico_upgrades(
     """Histórico paginado de todos os upgrades realizados."""
     pp = 50
     offset = (pagina - 1) * pp
-    where, params = ["1=1"], []
+    where, params = ["plano_anterior_nome IS NOT NULL"], []
 
     if tipo != "todos":
         where.append("tipo_mudanca=?"); params.append(tipo)
@@ -357,8 +358,10 @@ async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_vendedor())):
             SUM(status_negociacao='em_contato')    AS em_contato,
             SUM(status_negociacao='negociando')    AS negociando,
             SUM(status_negociacao='confirmado')    AS confirmado,
+            SUM(status_negociacao='cliente_ciente') AS cliente_ciente,
             SUM(status_negociacao='recusou')       AS recusou
         FROM hc_upgrades_base
+        WHERE plano_anterior_nome IS NOT NULL
     """).fetchone()
 
     # Log
@@ -400,6 +403,7 @@ async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_vendedor())):
             "em_contato":    safe(base["em_contato"]),
             "negociando":    safe(base["negociando"]),
             "confirmado":    safe(base["confirmado"]),
+            "cliente_ciente": safe(base["cliente_ciente"]),
             "recusou":       safe(base["recusou"]),
         },
         "log": {
@@ -414,6 +418,71 @@ async def resumo_upgrades(db=Depends(get_db), user=Depends(requer_vendedor())):
         "planos": [dict(r) for r in planos],
         "cidades": [dict(r) for r in cidades],
     }
+
+
+# ── Boletos do cliente ────────────────────────────────────────
+
+@router.get("/base/{id}/boletos")
+async def boletos_cliente(id: int, db=Depends(get_db), user=Depends(requer_backoffice())):
+    row = db.execute("SELECT ixc_contrato_id FROM hc_upgrades_base WHERE id=?", (id,)).fetchone()
+    if not row: raise HTTPException(404, "Não encontrado.")
+    try:
+        rows = ixc_select("""
+            SELECT fn.id, fn.data_vencimento, fn.valor, fn.status,
+                   fn.pagamento_data, vd.nome as plano_nome, vd.valor_contrato
+            FROM fn_areceber fn
+            LEFT JOIN cliente_contrato cc ON cc.id = fn.id_contrato
+            LEFT JOIN vd_contratos vd ON vd.id = cc.id_vd_contrato
+            WHERE fn.id_contrato = %s
+            AND fn.data_vencimento BETWEEN '2026-04-01' AND '2026-05-31'
+            ORDER BY fn.data_vencimento
+        """, (row["ixc_contrato_id"],))
+        def sv(v):
+            if v is None: return None
+            if hasattr(v,'__class__') and v.__class__.__name__=='Decimal': return float(v)
+            if hasattr(v,'strftime'): return str(v)
+            return v
+        return {"boletos": [{k: sv(val) for k,val in dict(r).items()} for r in rows]}
+    except Exception as e:
+        log.error(f"boletos_cliente: {e}")
+        return {"boletos": []}
+
+
+# ── Ranking operadores ────────────────────────────────────────
+
+@router.get("/ranking-operadores")
+async def ranking_operadores(db=Depends(get_db), user=Depends(requer_backoffice())):
+    rows = db.execute("""
+        SELECT operador_contato as operador,
+               COUNT(*) as total_contatos,
+               SUM(status_negociacao='cliente_ciente') as clientes_cientes,
+               SUM(status_negociacao='recusou') as recusaram,
+               SUM(status_negociacao='em_contato') as em_contato,
+               SUM(status_negociacao='negociando') as negociando,
+               MAX(data_contato) as ultimo_contato
+        FROM hc_upgrades_base
+        WHERE operador_contato IS NOT NULL
+        GROUP BY operador_contato
+        ORDER BY clientes_cientes DESC, total_contatos DESC
+    """).fetchall()
+    return {"ranking": [dict(r) for r in rows]}
+
+
+# ── Resumo por plano anterior ─────────────────────────────────
+
+@router.get("/resumo-planos")
+async def resumo_planos(db=Depends(get_db), user=Depends(requer_backoffice())):
+    rows = db.execute("""
+        SELECT plano_anterior_nome as plano, COUNT(*) as total,
+               SUM(status_negociacao='nao_contatado') as nao_contatado,
+               SUM(status_negociacao='em_contato') as em_contato,
+               SUM(status_negociacao='negociando') as negociando,
+               SUM(status_negociacao='cliente_ciente') as cliente_ciente,
+               SUM(status_negociacao='recusou') as recusou
+        FROM hc_upgrades_base WHERE plano_anterior_nome IS NOT NULL
+        GROUP BY plano_anterior_nome ORDER BY total DESC
+    """).fetchall()
+    return {"planos": [dict(r) for r in rows]}
 
 def _notif_telegram(p, plano_ant, payload, diferenca, tipo, por):
     import requests as _req
@@ -460,6 +529,7 @@ def _notif_telegram_negociacao(cl, status, obs, por):
         "em_contato":    "📞",
         "negociando":    "🤝",
         "confirmado":    "✅",
+        "cliente_ciente": "🎯",
         "recusou":       "❌",
         "nao_contatado": "📋",
     }
@@ -467,6 +537,7 @@ def _notif_telegram_negociacao(cl, status, obs, por):
         "em_contato":    "EM CONTATO",
         "negociando":    "NEGOCIANDO",
         "confirmado":    "CONFIRMADO",
+        "cliente_ciente": "CLIENTE CIENTE",
         "recusou":       "RECUSOU",
         "nao_contatado": "NÃO CONTATADO",
     }

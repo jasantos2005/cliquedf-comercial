@@ -1030,10 +1030,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
       <option value="">Todas as cidades</option>
     </select>
-    <select id="upg-plano" onchange="filtrarUpgrade()"
-      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;min-width:200px;">
-      <option value="">Todos os planos</option>
-    </select>
+
     <select id="upg-status-neg" onchange="filtrarUpgrade()"
       style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
       <option value="todos">Todos os status</option>
@@ -1041,6 +1038,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       <option value="em_contato">Em contato</option>
       <option value="negociando">Negociando</option>
       <option value="confirmado">Confirmado</option>
+      <option value="cliente_ciente">✅ Cliente ciente</option>
       <option value="recusou">Recusou</option>
     </select>
   </div>
@@ -1052,7 +1050,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
           <tr>
             <th>Cliente</th>
             <th>Cidade</th>
-            <th>Plano Atual</th>
+            <th>Plano Anterior → Atual</th>
             <th>Telefone</th>
             <th>Status</th>
             <th>Ação</th>
@@ -1067,23 +1065,20 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
 
 <!-- UPGRADE: REALIZADOS -->
 <div id="page-upgrade-log" class="page">
-  <!-- KPIs receita -->
-  <div class="kpi-row" id="upg-log-kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px;"></div>
+  <div id="upg-ranking-operadores" style="background:var(--surf);border-radius:14px;padding:20px;margin-bottom:20px;"></div>
+  <!-- KPIs clientes cientes -->
+  <div class="kpi-row" id="upg-log-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;"></div>
   <!-- Filtros -->
   <div style="display:flex;gap:10px;margin-bottom:16px;">
-    <select id="upg-log-tipo" onchange="carregarUpgradeLog()"
+    <input id="upg-log-busca" type="text" placeholder="Buscar cliente..." oninput="carregarUpgradeLog()"
+      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;width:200px;">
+    <select id="upg-log-operador" onchange="carregarUpgradeLog()"
       style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
-      <option value="todos">Todos os tipos</option>
-      <option value="upgrade">Upgrade</option>
-      <option value="downgrade">Downgrade</option>
-      <option value="lateral">Lateral</option>
+      <option value="">Todos os operadores</option>
     </select>
-    <select id="upg-log-status" onchange="carregarUpgradeLog()"
+    <select id="upg-log-cidade" onchange="carregarUpgradeLog()"
       style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
-      <option value="todos">Todos os status</option>
-      <option value="aplicado">Aplicado</option>
-      <option value="pendente">Pendente</option>
-      <option value="erro">Erro</option>
+      <option value="">Todas as cidades</option>
     </select>
   </div>
   <div class="card">
@@ -1094,17 +1089,15 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
             <th>Cliente</th>
             <th>Cidade</th>
             <th>Plano Anterior</th>
-            <th>Plano Novo</th>
-            <th>Diferença</th>
-            <th>Tipo</th>
-            <th>Por</th>
-            <th>Data</th>
-            <th>Status</th>
+            <th>Plano Atual</th>
+            <th>Operador</th>
+            <th>Data contato</th>
           </tr>
         </thead>
         <tbody id="upg-log-tbody"></tbody>
       </table>
     </div>
+    <div id="upg-log-paginacao" style="display:flex;gap:8px;justify-content:center;margin-top:14px;"></div>
   </div>
 </div>
     <div id="page-retencao" class="page" style="padding:40px;text-align:center">
@@ -1234,28 +1227,24 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <option value="em_contato">Em contato</option>
         <option value="negociando">Negociando</option>
         <option value="confirmado">Confirmado — pronto para upgrade</option>
+        <option value="cliente_ciente">✅ Cliente ciente do upgrade</option>
         <option value="recusou">Recusou</option>
       </select>
     </div>
-    <!-- Plano destino -->
-    <div style="margin-bottom:14px;">
-      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Plano destino</label>
-      <select id="upg-plano-novo" onchange="atualizarPreviewUpgrade()"
-        style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;color:var(--text);outline:none;">
-        <option value="">Selecione o plano novo</option>
-      </select>
-    </div>
-    <!-- Preview diferença -->
-    <div id="upg-preview" style="display:none;border-radius:10px;padding:12px;margin-bottom:14px;text-align:center;"></div>
+
     <!-- Observação -->
     <div style="margin-bottom:16px;">
       <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Observação</label>
       <textarea id="upg-obs" rows="2" placeholder="Ex: Cliente aceitou fidelidade 12 meses..."
         style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;color:var(--text);outline:none;resize:none;"></textarea>
     </div>
+    <div id="upg-boletos" style="margin-bottom:14px;display:none;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📄 Faturas Abr/Mai</div>
+      <div id="upg-boletos-body" style="font-size:12px;"></div>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button class="btn btn-outline" onclick="salvarNegociacao()">Salvar negociação</button>
-      <button class="btn btn-cyan" id="upg-btn-aplicar" onclick="aplicarUpgrade()" disabled>Aplicar upgrade no IXC</button>
+      <button class="btn btn-cyan" onclick="confirmarClienteCiente()" style="background:var(--green);">✅ Cliente ciente</button>
     </div>
   </div>
 </div>
@@ -1411,7 +1400,7 @@ function navTo(page) {
     cancelamentos: carregarCancelamentos,
     usuarios: carregarUsuarios,
     'upgrade-base': carregarUpgradeBase,
-    'upgrade-log':  carregarUpgradeLog,
+    'upgrade-log':  () => { carregarUpgradeLog(); carregarRankingOperadores(); },
     permissoes: carregarPermissoes,
   };
   if (loaders[page]) loaders[page]();
@@ -3303,6 +3292,7 @@ async function carregarUpgradeBase() {
       <div class="kpi" style="--ac:var(--amber);cursor:pointer;" onclick="_upgFiltrarStatus('em_contato')"><div class="kv">${b.em_contato + b.negociando}</div><div class="kl">Em negociação</div></div>
       <div class="kpi" style="--ac:var(--green);cursor:pointer;" onclick="_upgFiltrarStatus('confirmado')"><div class="kv">${b.confirmado}</div><div class="kl">Confirmados</div></div>
       <div class="kpi" style="--ac:var(--red);cursor:pointer;" onclick="_upgFiltrarStatus('recusou')"><div class="kv">${b.recusou}</div><div class="kl">Recusaram</div></div>
+      <div class="kpi" style="--ac:var(--green);cursor:pointer;" onclick="_upgFiltrarStatus('cliente_ciente')"><div class="kv">${b.cliente_ciente||0}</div><div class="kl">Clientes cientes</div></div>
       <div class="kpi" style="--ac:var(--purple);cursor:pointer;" onclick="_upgFiltrarStatus('todos')"><div class="kv">${l.total}</div><div class="kl">Upgrades feitos</div></div>
     `;
     // Preencher filtro de cidades
@@ -3315,35 +3305,20 @@ async function carregarUpgradeBase() {
         selC.appendChild(o);
       }
     });
-    // Preencher filtro de planos
-    const selP = document.getElementById('upg-plano');
-    const planosAtuais = Array.from(selP.options).map(o => o.value);
-    (r.planos||[]).forEach(p => {
-      if (!planosAtuais.includes(p.plano_nome)) {
-        const o = document.createElement('option');
-        o.value = o.textContent = p.plano_nome;
-        selP.appendChild(o);
-      }
-    });
+
   } catch(e) { console.error('upg kpis:', e); }
 
   // Tabela
   await _carregarTabelaUpgrade(1);
 
-  // Pré-carregar planos do IXC para o modal
-  if (!_upgPlanosIxc.length) {
-    try {
-      const rp = await api('/api/upgrade/planos');
-      _upgPlanosIxc = rp.planos || [];
-    } catch(e) {}
-  }
+
 }
 
 async function _carregarTabelaUpgrade(pagina = 1) {
   _upgPagina = pagina;
   const busca   = document.getElementById('upg-busca')?.value || '';
   const cidade  = document.getElementById('upg-cidade')?.value || '';
-  const plano   = document.getElementById('upg-plano')?.value || '';
+  const plano   = '';
   const status  = document.getElementById('upg-status-neg')?.value || 'todos';
   const tbody   = document.getElementById('upg-tbody');
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Carregando...</td></tr>';
@@ -3355,6 +3330,7 @@ async function _carregarTabelaUpgrade(pagina = 1) {
       em_contato:    {l:'Em contato',    c:'b-em_auditoria'},
       negociando:    {l:'Negociando',    c:'b-pendente'},
       confirmado:    {l:'Confirmado',    c:'b-aprovado'},
+      cliente_ciente:{l:'✅ Cliente ciente', c:'b-aprovado'},
       recusou:       {l:'Recusou',       c:'b-reprovado'},
     };
     tbody.innerHTML = (r.clientes||[]).map(cl => {
@@ -3362,9 +3338,9 @@ async function _carregarTabelaUpgrade(pagina = 1) {
       return `<tr>
         <td><div style="font-weight:600;">${esc(cl.cliente)}</div><div style="font-size:11px;color:var(--muted);">#${cl.ixc_contrato_id}</div></td>
         <td>${esc(cl.cidade||'—')}</td>
-        <td style="font-size:12px;">${esc(cl.plano_nome||'—')}</td>
+        <td style="font-size:11px;">${cl.plano_anterior_nome ? esc(cl.plano_anterior_nome)+' → ' : ''}<span style="color:var(--cyan)">${esc(cl.plano_nome||'—')}</span></td>
         <td style="font-size:12px;color:var(--muted);">${esc(cl.telefone_celular||cl.telefone_residencial||'—')}</td>
-        <td><span class="badge ${sn.c}">${sn.l}</span></td>
+        <td><span class="badge ${sn.c}">${sn.l}</span>${cl.operador_contato ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;">'+esc(cl.operador_contato)+'</div>' : ''}</td>
         <td><button class="btn btn-cyan" style="padding:5px 12px;font-size:12px;" onclick="abrirModalUpgrade(${cl.id})">Abrir</button></td>
       </tr>`;
     }).join('') || '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Nenhum resultado.</td></tr>';
@@ -3420,21 +3396,18 @@ async function abrirModalUpgrade(id) {
     document.getElementById('upg-neg-status').value = cl.status_negociacao || 'nao_contatado';
     document.getElementById('upg-obs').value = cl.obs_negociacao || '';
 
-    // Preencher dropdown de planos
-    const sel = document.getElementById('upg-plano-novo');
-    sel.innerHTML = '<option value="">Selecione o plano novo</option>';
-    _upgPlanosIxc.forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.dataset.nome  = p.nome;
-      opt.dataset.valor = p.valor || 0;
-      opt.textContent   = `${p.nome} — R$ ${fmtVal(p.valor||0)}/mês`;
-      sel.appendChild(opt);
-    });
 
-    document.getElementById('upg-preview').style.display = 'none';
-    document.getElementById('upg-btn-aplicar').disabled = true;
     document.getElementById('modal-upgrade').classList.add('show');
+    try {
+      const rb = await api(`/api/upgrade/base/${id}/boletos`);
+      const bolDiv = document.getElementById('upg-boletos');
+      const bolBody = document.getElementById('upg-boletos-body');
+      const SB = {A:'🔴 Aberto',P:'✅ Pago',R:'↩ Rej.',C:'❌ Cancel.'};
+      if (rb.boletos && rb.boletos.length) {
+        bolBody.innerHTML = rb.boletos.map(b => '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);"><span>' + (b.data_vencimento||'-') + '</span><span style="font-weight:700;">R$ ' + fmtVal(b.valor||0) + '</span><span>' + (SB[b.status]||b.status) + '</span></div>').join('');
+        bolDiv.style.display = 'block';
+      } else { bolDiv.style.display = 'none'; }
+    } catch(e) { document.getElementById('upg-boletos').style.display='none'; }
   } catch(e) {
     toast('Erro ao abrir cliente.', 'err');
     console.error(e);
@@ -3473,6 +3446,27 @@ function _upgFiltrarStatus(status) {
   const sel = document.getElementById('upg-status-neg');
   if (sel) sel.value = status;
   _carregarTabelaUpgrade(1);
+}
+
+async function confirmarClienteCiente() {
+  if (!_upgClienteAtivo) return;
+  if (!confirm('Confirmar que o cliente ' + _upgClienteAtivo.cliente + ' está ciente do upgrade?')) return;
+  const tk = localStorage.getItem('hc_p_token');
+  try {
+    const r = await fetch(`/api/upgrade/base/${_upgClienteAtivo.id}/negociacao`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'Authorization':'Bearer '+tk},
+      body: JSON.stringify({
+        status_negociacao: 'cliente_ciente',
+        obs_negociacao: document.getElementById('upg-obs').value || 'Cliente ciente do upgrade realizado.',
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) { toast('Erro: ' + (d.detail||r.status), 'err'); return; }
+    fecharModal('modal-upgrade');
+    toast('✅ Cliente ciente registrado!', 'ok');
+    _carregarTabelaUpgrade(_upgPagina);
+  } catch(e) { toast('Erro ao registrar.', 'err'); console.error(e); }
 }
 
 async function salvarNegociacao() {
@@ -3531,43 +3525,78 @@ async function aplicarUpgrade() {
 }
 
 // ── Histórico de upgrades realizados ─────────────────────────
-async function carregarUpgradeLog() {
-  const tipo   = document.getElementById('upg-log-tipo')?.value   || 'todos';
-  const status = document.getElementById('upg-log-status')?.value || 'todos';
-  const tbody  = document.getElementById('upg-log-tbody');
-  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Carregando...</td></tr>';
-
+async function carregarRankingOperadores() {
   try {
-    // KPIs
-    const res = await api('/api/upgrade/resumo');
-    const l = res.log;
-    document.getElementById('upg-log-kpis').innerHTML = `
-      <div class="kpi" style="--ac:var(--green)"><div class="kv">${l.upgrades}</div><div class="kl">Upgrades</div></div>
-      <div class="kpi" style="--ac:var(--red)"><div class="kv">${l.downgrades}</div><div class="kl">Downgrades</div></div>
-      <div class="kpi" style="--ac:var(--cyan)"><div class="kv">R$ ${fmtVal(l.ganho_total)}</div><div class="kl">Ganho/Perda Total</div></div>
-      <div class="kpi" style="--ac:var(--purple)"><div class="kv">${l.total}</div><div class="kl">Total realizados</div></div>
-    `;
+    const r = await api('/api/upgrade/ranking-operadores');
+    const el = document.getElementById('upg-ranking-operadores');
+    if (!el) return;
+    if (!r.ranking || !r.ranking.length) {
+      el.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;">Nenhum contato registrado ainda.</div>';
+      return;
+    }
+    const rows = r.ranking.map((op,i) => {
+      return '<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 4px;font-weight:700;color:var(--cyan);">' + (i+1) + 'o</td><td style="padding:8px 4px;font-weight:600;">' + esc(op.operador||'-') + '</td><td style="padding:8px 4px;text-align:center;">' + (op.total_contatos||0) + '</td><td style="padding:8px 4px;text-align:center;font-weight:700;color:var(--green);">' + (op.clientes_cientes||0) + '</td><td style="padding:8px 4px;text-align:center;color:var(--red);">' + (op.recusaram||0) + '</td><td style="padding:8px 4px;font-size:11px;color:var(--muted);">' + (op.ultimo_contato||'-') + '</td></tr>';
+    }).join('');
+    el.innerHTML = '<div style="font-size:13px;font-weight:700;margin-bottom:12px;">🏆 Ranking de Operadores</div><table style="width:100%;border-collapse:collapse;"><thead><tr style="font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);"><th style="padding:8px 4px;text-align:left;">#</th><th style="padding:8px 4px;text-align:left;">Operador</th><th style="padding:8px 4px;text-align:center;">Contatados</th><th style="padding:8px 4px;text-align:center;">Cientes</th><th style="padding:8px 4px;text-align:center;">Recusaram</th><th style="padding:8px 4px;text-align:left;">Último contato</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  } catch(e) { console.error('ranking:', e); }
+}
 
-    // Tabela
-    const r = await api(`/api/upgrade/log?tipo=${tipo}&status=${status}`);
-    const TIPO_ICON = {upgrade:'⬆️', downgrade:'⬇️', lateral:'↔️'};
-    tbody.innerHTML = (r.log||[]).map(lg => `
+async function carregarUpgradeLog(pagina = 1) {
+  const busca    = document.getElementById('upg-log-busca')?.value || '';
+  const operador = document.getElementById('upg-log-operador')?.value || '';
+  const cidade   = document.getElementById('upg-log-cidade')?.value || '';
+  const tbody    = document.getElementById('upg-log-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Carregando...</td></tr>';
+  try {
+    const res = await api('/api/upgrade/resumo');
+    const b = res.base;
+    document.getElementById('upg-log-kpis').innerHTML = `
+      <div class="kpi" style="--ac:var(--green)"><div class="kv">${b.cliente_ciente||0}</div><div class="kl">✅ Clientes cientes</div></div>
+      <div class="kpi" style="--ac:var(--amber)"><div class="kv">${(b.em_contato||0)+(b.negociando||0)}</div><div class="kl">Em negociação</div></div>
+      <div class="kpi" style="--ac:var(--red)"><div class="kv">${b.recusou||0}</div><div class="kl">Recusaram</div></div>
+    `;
+    const rk = await api('/api/upgrade/ranking-operadores');
+    const selOp = document.getElementById('upg-log-operador');
+    const opsAtuais = Array.from(selOp.options).map(o => o.value);
+    (rk.ranking||[]).forEach(op => {
+      if (!opsAtuais.includes(op.operador)) {
+        const o = document.createElement('option'); o.value = o.textContent = op.operador; selOp.appendChild(o);
+      }
+    });
+    let url = `/api/upgrade/base?pagina=${pagina}&status=cliente_ciente&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}`;
+    const r = await api(url);
+    let clientes = r.clientes || [];
+    if (operador) clientes = clientes.filter(cl => cl.operador_contato === operador);
+    const selCid = document.getElementById('upg-log-cidade');
+    const cidsAtuais = Array.from(selCid.options).map(o => o.value);
+    clientes.forEach(cl => {
+      if (cl.cidade && !cidsAtuais.includes(cl.cidade)) {
+        const o = document.createElement('option'); o.value = o.textContent = cl.cidade; selCid.appendChild(o);
+      }
+    });
+    tbody.innerHTML = clientes.map(cl => `
       <tr>
-        <td><strong>${esc(lg.cliente||'—')}</strong></td>
-        <td style="font-size:12px;color:var(--muted);">${esc(lg.cidade||'—')}</td>
-        <td style="font-size:12px;">${esc(lg.plano_anterior_nome||'—')}<br><span style="color:var(--muted);">R$ ${fmtVal(lg.plano_anterior_valor||0)}</span></td>
-        <td style="font-size:12px;color:var(--cyan);">${esc(lg.plano_novo_nome||'—')}<br><span style="color:var(--muted);">R$ ${fmtVal(lg.plano_novo_valor||0)}</span></td>
-        <td style="font-weight:700;color:${(lg.diferenca_valor||0)>=0?'var(--green)':'var(--red)'};">
-          ${(lg.diferenca_valor||0)>=0?'+':''}R$ ${fmtVal(lg.diferenca_valor||0)}
-        </td>
-        <td>${TIPO_ICON[lg.tipo_mudanca]||''} ${lg.tipo_mudanca||'—'}</td>
-        <td style="font-size:12px;color:var(--muted);">${esc(lg.realizado_por||'—')}</td>
-        <td style="font-size:12px;color:var(--muted);">${fmtData(lg.realizado_em)}</td>
-        <td><span class="badge ${lg.status==='aplicado'?'b-aprovado':lg.status==='erro'?'b-reprovado':'b-pendente'}">${lg.status||'—'}</span></td>
+        <td><strong>${esc(cl.cliente||'—')}</strong><div style="font-size:11px;color:var(--muted);">#${cl.ixc_contrato_id}</div></td>
+        <td style="font-size:12px;">${esc(cl.cidade||'—')}</td>
+        <td style="font-size:12px;color:var(--muted);">${esc(cl.plano_anterior_nome||'—')}</td>
+        <td style="font-size:12px;color:var(--cyan);">${esc(cl.plano_nome||'—')}</td>
+        <td style="font-size:12px;font-weight:600;color:var(--green);">${esc(cl.operador_contato||'—')}</td>
+        <td style="font-size:12px;color:var(--muted);">${cl.data_contato ? fmtData(cl.data_contato) : '—'}</td>
       </tr>
-    `).join('') || '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--muted);">Nenhum registro.</td></tr>';
+    `).join('') || '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Nenhum cliente ciente ainda.</td></tr>';
+    const totalPag = Math.ceil((r.total||0) / 50);
+    const pag = document.getElementById('upg-log-paginacao');
+    if (pag) {
+      pag.innerHTML = '';
+      for (let i = 1; i <= Math.min(totalPag,10); i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i; btn.className = 'btn '+(i===pagina?'btn-cyan':'btn-outline');
+        btn.style = 'padding:5px 12px;font-size:12px;width:auto;';
+        btn.onclick = () => carregarUpgradeLog(i); pag.appendChild(btn);
+      }
+    }
   } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--red);">Erro ao carregar.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--red);">Erro ao carregar.</td></tr>';
     console.error(e);
   }
 }
