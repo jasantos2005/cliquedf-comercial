@@ -59,11 +59,13 @@ def sync_vendedores():
     conn = db()
     # Preservar usuario_ixc_id existente antes de deletar
     usu_map = {r[0]: r[1] for r in conn.execute("SELECT id, usuario_ixc_id FROM hc_vendedores WHERE usuario_ixc_id IS NOT NULL").fetchall()}
+    func_map = {r[0]: r[1] for r in conn.execute("SELECT id, funcionario_ixc_id FROM hc_vendedores WHERE funcionario_ixc_id IS NOT NULL").fetchall()}
     conn.execute("DELETE FROM hc_vendedores")
     for r in rows:
         usu_id = usu_map.get(r["id"])
-        conn.execute("INSERT INTO hc_vendedores(id,nome,login_ixc,ativo,usuario_ixc_id)VALUES(?,?,?,1,?)",
-                     (r["id"], r["nome"], None, usu_id))
+        func_id = func_map.get(r["id"])
+        conn.execute("INSERT INTO hc_vendedores(id,nome,login_ixc,ativo,usuario_ixc_id,funcionario_ixc_id)VALUES(?,?,?,1,?,?)",
+                     (r["id"], r["nome"], None, usu_id, func_id))
     conn.commit(); conn.close()
     log.info(f"[OK] {len(rows)} vendedores")
 

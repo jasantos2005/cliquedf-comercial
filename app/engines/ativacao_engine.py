@@ -30,17 +30,17 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 
 def _get_usuario_ixc_id(ixc_vendedor_id: int) -> int:
-    """Retorna o usuario_ixc_id correspondente ao vendedor para o campo responsavel."""
+    """Retorna o funcionario_ixc_id correspondente ao vendedor para o campo responsavel."""
     try:
         db_path = Path(__file__).resolve().parent.parent.parent / 'hub_comercial.db'
         conn = sqlite3.connect(str(db_path))
-        row = conn.execute('SELECT usuario_ixc_id FROM hc_vendedores WHERE id=?', (ixc_vendedor_id,)).fetchone()
+        row = conn.execute('SELECT funcionario_ixc_id FROM hc_vendedores WHERE id=?', (ixc_vendedor_id,)).fetchone()
         conn.close()
         if row and row[0]:
             return int(row[0])
     except:
         pass
-    return ixc_vendedor_id  # fallback: usa o proprio vendedor_id
+    return ixc_vendedor_id  # fallback
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
