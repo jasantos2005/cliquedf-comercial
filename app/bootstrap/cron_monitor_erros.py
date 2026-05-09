@@ -150,6 +150,17 @@ def erros_manuais():
     return [dict(r) for r in rows]
 
 
+def _salvar_log(status, resumo, duracao=0):
+    try:
+        import sqlite3
+        c = sqlite3.connect(str(DB_PATH))
+        c.execute("INSERT INTO hc_automacoes_log(motor,status,resumo,duracao_s) VALUES(?,?,?,?)",
+                  ("Monitor de Erros", status, resumo, round(duracao, 2)))
+        c.commit(); c.close()
+    except Exception as e:
+        log.warning(f"_salvar_log: {e}")
+
+
 def main():
     log.info("=== Monitor Hub Comercial ===")
     linhas = []
@@ -184,10 +195,13 @@ def main():
 
     if not linhas:
         log.info("Nenhum erro encontrado.")
+        _salvar_log("ok", "Nenhum erro encontrado.")
         return
 
-    msg = f"🤖 *Hub Comercial Monitor* `{agora}`\n\n" + "\n".join(linhas)
+    msg = f"\U0001f916 *Hub Comercial Monitor* `{agora}`\n\n" + "\n".join(linhas)
     notificar(msg)
+    resumo = f"Correcoes: cidades={len(cidades)} vendedores={len(vendedores)} alertas={len(manuais)}"
+    _salvar_log("ok" if not manuais else "alerta", resumo)
     log.info(f"Notificacao enviada. {len(linhas)} itens.")
 
 
