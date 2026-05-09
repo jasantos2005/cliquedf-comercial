@@ -102,4 +102,16 @@ if __name__ == "__main__":
         sync_cidades("SE")
         log.info("Sync concluído.")
     except Exception as e:
-        log.error(f"ERRO: {e}"); sys.exit(1)
+        log.error(f"ERRO: {e}")
+        try:
+            import requests as _req
+            token = os.getenv("TELEGRAM_TOKEN")
+            if token:
+                _req.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                          json={"chat_id": "2135602169",
+                                "text": f"🚨 *ERRO CRITICO — Sync Hub Comercial*
+
+`{str(e)[:300]}`",
+                                "parse_mode": "Markdown"}, timeout=10)
+        except: pass
+        sys.exit(1)

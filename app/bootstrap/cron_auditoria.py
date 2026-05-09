@@ -130,4 +130,27 @@ def _salvar_log(status, resumo, duracao=0):
         c.commit(); c.close()
     except: pass
 
-if __name__ == "__main__": processar()
+def notificar_ailton(msg):
+    """Notifica Ailton pessoalmente em caso de erro critico."""
+    import requests as _req
+    token = os.getenv("TELEGRAM_TOKEN")
+    if not token: return
+    try:
+        _req.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                  json={"chat_id": "2135602169", "text": msg, "parse_mode": "Markdown"},
+                  timeout=10)
+    except Exception as e:
+        log.warning(f"notificar_ailton: {e}")
+
+if __name__ == "__main__":
+    try:
+        processar()
+    except Exception as e:
+        log.error(f"ERRO CRITICO cron_auditoria: {e}")
+        notificar_ailton(
+            f"🚨 *ERRO CRITICO — Auditoria Hub Comercial*\n\n"
+            f"O cron de auditoria falhou com o seguinte erro:\n"
+            f"`{str(e)[:300]}`\n\n"
+            f"Verifique o servidor."
+        )
+        _salvar_log("erro", f"Erro critico: {str(e)[:200]}")
