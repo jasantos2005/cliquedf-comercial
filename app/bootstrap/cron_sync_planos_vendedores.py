@@ -71,13 +71,16 @@ def sync_vendedores():
 
 def sync_cidades(uf="SE"):
     log.info(f"Sync cidades UF={uf}...")
+    # uf=28 é o ID numérico de Sergipe no IXC
+    UF_MAP = {"SE": 28, "AL": 2, "BA": 10, "PE": 22}
+    uf_id = UF_MAP.get(uf, 28)
     rows = ixc_select(
-        "SELECT id, nome, uf FROM ixcprovedor.cidade WHERE uf = %s ORDER BY nome", (uf,)
+        "SELECT id, nome FROM ixcprovedor.cidade WHERE uf = %s ORDER BY nome", (uf_id,)
     )
     conn = db(); conn.execute("DELETE FROM hc_cidades_cache WHERE uf = ?", (uf,))
     for r in rows:
         conn.execute("INSERT OR REPLACE INTO hc_cidades_cache(id,nome,uf)VALUES(?,?,?)",
-                     (r["id"], r["nome"], r["uf"]))
+                     (r["id"], r["nome"], uf))
     conn.commit(); conn.close()
     log.info(f"[OK] {len(rows)} cidades")
 
@@ -96,8 +99,7 @@ if __name__ == "__main__":
     try:
         sync_planos()
         sync_vendedores()
-        if "--cidades" in sys.argv:
-            sync_cidades("SE")
+        sync_cidades("SE")
         log.info("Sync concluído.")
     except Exception as e:
         log.error(f"ERRO: {e}"); sys.exit(1)
