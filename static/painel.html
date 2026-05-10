@@ -3527,6 +3527,24 @@ async function aplicarUpgrade() {
 }
 
 // ── Histórico de upgrades realizados ─────────────────────────
+function filtrarPorOperador(operador) {
+  const sel = document.getElementById('upg-log-operador');
+  if (sel) {
+    // Garantir que a opcao existe
+    let existe = Array.from(sel.options).some(o => o.value === operador);
+    if (!existe) {
+      const o = document.createElement('option');
+      o.value = o.textContent = operador;
+      sel.appendChild(o);
+    }
+    sel.value = operador;
+  }
+  // Scroll para a tabela
+  const tbody = document.getElementById('upg-log-tbody');
+  if (tbody) tbody.scrollIntoView({behavior:'smooth'});
+  carregarUpgradeLog(1);
+}
+
 async function carregarRankingOperadores() {
   try {
     const r = await api('/api/upgrade/ranking-operadores');
@@ -3537,7 +3555,7 @@ async function carregarRankingOperadores() {
       return;
     }
     const rows = r.ranking.map((op,i) => {
-      return '<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 4px;font-weight:700;color:var(--cyan);">' + (i+1) + 'o</td><td style="padding:8px 4px;font-weight:600;">' + esc(op.operador||'-') + '</td><td style="padding:8px 4px;text-align:center;">' + (op.total_contatos||0) + '</td><td style="padding:8px 4px;text-align:center;font-weight:700;color:var(--green);">' + (op.clientes_cientes||0) + '</td><td style="padding:8px 4px;text-align:center;color:var(--red);">' + (op.recusaram||0) + '</td><td style="padding:8px 4px;font-size:11px;color:var(--muted);">' + (op.ultimo_contato||'-') + '</td></tr>';
+      return '<tr style="border-bottom:1px solid var(--border);"><td style="padding:8px 4px;font-weight:700;color:var(--cyan);">' + (i+1) + 'o</td><td style="padding:8px 4px;font-weight:600;"><span style="cursor:pointer;color:var(--cyan);text-decoration:underline;" onclick="filtrarPorOperador(\'' + esc(op.operador||'') + '\')">' + esc(op.operador||'-') + '</span></td><td style="padding:8px 4px;text-align:center;">' + (op.total_contatos||0) + '</td><td style="padding:8px 4px;text-align:center;font-weight:700;color:var(--green);">' + (op.clientes_cientes||0) + '</td><td style="padding:8px 4px;text-align:center;color:var(--red);">' + (op.recusaram||0) + '</td><td style="padding:8px 4px;font-size:11px;color:var(--muted);">' + (op.ultimo_contato||'-') + '</td></tr>';
     }).join('');
     el.innerHTML = '<div style="font-size:13px;font-weight:700;margin-bottom:12px;">🏆 Ranking de Operadores</div><table style="width:100%;border-collapse:collapse;"><thead><tr style="font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);"><th style="padding:8px 4px;text-align:left;">#</th><th style="padding:8px 4px;text-align:left;">Operador</th><th style="padding:8px 4px;text-align:center;">Contatados</th><th style="padding:8px 4px;text-align:center;">Cientes</th><th style="padding:8px 4px;text-align:center;">Recusaram</th><th style="padding:8px 4px;text-align:left;">Último contato</th></tr></thead><tbody>' + rows + '</tbody></table>';
   } catch(e) { console.error('ranking:', e); }
