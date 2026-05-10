@@ -159,6 +159,25 @@ def consultar_cpf(cpf: str, user=Depends(requer_vendedor())):
     except Exception as e:
         raise HTTPException(500, f"Erro ao consultar CPF: {e}")
 
+@router.post("/preview-auditoria")
+async def preview_auditoria(dados: str = Form(...), user=Depends(requer_vendedor())):
+    """Roda a auditoria em modo preview sem salvar nada. Retorna pendencias."""
+    try:
+        f = json.loads(dados)
+    except:
+        raise HTTPException(400, "Dados inválidos.")
+    from app.engines.auditoria_engine import auditar
+    resultado = auditar(f)
+    pendencias = [r for r in resultado if r["resultado"] in ("reprovado", "atencao")]
+    criticos = [r for r in pendencias if r["resultado"] == "reprovado"]
+    return {
+        "pode_enviar": len(criticos) == 0,
+        "criticos": criticos,
+        "atencao": [r for r in pendencias if r["resultado"] == "atencao"],
+        "total_pendencias": len(pendencias)
+    }
+
+
 @router.post("/precadastro")
 async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:UploadFile=File(None),comp:UploadFile=File(None),db=Depends(get_db),user=Depends(requer_vendedor())):
     try: f=json.loads(dados)

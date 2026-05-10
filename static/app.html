@@ -1533,6 +1533,25 @@ async function comprimir(file){
 // ENVIO
 async function enviarCadastro(){
   if(modoOffline){ await salvarOfflineIDB(); return; }
+  // Preview de auditoria antes de enviar
+  try {
+    const fd2 = new FormData();
+    fd2.append('dados', JSON.stringify(formDados));
+    const prev = await fetch(`${API}/api/vendedor/preview-auditoria`, {
+      method:'POST', headers:{Authorization:`Bearer ${token}`}, body:fd2
+    });
+    const pd = await prev.json();
+    if (pd.criticos && pd.criticos.length > 0) {
+      const msgs = pd.criticos.map(r => '❌ ' + r.legenda).join('\n');
+      const continuar = confirm('⚠️ ATENÇÃO — Problemas encontrados:\n\n' + msgs + '\n\nDeseja enviar mesmo assim?');
+      if (!continuar) return;
+    } else if (pd.atencao && pd.atencao.length > 0) {
+      const msgs = pd.atencao.map(r => '⚠️ ' + r.legenda).join('\n');
+      const continuar = confirm('Atenção — Verifique antes de enviar:\n\n' + msgs + '\n\nDeseja continuar?');
+      if (!continuar) return;
+    }
+  } catch(e) { /* ignora erro no preview, segue normal */ }
+
   const btn=document.getElementById('btn-enviar');
   btn.innerHTML='<span class="spinner"></span>Enviando...'; btn.disabled=true;
   try{
