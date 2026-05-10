@@ -49,5 +49,6 @@ async def health():
     return {"status":"ok","operacao":os.getenv("OPERACAO","HubComercial"),"versao":"1.0.0"}
 app.include_router(admin.router,       prefix="/api/admin",       tags=["Admin"])
 app.include_router(upgrade.router,     prefix="/api/upgrade",     tags=["Upgrade"])
+app.include_router(metas.router,  prefix="/api/metas", tags=["metas"])
 app.include_router(retencao_router)
 init_retencao_tables()

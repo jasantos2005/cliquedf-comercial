@@ -598,6 +598,10 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07M8.46 8.46a5 5 0 000 7.07"/></svg>
         <span class="ni-label">Automacoes</span>
       </div>
+      <div class="ni" id="ni-metas" onclick="navTo('metas')">
+        <span class="ni-icon">🎯</span>
+        <span class="ni-label">Metas</span>
+      </div>
       <div class="sb-section">Upgrade</div>
       <div class="ni" id="ni-upgrade-base" onclick="navTo('upgrade-base')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
@@ -1019,6 +1023,19 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       </div>
 
 <!-- UPGRADE: A REALIZAR -->
+<div id="page-metas" class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div>
+      <div style="font-size:18px;font-weight:700;">🎯 Metas de Ativação</div>
+      <div style="font-size:13px;color:var(--muted);">Defina e acompanhe as metas mensais dos vendedores</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <input type="month" id="metas-mes" style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;" onchange="carregarMetas()">
+    </div>
+  </div>
+  <div id="metas-tabela" style="background:var(--surf);border-radius:14px;overflow:hidden;"></div>
+</div>
+
 <div id="page-upgrade-base" class="page">
   <!-- KPIs -->
   <div class="kpi-row" id="upg-kpis" style="grid-template-columns:repeat(6,1fr);margin-bottom:20px;"></div>
@@ -1372,7 +1389,7 @@ const PAGE_TITLES = {
     'vend-perfil': 'Vendedores — Perfil',
   financeiro: 'Financeiro', cancelamentos: 'Cancelamentos',
   usuarios: 'Usuários', permissoes: 'Permissões por Grupo',
-  'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados', 'retencao': 'Retenção de Clientes'
+  'metas': 'Metas de Ativação', 'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados', 'retencao': 'Retenção de Clientes'
 };
 
 function navTo(page) {
@@ -1380,7 +1397,7 @@ function navTo(page) {
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById(`page-${page}`);
   if (pg) pg.classList.add('active');
-  const niId = ['upgrade-base','upgrade-log','aud-fila','aud-ixc','sem-os','vendas-lista','vendas-hub','vendas-cidades','retencao'].includes(page) ? `ni-${page}` : `ni-${page.split('-')[0]}`;
+  const niId = ['metas','upgrade-base','upgrade-log','aud-fila','aud-ixc','sem-os','vendas-lista','vendas-hub','vendas-cidades','retencao'].includes(page) ? `ni-${page}` : `ni-${page.split('-')[0]}`;
   const ni = document.getElementById(niId);
   if (ni) ni.classList.add('active');
   document.getElementById('tb-title').textContent = PAGE_TITLES[page] || page;
@@ -1400,7 +1417,8 @@ function navTo(page) {
     financeiro: carregarFinanceiro,
     cancelamentos: carregarCancelamentos,
     usuarios: carregarUsuarios,
-    'upgrade-base': carregarUpgradeBase,
+    'metas': carregarMetas,
+  'upgrade-base': carregarUpgradeBase,
     'upgrade-log':  () => { carregarUpgradeLog(); carregarRankingOperadores(); },
     permissoes: carregarPermissoes,
   };
@@ -3545,6 +3563,66 @@ function filtrarPorOperador(operador) {
   carregarUpgradeLog(1);
 }
 
+async function carregarMetas() {
+  const mesInput = document.getElementById('metas-mes');
+  if (!mesInput.value) {
+    const now = new Date();
+    mesInput.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  }
+  const mes = mesInput.value;
+  const el = document.getElementById('metas-tabela');
+  el.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;">Carregando...</div>';
+  try {
+    const r = await api('/api/metas?mes=' + mes);
+    const vends = r.vendedores || [];
+    const isAdmin = (_sGet('hc_p_nivel') >= 50);
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;">' +
+      '<thead><tr style="font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);">' +
+      '<th style="padding:12px 16px;text-align:left;">Vendedor</th>' +
+      '<th style="padding:12px 16px;text-align:center;">Meta</th>' +
+      '<th style="padding:12px 16px;text-align:center;">Realizados</th>' +
+      '<th style="padding:12px 16px;text-align:center;">Progresso</th>' +
+      '<th style="padding:12px 16px;text-align:center;">%</th>' +
+      (isAdmin ? '<th style="padding:12px 16px;text-align:center;">Ação</th>' : '') +
+      '</tr></thead><tbody>' +
+      vends.map(v => {
+        const pct = Math.min(100, v.percentual || 0);
+        const cor = pct >= 100 ? 'var(--green)' : pct >= 70 ? 'var(--amber)' : 'var(--red)';
+        const bar = '<div style="background:var(--surf2);border-radius:4px;height:8px;width:120px;display:inline-block;vertical-align:middle;">' +
+          '<div style="background:' + cor + ';height:8px;border-radius:4px;width:' + pct + '%;"></div></div>';
+        return '<tr style="border-bottom:1px solid var(--border);">' +
+          '<td style="padding:12px 16px;font-weight:600;">' + esc(v.vendedor_nome) + '</td>' +
+          '<td style="padding:12px 16px;text-align:center;">' +
+            (isAdmin ? '<input type="number" min="0" value="' + (v.meta||0) + '" ' +
+              'style="width:70px;background:var(--surf2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);text-align:center;" ' +
+              'id="meta-' + v.vendedor_id + '" />' : '<strong>' + (v.meta||0) + '</strong>') +
+          '</td>' +
+          '<td style="padding:12px 16px;text-align:center;font-weight:700;font-size:16px;">' + (v.realizados||0) + '</td>' +
+          '<td style="padding:12px 16px;text-align:center;">' + bar + '</td>' +
+          '<td style="padding:12px 16px;text-align:center;font-weight:700;color:' + cor + ';">' + pct.toFixed(1) + '%</td>' +
+          (isAdmin ? '<td style="padding:12px 16px;text-align:center;">' +
+            '<button class="btn btn-cyan" style="padding:5px 12px;font-size:12px;width:auto;" ' +
+            'onclick="salvarMeta(' + v.vendedor_id + ','' + mes + '')">Salvar</button></td>' : '') +
+          '</tr>';
+      }).join('') + '</tbody></table>';
+  } catch(e) { el.innerHTML = '<div style="padding:20px;color:var(--red);">Erro ao carregar.</div>'; console.error(e); }
+}
+
+async function salvarMeta(vendedorId, mes) {
+  const input = document.getElementById('meta-' + vendedorId);
+  if (!input) return;
+  const meta = parseInt(input.value) || 0;
+  try {
+    const r = await api('/api/metas', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({vendedor_id: vendedorId, mes: mes, meta: meta})
+    });
+    if (r.ok) toast('Meta salva!', 'ok');
+    else toast('Erro ao salvar.', 'err');
+  } catch(e) { toast('Erro ao salvar.', 'err'); }
+}
+
 async function carregarRankingOperadores() {
   try {
     const r = await api('/api/upgrade/ranking-operadores');
@@ -3583,10 +3661,10 @@ async function carregarUpgradeLog(pagina = 1) {
         const o = document.createElement('option'); o.value = o.textContent = op.operador; selOp.appendChild(o);
       }
     });
-    let url = `/api/upgrade/base?pagina=${pagina}&status=cliente_ciente&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}`;
+    let url = `/api/upgrade/base?pagina=${pagina}&status=cliente_ciente&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}&operador=${encodeURIComponent(operador)}`;
     const r = await api(url);
     let clientes = r.clientes || [];
-    if (operador) clientes = clientes.filter(cl => cl.operador_contato === operador);
+
     const selCid = document.getElementById('upg-log-cidade');
     const cidsAtuais = Array.from(selCid.options).map(o => o.value);
     clientes.forEach(cl => {
