@@ -10,19 +10,19 @@
 <link rel="manifest" href="/static/manifest.json">
 <style>
 :root{
-  --bg:#0a0e1a;--surf:#111827;--surf2:#1a2235;--border:#1e2d45;
-  --text:#e2e8f0;--muted:#6b7fa3;--cyan:#00d4ff;--green:#00e5a0;
+  --bg:#070D1A;--surf:rgba(255,255,255,0.04);--surf2:rgba(255,255,255,0.07);--border:rgba(255,255,255,0.08);
+  --text:#E8EDF2;--muted:#7A93AD;--cyan:#F5821F;--green:#00E5A0;
   --red:#ff4d6a;--amber:#ffb83f;--purple:#a78bfa;--orange:#fb923c;
   --radius:14px;--safe:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',sans-serif;font-size:15px;overscroll-behavior:none;}
+html,body{height:100%;background:#070D1A;color:var(--text);font-family:-apple-system,'Segoe UI',sans-serif;font-size:15px;overscroll-behavior:none;}
 #app{display:flex;flex-direction:column;height:100vh;height:100dvh;}
 
 /* HEADER */
-#header{background:var(--surf);border-bottom:1px solid var(--border);padding:12px 60px 12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+#header{background:rgba(7,13,26,0.9);border-bottom:1px solid rgba(245,130,31,0.2);padding:12px 60px 12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;backdrop-filter:blur(12px);}
 .logo{font-size:17px;font-weight:800;letter-spacing:-.5px;}
-.logo span{color:var(--cyan);}
+.logo span{color:#F5821F;}
 .user-chip{background:var(--surf2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--muted);}
 .user-chip strong{color:var(--text);font-weight:600;}
 
@@ -34,9 +34,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .screen.active{display:block;}
 
 /* BOTTOM NAV */
-#bnav{position:fixed;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--border);display:flex;padding-bottom:var(--safe);z-index:100;}
+#bnav{position:fixed;bottom:0;left:0;right:0;background:rgba(7,13,26,0.92);border-top:1px solid rgba(245,130,31,0.15);display:flex;padding-bottom:var(--safe);z-index:100;backdrop-filter:blur(12px);}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 4px 8px;gap:3px;font-size:10px;color:var(--muted);border:none;background:none;cursor:pointer;transition:color .2s;}
-.nb.on{color:var(--cyan);}
+.nb.on{color:#F5821F;}
 .nb svg{width:22px;height:22px;transition:transform .2s;}
 .nb.on svg{transform:scale(1.1);}
 .nb .badge-dot{position:absolute;top:8px;right:calc(50% - 14px);width:7px;height:7px;border-radius:50%;background:var(--red);border:2px solid var(--surf);}
@@ -44,7 +44,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 /* KPI GRID */
 .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
 .kpi{background:var(--surf);border:1px solid var(--border);border-radius:var(--radius);padding:14px;position:relative;overflow:hidden;}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ac,var(--cyan));}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ac,#F5821F);box-shadow:0 0 8px var(--ac,rgba(245,130,31,0.5));}
 .kpi .kv{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
 .kpi .kl{font-size:11px;color:var(--muted);margin-top:4px;}
 
@@ -72,7 +72,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .b-pendente{background:rgba(255,184,63,.1);color:var(--amber);}
 .b-reprovado,.b-erro_ativacao{background:rgba(255,77,106,.1);color:var(--red);}
 .b-aguard_correcao{background:rgba(245,166,35,.1);color:var(--amber);}
-.b-ativado{background:rgba(0,212,255,.1);color:var(--cyan);}
+.b-ativado{background:rgba(245,130,31,0.12);color:#F5821F;}
 .b-assinatura_pendente{background:rgba(167,139,250,.12);color:var(--purple);}
 .b-em_dia{background:rgba(0,229,160,.1);color:var(--green);}
 .b-atraso_leve{background:rgba(255,184,63,.1);color:var(--amber);}
