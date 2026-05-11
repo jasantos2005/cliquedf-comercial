@@ -161,6 +161,48 @@ def _salvar_log(status, resumo, duracao=0):
         log.warning(f"_salvar_log: {e}")
 
 
+def verificar_regras():
+    """Verifica integridade das regras criticas do sistema."""
+    problemas = []
+    try:
+        base = Path(__file__).resolve().parent.parent.parent
+
+        # R25 — CPF duplicado com financeiro
+        with open(base / 'app/engines/auditoria_engine.py') as f:
+            audit = f.read()
+        if 'tem_divida' not in audit or 'divida em aberto' not in audit:
+            problemas.append("R25 auditoria_engine — regra CPF duplicado com financeiro quebrada")
+        if 'pode abrir novo contrato' not in audit:
+            problemas.append("R25 auditoria_engine — regra CPF duplicado OK quebrada")
+
+        # Engine — reutiliza cliente existente
+        with open(base / 'app/engines/ativacao_engine.py') as f:
+            engine = f.read()
+        if 'cliente ja existe no IXC' not in engine or 'pulando INSERT' not in engine:
+            problemas.append("ativacao_engine — reutilizacao de cliente existente quebrada")
+        if '_get_usuario_ixc_id' not in engine:
+            problemas.append("ativacao_engine — responsavel funcionario_ixc_id quebrado")
+
+        # App — preview auditoria
+        with open(base / 'static/app.html') as f:
+            app = f.read()
+        if 'preview-auditoria' not in app:
+            problemas.append("app.html — preview de auditoria antes de enviar quebrado")
+
+        # Sync — preserva mapeamentos
+        with open(base / 'app/bootstrap/cron_sync_planos_vendedores.py') as f:
+            sync = f.read()
+        if 'funcionario_ixc_id' not in sync or 'usuario_ixc_id' not in sync:
+            problemas.append("cron_sync — preservacao usuario/funcionario_ixc_id quebrada")
+        if 'NOT IN (2, 21, 40, 29, 1)' not in sync:
+            problemas.append("cron_sync — exclusao de vendedores genericos quebrada")
+
+    except Exception as e:
+        problemas.append(f"Erro ao verificar regras: {e}")
+
+    return problemas
+
+
 def main():
     log.info("=== Monitor Hub Comercial ===")
     linhas = []
@@ -192,6 +234,13 @@ def main():
         for e in manuais[:5]:
             msg = (e["erro_msg"] or "")[:80]
             linhas.append(f"  ❌ #{e['id']} {e['razao']}: {msg}")
+
+    # Verificar integridade das regras
+    regras_quebradas = verificar_regras()
+    if regras_quebradas:
+        linhas.append(f"*🔴 Regras do sistema quebradas ({len(regras_quebradas)}):*")
+        for r in regras_quebradas:
+            linhas.append(f"  ⚠️ {r}")
 
     if not linhas:
         log.info("Nenhum erro encontrado.")
