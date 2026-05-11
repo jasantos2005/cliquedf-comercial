@@ -251,6 +251,10 @@ def auditar(f: dict, docs: list) -> dict:
         add("R24", "ok")
 
     # R25 — CPF/CNPJ duplicado no IXC
+    # Regra: cliente existente com contrato ativo
+    #   - Tem divida em aberto → REPROVADO
+    #   - Sem divida (financeiro ok) → APROVADO (pode abrir novo contrato)
+    #   - Sem contrato ativo → PENDENTE (ex-cliente, verificar)
     if cpf:
         try:
             dup = ixc_select_one(
@@ -264,10 +268,28 @@ def auditar(f: dict, docs: list) -> dict:
                     "WHERE id_cliente=%s AND status='A' LIMIT 1",
                     (dup["id"],)
                 )
-                add("R25",
-                    "reprovado" if ativo else "pendente",
-                    f"{'Contrato ativo' if ativo else 'Sem contrato ativo'}: "
-                    f"{dup['razao']} (ID {dup['id']})")
+                if ativo:
+                    # Verificar dividas em aberto
+                    divida = ixc_select_one(
+                        "SELECT COUNT(*) as qtd, SUM(valor) as total "
+                        "FROM ixcprovedor.fn_areceber "
+                        "WHERE id_cliente=%s AND status='A' "
+                        "AND data_vencimento < CURDATE()",
+                        (dup["id"],)
+                    )
+                    tem_divida = divida and int(divida["qtd"] or 0) > 0
+                    if tem_divida:
+                        total = float(divida["total"] or 0)
+                        add("R25", "reprovado",
+                            f"Cliente com contrato ativo E divida em aberto "
+                            f"(R$ {total:.2f}): {dup['razao']} (ID {dup['id']})")
+                    else:
+                        add("R25", "ok",
+                            f"Cliente ja cadastrado, financeiro em dia — "
+                            f"pode abrir novo contrato: {dup['razao']} (ID {dup['id']})")
+                else:
+                    add("R25", "pendente",
+                        f"Ex-cliente sem contrato ativo: {dup['razao']} (ID {dup['id']})")
             else:
                 add("R25", "ok")
         except Exception as e:
