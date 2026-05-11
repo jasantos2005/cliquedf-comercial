@@ -543,16 +543,38 @@ def ativar_cliente(precadastro_id: int) -> int:
             _log_etapa(conn, precadastro_id, "validacao_cidade", False, erro=erro)
             return 0
 
-        # ── Etapa 1: INSERT cliente ───────────────────────────
+        # ── Etapa 1: INSERT cliente (ou reutilizar existente) ─
         try:
-            ixc_cli_id = inserir_cliente(p)
-            conn.execute(
-                "UPDATE hc_precadastros SET ixc_cliente_id=? WHERE id=?",
-                (ixc_cli_id, precadastro_id)
-            )
-            conn.commit()
-            _log_etapa(conn, precadastro_id, "insert_cliente", True, ixc_id=ixc_cli_id)
-            log.info(f"#{precadastro_id} cliente criado no IXC: ID={ixc_cli_id}")
+            # Verificar se cliente ja existe no IXC pelo CPF
+            cpf_raw = (p.get("cnpj_cpf") or "").replace(".","").replace("-","").replace("/","").strip()
+            ixc_cli_existente = None
+            if cpf_raw:
+                from app.services.ixc_db import ixc_select_one as _ixc_one
+                ixc_cli_existente = _ixc_one(
+                    "SELECT id FROM ixcprovedor.cliente "
+                    "WHERE REPLACE(REPLACE(REPLACE(cnpj_cpf,'.',''),'-',''),'/','')=%s LIMIT 1",
+                    (cpf_raw,)
+                )
+            if ixc_cli_existente:
+                ixc_cli_id = int(ixc_cli_existente["id"])
+                log.info(f"#{precadastro_id} cliente ja existe no IXC: ID={ixc_cli_id} — pulando INSERT")
+                conn.execute(
+                    "UPDATE hc_precadastros SET ixc_cliente_id=? WHERE id=?",
+                    (ixc_cli_id, precadastro_id)
+                )
+                conn.commit()
+                _log_etapa(conn, precadastro_id, "insert_cliente", True,
+                           ixc_id=ixc_cli_id,
+                           payload=f"Cliente existente reutilizado (ID={ixc_cli_id})")
+            else:
+                ixc_cli_id = inserir_cliente(p)
+                conn.execute(
+                    "UPDATE hc_precadastros SET ixc_cliente_id=? WHERE id=?",
+                    (ixc_cli_id, precadastro_id)
+                )
+                conn.commit()
+                _log_etapa(conn, precadastro_id, "insert_cliente", True, ixc_id=ixc_cli_id)
+                log.info(f"#{precadastro_id} cliente criado no IXC: ID={ixc_cli_id}")
         except Exception as e:
             _log_etapa(conn, precadastro_id, "insert_cliente", False, erro=str(e))
             conn.execute(
