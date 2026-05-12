@@ -120,8 +120,13 @@ def _hoje_brt_date() -> str:
 
 
 def _senha_padrao(cpf_cnpj: str) -> str:
-    """Senha padrão do cliente = CPF/CNPJ sem máscara."""
-    return re.sub(r"\D", "", cpf_cnpj or "")
+    """Senha padrão do cliente = CPF/CNPJ com máscara."""
+    raw = re.sub(r"\D", "", cpf_cnpj or "")
+    if len(raw) == 11:
+        return f"{raw[:3]}.{raw[3:6]}.{raw[6:9]}-{raw[9:]}"
+    elif len(raw) == 14:
+        return f"{raw[:2]}.{raw[2:5]}.{raw[5:8]}/{raw[8:12]}-{raw[12:]}"
+    return raw
 
 
 def _fmt_cpf_cnpj(doc: str, tipo: str) -> str:
