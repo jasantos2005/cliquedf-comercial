@@ -57,7 +57,7 @@ def ranking_vendedores(data_inicio, data_fim=None):
         LEFT JOIN hc_precadastros p ON p.ixc_vendedor_id = v.id
             AND p.criado_em >= ? AND p.criado_em <= ?
         WHERE v.ativo=1
-        AND v.id IN (SELECT DISTINCT ixc_funcionario_id FROM hc_usuarios WHERE ixc_funcionario_id IS NOT NULL)
+        AND v.id IN (31, 45, 48, 6, 49, 22)
         GROUP BY v.id, v.nome
         ORDER BY ativados DESC, v.nome
     """, (data_inicio, data_fim)).fetchall()
