@@ -247,7 +247,7 @@ def inserir_cliente(p: dict) -> int:
         IXC_ID_CONTA,
         IXC_ID_FILIAL,
         _senha_padrao(cpf_raw),             # senha = CPF sem máscara
-        0,                                  # hotsite_acesso = int(11), nao gravar CPF
+        2,                                  # hotsite_acesso = 2 (central do assinante)
         "S", "A", "S", "S",                 # ativo, status_internet, bloqueio_automatico, aviso_atraso
         tipo_assin, tipo_scm,
         _hoje_brt(), _hoje_brt(),           # data_cadastro, ultima_atualizacao (BRT)
@@ -291,7 +291,8 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
     fidel   = int(p.get("fidelidade") or 12)
     venc    = int(p.get("dia_vencimento") or 10)
     plano   = p.get("ixc_plano_id") or 0
-    vend    = p.get("ixc_vendedor_id") or 0
+    vend    = p.get("ixc_vendedor_id") or 0          # id_vendedor_ativ = tabela vendedor
+    vend_resp = _get_usuario_ixc_id(vend)             # id_vendedor = tabela colaborador
 
     # Data de expiração = data atual + 365 dias
     hoje_brt    = _hoje_brt_date()
@@ -347,7 +348,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         ixc_cliente_id, plano, "P", hoje_brt,
         "S", valor,
         IXC_ID_TIPO_CONTRATO, IXC_ID_FILIAL, IXC_ID_TIPO_DOC,  # 501
-        IXC_ID_CARTEIRA, vend, vend,                             # id_carteira=6, id_vendedor=id_vendedor_ativ
+        IXC_ID_CARTEIRA, vend_resp, vend,                        # id_carteira=6, id_vendedor(colab)=id_vendedor_ativ(vend)
         "AA", "S", "S",                  # status_internet=AA (Ag.Assinatura), bloq, aviso
         taxa,                            # taxa_instalacao
         taxa,                            # desconto_fidelidade = taxa_instalacao
