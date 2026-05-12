@@ -323,7 +323,8 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             condicao_pagamento_primeira_fat,
             obs, tipo_localidade,
             descricao_aux_plano_venda, id_modelo,
-            contrato, id_motivo_inclusao
+            contrato, id_motivo_inclusao,
+            assinatura_digital
         ) VALUES (
             %s, %s, %s, %s,
             %s, %s,
@@ -338,7 +339,8 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             %s,
             %s, %s,
             %s, %s,
-            %s, %s
+            %s, %s,
+            %s
         )
     """
     params = (
@@ -358,10 +360,11 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         IXC_ID_PRODUTO_ATIV,             # id_produto_ativ = 121
         1,                               # id_cond_pag_ativ = 1 (à vista)
         primeiro_venc,                   # condicao_pagamento_primeira_fat
-        p.get("obs") or "", "U",         # obs, tipo_localidade=U (urbano)
+        (p.get("obs") or "").replace("%", "%%"), "U",  # obs, tipo_localidade=U (urbano)
         nome_plano, 13,                  # descricao_aux_plano_venda, id_modelo=13
         nome_plano,                      # contrato (nome do plano)
         id_motivo_incl,                  # 1=NV, 6=TIT, 8=Reativação
+        "S",                             # assinatura_digital = S (obrigatorio)
     )
     return ixc_insert(sql, params)
 
