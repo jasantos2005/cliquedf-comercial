@@ -247,7 +247,7 @@ def inserir_cliente(p: dict) -> int:
         IXC_ID_CONTA,
         IXC_ID_FILIAL,
         _senha_padrao(cpf_raw),             # senha = CPF sem máscara
-        cpf_raw,                            # hotsite_acesso = CPF sem máscara
+        0,                                  # hotsite_acesso = int(11), nao gravar CPF
         "S", "A", "S", "S",                 # ativo, status_internet, bloqueio_automatico, aviso_atraso
         tipo_assin, tipo_scm,
         _hoje_brt(), _hoje_brt(),           # data_cadastro, ultima_atualizacao (BRT)
