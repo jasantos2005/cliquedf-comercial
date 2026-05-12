@@ -179,15 +179,17 @@ def verificar_regras():
         if sem_vendedor and sem_vendedor['total'] > 0:
             problemas.append(f"Cadastros sem vendedor nas ultimas 24h: {sem_vendedor['total']}")
 
-        # Verificar cadastros duplicados — mesmo CPF em menos de 5 minutos
+        # Verificar cadastros duplicados — mesmo CPF em menos de 5 minutos (duplicata real)
         duplicados = _conn.execute("""
-            SELECT cnpj_cpf, COUNT(*) as qtd FROM hc_precadastros
-            WHERE criado_em >= datetime('now', '-24 hours', '-3 hours')
-            GROUP BY cnpj_cpf HAVING qtd > 1
+            SELECT a.cnpj_cpf, a.razao, a.criado_em, b.criado_em as criado_em2
+            FROM hc_precadastros a
+            JOIN hc_precadastros b ON b.cnpj_cpf = a.cnpj_cpf AND b.id > a.id
+            WHERE a.criado_em >= datetime('now', '-24 hours', '-3 hours')
+            AND (strftime('%s', b.criado_em) - strftime('%s', a.criado_em)) <= 300
         """).fetchall()
         if duplicados:
             for d in duplicados:
-                problemas.append(f"CPF duplicado nas ultimas 24h: {d['cnpj_cpf']} ({d['qtd']}x)")
+                problemas.append(f"Cadastro duplicado em menos de 5min: {d['cnpj_cpf']} ({d['razao']})")
 
         _conn.close()
         base = Path(__file__).resolve().parent.parent.parent
