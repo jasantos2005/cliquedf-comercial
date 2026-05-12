@@ -146,7 +146,7 @@ def msg_horaria(hora):
     rows = ranking_vendedores(f"{hoje} 00:00:00")
     total_ativ = sum(r['ativados'] for r in rows)
 
-    titulo = f"📊 *Vendas do dia — {data_fmt} {hora:02d}:00*"
+    titulo = f"📊 *Vendas do dia — {data_fmt}*"
     ranking_txt = formatar_ranking(rows, titulo)
 
     msg = f"{ranking_txt}\n\n🎯 Total do dia: *{total_ativ}* ativações"
