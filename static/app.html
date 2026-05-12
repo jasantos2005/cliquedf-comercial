@@ -1553,6 +1553,7 @@ async function enviarCadastro(){
   } catch(e) { /* ignora erro no preview, segue normal */ }
 
   const btn=document.getElementById('btn-enviar');
+  if (btn.disabled) return;
   btn.innerHTML='<span class="spinner"></span>Enviando...'; btn.disabled=true;
   try{
     const fd=new FormData();

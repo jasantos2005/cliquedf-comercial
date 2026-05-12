@@ -1793,7 +1793,10 @@ async function confirmarAprovar() {
     await api(`/api/auditoria/${_audId}/aprovar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ justificativa: just }) });
     fecharModal('modal-aprovar'); toast('Cadastro aprovado!', 'ok');
     carregarAuditoria(audStatusFiltro); abrirDetalhe(_audId);
-  } catch (e) { toast('Erro ao aprovar', 'err'); }
+  } catch (e) { toast('Erro ao aprovar', 'err');
+    const btnConf = document.querySelector('#modal-aprovar .btn-green');
+    if (btnConf) { btnConf.disabled=false; btnConf.textContent='Confirmar aprovação'; }
+  }
 }
 
 async function confirmarReprovar() {
@@ -2785,6 +2788,8 @@ function abrirLiberacao(id, nome, acao) {
   document.getElementById('modal-liberacao').classList.add('show');
 }
 async function confirmarLiberacao() {
+    const btnLib = document.querySelector('#modal-liberacao .btn-green, #modal-liberacao .btn-red');
+    if (btnLib) { if (btnLib.disabled) return; btnLib.disabled=true; btnLib.textContent='Aguarde...'; }
   const motivo = document.getElementById('ml-motivo').value.trim();
   const err = document.getElementById('ml-err');
   if (!motivo) { err.textContent = 'Informe o motivo.'; return; }

@@ -100,16 +100,11 @@ def main():
             if cc['id_vendedor_ativ'] != vend_esperado:
                 problemas.append(f"id_vendedor_ativ={cc['id_vendedor_ativ']} ({cc['vendedor_ativ_nome']}) esperado={vend_esperado}")
 
-            # 3. Taxa instalacao
-            taxa_hub = float(p['taxa_instalacao'] or 0)
+            # 3. Desconto fidelidade deve ser igual a taxa_instalacao no IXC
             taxa_ixc = float(cc['taxa_instalacao'] or 0)
-            if abs(taxa_hub - taxa_ixc) > 0.01:
-                problemas.append(f"taxa_instalacao={taxa_ixc} (Hub={taxa_hub})")
-
-            # 4. Desconto fidelidade = taxa
             desc_ixc = float(cc['desconto_fidelidade'] or 0)
-            if abs(desc_ixc - taxa_ixc) > 0.01:
-                problemas.append(f"desconto_fidelidade={desc_ixc} (esperado={taxa_ixc})")
+            if taxa_ixc > 0 and abs(desc_ixc - taxa_ixc) > 0.01:
+                problemas.append(f"desconto_fidelidade={desc_ixc} diferente da taxa={taxa_ixc}")
 
             # 5. Condicao pagamento = dia escolhido
             venc_hub = str(p['dia_vencimento'] or '')
