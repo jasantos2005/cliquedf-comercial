@@ -111,57 +111,7 @@ def processar():
                         log.info(f"#{pid} Lead IXC criado id={lead_id}")
             except Exception as e:
                 log.error(f"#{pid} Erro ao criar lead IXC: {e}")
-            # Ativar imediatamente no IXC
-            ixc_cli_id = 0
-            ixc_cont_id = 0
-            erro_ativ = None
-            try:
-                from app.engines.ativacao_engine import ativar_precadastro
-                ixc_cli_id = ativar_precadastro(pid)
-                # Buscar contrato criado
-                row_cont = conn.execute(
-                    "SELECT ixc_contrato_id FROM hc_precadastros WHERE id=?", (pid,)
-                ).fetchone()
-                ixc_cont_id = row_cont[0] if row_cont else 0
-                log.info(f"#{pid} Ativado no IXC: cliente={ixc_cli_id} contrato={ixc_cont_id}")
-            except Exception as e:
-                erro_ativ = str(e)
-                log.error(f"#{pid} Erro na ativacao: {e}")
-
-            # Montar mensagem para o grupo
-            cpf = (p.get('cnpj_cpf') or '').strip()
-            fone_cli = (p.get('whatsapp') or p.get('telefone_celular') or '').strip()
-            url_central = "https://sistema.cliquedf.com.br/central_assinante_web/login"
-
-            if ixc_cont_id and not erro_ativ:
-                msg_grupo = (
-                    f"✅ *CADASTRO APROVADO E CONTRATO CRIADO*\n\n"
-                    f"Vendedor: {vendedor}\n"
-                    f"Cliente: {cliente}\n"
-                    f"Protocolo: `{proto}`\n"
-                    f"Contrato IXC: `#{ixc_cont_id}`\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"📲 *Enviar para o cliente via WhatsApp:*\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"Olá *{cliente.title()}*! 😊\n"
-                    f"Seu contrato com a *Cliquedf* está pronto para assinatura.\n\n"
-                    f"👉 Acesse o link abaixo para assinar:\n"
-                    f"{url_central}\n\n"
-                    f"🔑 Login: `{cpf}`\n"
-                    f"🔑 Senha: `{cpf}`\n\n"
-                    f"_Após assinar, sua internet será ativada automaticamente!_ 🚀\n"
-                    f"━━━━━━━━━━━━━━━━━━━━"
-                )
-            else:
-                msg_grupo = (
-                    f"✅ *CADASTRO APROVADO*\n\n"
-                    f"Vendedor: {vendedor}\n"
-                    f"Cliente: {cliente}\n"
-                    f"Protocolo: `{proto}`\n\n"
-                    f"⚠️ Erro na ativação: {erro_ativ or 'verifique o painel'}\n"
-                    f"_Lead criado no IXC. Aguardando ativação manual._"
-                )
-            enviar_telegram(msg_grupo)
+            enviar_telegram(f"✅ *CADASTRO APROVADO*\n\nVendedor: {vendedor}\nCliente: {cliente}\nProtocolo: `{proto}`\n\n_Lead criado no IXC. Aguardando consulta Serasa._")
         else:
             probs=[r for r in resultado["regras"] if r["resultado"] in("reprovado","pendente","alerta")]
             linhas="\n".join(f"{'❌' if r['resultado']=='reprovado' else '⚠️'} {r['legenda']}" for r in probs)
