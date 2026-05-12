@@ -297,8 +297,9 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
     hoje_brt    = _hoje_brt_date()
     data_expira = (date.fromisoformat(hoje_brt) + timedelta(days=365)).strftime("%Y-%m-%d")
 
-    # Vencimento da primeira fatura
-    primeiro_venc = f"{hoje_brt.rsplit('-', 1)[0]}-{venc:02d}"
+    # Vencimento da primeira fatura — dia escolhido pelo cliente
+    # Formato IXC: apenas o dia (ex: 5, 10, 20)
+    primeiro_venc = str(venc)
 
     # Motivo de inclusão conforme tipo de OS
     os_assunto       = int(p.get("os_assunto") or IXC_ID_ASSUNTO_INSTALL)
@@ -347,7 +348,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         IXC_ID_CARTEIRA, vend, vend,                             # id_carteira=6, id_vendedor=id_vendedor_ativ
         "AA", "S", "S",                  # status_internet=AA (Ag.Assinatura), bloq, aviso
         taxa,                            # taxa_instalacao
-        taxa,                            # desconto_fidelidade = taxa (conforme insert real)
+        taxa,                            # desconto_fidelidade = taxa_instalacao
         fidel,                           # fidelidade
         "I", _agora(), _agora(),         # tipo=Instalação, datas
         "S", data_expira,                # endereco_padrao_cliente, data_expiracao (+365 dias)
@@ -394,9 +395,42 @@ def inserir_os_instalacao(p: dict, ixc_cliente_id: int, ixc_contrato_id: int) ->
             %s, %s
         )
     """
+    taxa_os   = float(p.get("taxa_instalacao") or 0)
+    endereco_os = f"{p.get('endereco') or ''} {p.get('numero') or ''}".strip()
+    if p.get('bairro'): endereco_os += f" {p.get('bairro')}"
+    if p.get('cidade_nome'): endereco_os += f" {p.get('cidade_nome')}"
+
+    if taxa_os > 0:
+        txt_taxa = (
+            f"VALOR DA TAXA: INSTALAÇÃO  EM REDE DE FIBRA OPTICA CLIENTE IRA EFETUAR "
+            f"O PAGAMENTO DO VALOR DE {taxa_os:.0f},00 REAIS VIA PIX REFERENTE A TAXA "
+            f"DA INSTALAÇÃO + ROTEADOR.  COM ONU E PTO EM REGIME DE COMODATO."
+        )
+    else:
+        txt_taxa = (
+            "VALOR DA TAXA: INSTALAÇÃO  EM REDE DE FIBRA OPTICA CLIENTE FICOU ISENTO "
+            "DA TAXA DE INSTALAÇÃO POR PROMOÇÃO INSTALAÇÃO GRATIS COM ROTEADOR, ONU E "
+            "PTO EM REGIME DE COMODATO E COM CONTRATO DE FIDELIDADE DE UM ANO"
+        )
+
+    plano_mb = nome_plano.upper().replace("CLIQUEDF - 2026 ", "").replace("CLIQUEDF - 2026", "").strip()
+
     msg = (
-        f"OS gerada automaticamente pelo Hub Comercial.\n"
-        f"Contrato: {ixc_contrato_id} | Plano: {nome_plano} | Vendedor ID: {vend}"
+        f"CLIENTE TEM VIABILIDADE SIM(  x   ) NÃO (      )\n"
+        f"FOI EXPLICADO SOBRE PRAZOS  SIM(   x  ) NÃO (      )\n"
+        f"FOI EXPLICADO CANAIS DE ATENDIMENTOS SIM(   x  ) NÃO (      )\n"
+        f"FOI EXPLICADO SOBRE FIDELIDADE  SIM(   x  ) NÃO (      )\n"
+        f"FOI EXPLICADO SOBRE COMODATO DE PRODUTOS  SIM(   x  ) NÃO (      )\n"
+        f"\n"
+        f"            ATIVAÇÃO FIBRA\n"
+        f"ENDEREÇO DO CLIENTE:{endereco_os}\n"
+        f"PONTO DE REFERÊNCIA: {p.get('referencia') or ''}\n"
+        f"APELIDO:\n"
+        f"COM ROTEADOR( x    )    obs: levar contrato{' e carnê' if taxa_os == 0 else ''}\n"
+        f"SEM ROTEADOR(       )\n"
+        f"{txt_taxa}\n"
+        f"CLIENTE CIENTE DO VALOR DE FIBRA EXCEDENTE SIM (  x   )  NÃO (     )\n"
+        f"PLANO :{plano_mb}"
     )
     params = (
         ixc_cliente_id,
