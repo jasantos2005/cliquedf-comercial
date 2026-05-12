@@ -165,6 +165,31 @@ def verificar_regras():
     """Verifica integridade das regras criticas do sistema."""
     problemas = []
     try:
+        import sqlite3 as _sq
+        _conn = _sq.connect(str(DB_PATH))
+        _conn.row_factory = _sq.Row
+
+        # Verificar vendedor errado — ixc_vendedor_id nulo em cadastros recentes
+        sem_vendedor = _conn.execute("""
+            SELECT COUNT(*) as total FROM hc_precadastros
+            WHERE ixc_vendedor_id IS NULL
+            AND criado_em >= datetime('now', '-24 hours', '-3 hours')
+            AND status NOT IN ('cancelado','excluido')
+        """).fetchone()
+        if sem_vendedor and sem_vendedor['total'] > 0:
+            problemas.append(f"Cadastros sem vendedor nas ultimas 24h: {sem_vendedor['total']}")
+
+        # Verificar cadastros duplicados — mesmo CPF em menos de 5 minutos
+        duplicados = _conn.execute("""
+            SELECT cnpj_cpf, COUNT(*) as qtd FROM hc_precadastros
+            WHERE criado_em >= datetime('now', '-24 hours', '-3 hours')
+            GROUP BY cnpj_cpf HAVING qtd > 1
+        """).fetchall()
+        if duplicados:
+            for d in duplicados:
+                problemas.append(f"CPF duplicado nas ultimas 24h: {d['cnpj_cpf']} ({d['qtd']}x)")
+
+        _conn.close()
         base = Path(__file__).resolve().parent.parent.parent
 
         # R25 — CPF duplicado com financeiro
