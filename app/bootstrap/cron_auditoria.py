@@ -53,14 +53,14 @@ def processar():
         novo = status_map.get(resultado["resultado_final"],"pendente")
         cur.execute("UPDATE hc_precadastros SET status=?,atualizado_em=datetime('now','-3 hours') WHERE id=?",(novo,pid)); conn.commit()
         log.info(f"#{pid} {p.get('razao','?')[:30]} → {novo}")
-        # Buscar nome real no IXC se possivel
+        # Buscar nome do vendedor direto no hub pelo ixc_vendedor_id
         try:
-            from app.services.ixc_db import ixc_conn as _ixc
-            with _ixc() as _c:
-                with _c.cursor() as _icur:
-                    _icur.execute("SELECT funcionario FROM ixcprovedor.funcionarios WHERE id=%s", (p.get('vend_func_id'),))
-                    _fr = _icur.fetchone()
-                    vendedor = (_fr['funcionario'] if _fr else p.get('vendedor_nome') or 'Vendedor').upper()
+            import sqlite3 as _sq
+            _conn = _sq.connect(str(get_db().execute("PRAGMA database_list").fetchone()[2] if False else __import__("pathlib").Path(__file__).resolve().parent.parent.parent / "hub_comercial.db"))
+            _conn.row_factory = _sq.Row
+            _vr = _conn.execute("SELECT nome FROM hc_vendedores WHERE id=? LIMIT 1", (p.get('ixc_vendedor_id'),)).fetchone()
+            vendedor = (_vr['nome'] if _vr else p.get('vendedor_nome') or 'Vendedor').upper()
+            _conn.close()
         except:
             vendedor = (p.get('vendedor_nome') or 'Vendedor').upper()
         cliente=(p.get("razao") or "—").upper()
