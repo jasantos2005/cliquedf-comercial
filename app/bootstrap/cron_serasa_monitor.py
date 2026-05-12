@@ -146,8 +146,8 @@ def processar():
             ixc_cont_id = 0
             erro_ativ = None
             try:
-                from app.engines.ativacao_engine import ativar_precadastro
-                ativar_precadastro(pid)
+                from app.engines.ativacao_engine import ativar_cliente
+                ativar_cliente(pid)
                 row = conn.execute("SELECT ixc_contrato_id FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
                 ixc_cont_id = row[0] if row else 0
                 log.info(f"#{pid} Ativado no IXC contrato={ixc_cont_id}")
