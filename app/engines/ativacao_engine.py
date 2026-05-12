@@ -354,8 +354,8 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         fidel,                           # fidelidade
         "I", _agora(), _agora(),         # tipo=Instalação, datas
         "S", data_expira,                # endereco_padrao_cliente, data_expiracao (+365 dias)
-        1 if taxa > 0 else 0,            # ativacao_numero_parcelas
-        taxa if taxa > 0 else 0,         # ativacao_valor_parcela = taxa
+        1,                               # ativacao_numero_parcelas = sempre 1
+        taxa,                            # ativacao_valor_parcela = taxa (0 se isento)
         IXC_ID_TIPO_DOC,                 # id_tipo_doc_ativ = 501
         IXC_ID_PRODUTO_ATIV,             # id_produto_ativ = 121
         1,                               # id_cond_pag_ativ = 1 (à vista)
