@@ -19,7 +19,7 @@ DB_PATH        = BASE_DIR / "hub_comercial.db"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_GRUPO = os.getenv("TELEGRAM_CHAT_ID", "")
 META_DIA       = 4
-VENDEDORES_IDS = (31, 45, 48, 6, 49, 22)
+VENDEDORES_IDS = (31, 45, 48, 6, 49)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def ranking_vendedores(data_inicio, data_fim=None):
         FROM hc_vendedores v
         LEFT JOIN hc_precadastros p ON p.ixc_vendedor_id = v.id
             AND p.criado_em >= ? AND p.criado_em <= ?
-        WHERE v.ativo=1 AND v.id IN (31,45,48,6,49,22)
+        WHERE v.ativo=1 AND v.id IN (31,45,48,6,49)
         GROUP BY v.id, v.nome
         ORDER BY ativados DESC, v.nome
     """, (data_inicio, data_fim)).fetchall()
