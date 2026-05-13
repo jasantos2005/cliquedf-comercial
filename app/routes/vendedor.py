@@ -195,6 +195,19 @@ async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:
     ).fetchone() if func_id else None
     ixc_vend_id = vend_row["id"] if vend_row else func_id
 
+    # Proteção contra duplo clique — mesmo CPF em 60 segundos
+    cpf_check = (f.get("cnpj_cpf") or "").replace(".","").replace("-","").replace("/","").strip()
+    if cpf_check:
+        dup = db.execute("""
+            SELECT id FROM hc_precadastros
+            WHERE REPLACE(REPLACE(REPLACE(cnpj_cpf,'.',''),'-',''),'/','')=?
+            AND id_vendedor_hub=?
+            AND criado_em >= datetime('now','-60 seconds','-3 hours')
+            LIMIT 1
+        """, (cpf_check, int(user["sub"]))).fetchone()
+        if dup:
+            raise HTTPException(400, f"Cadastro duplicado — aguarde antes de reenviar. ID={dup['id']}")
+
     cur=db.cursor()
     cur.execute("""INSERT INTO hc_precadastros(status,id_vendedor_hub,ixc_vendedor_id,canal_venda,protocolo,tipo_pessoa,razao,cnpj_cpf,telefone_celular,whatsapp,email,data_nascimento,sexo,rg_orgao_emissor,nacionalidade,cep,endereco,numero,bairro,complemento,referencia,cidade_nome,uf_sigla,ixc_cidade_id,viabilidade_status,viabilidade_nivel,viabilidade_obs,viabilidade_checado_em,ixc_plano_id,plano_nome,plano_valor,taxa_instalacao,fidelidade,dia_vencimento,obs,criado_em,atualizado_em)VALUES('enviado',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','-3 hours'),datetime('now','-3 hours'))""",
         (int(user["sub"]),ixc_vend_id,f.get("canal_venda"),protocolo,f.get("tipo_pessoa","F"),f.get("razao"),f.get("cnpj_cpf"),f.get("telefone_celular"),f.get("whatsapp"),f.get("email"),f.get("data_nascimento") or None,f.get("sexo") or "",f.get("rg_orgao_emissor") or "",f.get("nacionalidade") or "Brasileiro",f.get("cep"),f.get("endereco"),f.get("numero"),f.get("bairro"),f.get("complemento"),f.get("referencia"),f.get("cidade_nome"),f.get("uf_sigla"),f.get("ixc_cidade_id"),f.get("viabilidade_status"),f.get("viabilidade_nivel",0),f.get("viabilidade_obs"),agora(),f.get("ixc_plano_id"),f.get("plano_nome"),f.get("plano_valor"),f.get("taxa_instalacao"),f.get("fidelidade"),f.get("dia_vencimento"),f.get("obs")))
