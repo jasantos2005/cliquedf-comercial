@@ -45,6 +45,7 @@ async def listar_base(
     plano:    str = Query(""),
     status:   str = Query("todos"),   # todos | nao_contatado | em_contato | negociando | confirmado | recusou
     busca:    str = Query(""),
+    operador: str = Query(""),
     pagina:   int = Query(1, ge=1),
     db=Depends(get_db),
     user=Depends(requer_vendedor())
@@ -55,7 +56,7 @@ async def listar_base(
     """
     pp = 50
     offset = (pagina - 1) * pp
-    where, params = ["plano_anterior_nome IS NOT NULL", "status_negociacao != 'cliente_ciente'"], []
+    where, params = ["plano_anterior_nome IS NOT NULL"], []
 
     if cidade:
         where.append("cidade = ?"); params.append(cidade)
@@ -63,9 +64,13 @@ async def listar_base(
         where.append("plano_nome LIKE ?"); params.append(f"%{plano}%")
     if status != "todos":
         where.append("status_negociacao = ?"); params.append(status)
+    else:
+        where.append("status_negociacao != 'cliente_ciente'")
     if busca:
         where.append("(cliente LIKE ? OR telefone_celular LIKE ? OR ixc_contrato_id LIKE ?)")
         params += [f"%{busca}%", f"%{busca}%", f"%{busca}%"]
+    if operador:
+        where.append("operador_contato = ?"); params.append(operador)
 
     w = " AND ".join(where)
     total = db.execute(f"SELECT COUNT(*) FROM hc_upgrades_base WHERE {w}", params).fetchone()[0]
@@ -316,7 +321,7 @@ async def historico_upgrades(
     """Histórico paginado de todos os upgrades realizados."""
     pp = 50
     offset = (pagina - 1) * pp
-    where, params = ["plano_anterior_nome IS NOT NULL", "status_negociacao != 'cliente_ciente'"], []
+    where, params = ["plano_anterior_nome IS NOT NULL"], []
 
     if tipo != "todos":
         where.append("tipo_mudanca=?"); params.append(tipo)
