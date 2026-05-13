@@ -96,24 +96,65 @@ def processar():
 
     for row in pendentes:
         p = dict(row); pid = p["id"]
-        # Se foi liberado por supervisor, pular Serasa e ir direto para assinatura
+        # Se foi liberado por supervisor — mesmo fluxo do Serasa OK
         if 'liberado_supervisor=1' in (p.get('obs') or ''):
-            token = gerar_link(pid, conn)
             conn.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes)VALUES(?,99,'SUPERVISOR_BYPASS','Bypass Serasa por supervisor','ok','Liberado por supervisor')",(pid,))
             conn.commit()
-            link = f"{BASE_URL}/assinar/{token}"
-            telegram(TELEGRAM_CHAT_ID, f"✅ *LINK GERADO — LIBERAÇÃO SUPERVISOR*\n\nCliente: *{p.get('razao','?')}*\nVendedor: {p.get('vendedor_nome','?')}\nPlano: {p.get('plano_nome','?')}\n\n📝 [Link de assinatura]({link})")
-            fone = ''.join(filter(str.isdigit, p.get('whatsapp') or p.get('telefone_celular') or ''))
-            if fone:
-                if not fone.startswith('55'): fone = '55' + fone
-                import urllib.parse
-                wa_msg = f"Olá, {p.get('razao','').split()[0]}! 😊\n\nSeu cadastro foi aprovado! Acesse o link para assinar seu contrato:\n\n{link}\n\nO link expira em 48 horas."
-                wa_link = f"https://wa.me/{fone}?text={urllib.parse.quote(wa_msg)}"
-                telegram(TELEGRAM_CHAT_ID, f"📱 *LINK WHATSAPP*\n\nCliente: *{p.get('razao','?')}*\nFone: {p.get('whatsapp') or p.get('telefone_celular','?')}\n\n[Clique para abrir WhatsApp]({wa_link})")
-            email_cliente = (p.get('email') or '').strip()
-            if email_cliente:
-                enviar_email(email_cliente, p.get('razao',''), p.get('plano_nome',''), link)
-            log.info(f"#{pid} LIBERADO SUPERVISOR — link gerado")
+
+            # Ativar no IXC
+            ixc_cont_id = 0
+            erro_ativ = None
+            try:
+                from app.engines.ativacao_engine import ativar_cliente
+                ativar_cliente(pid)
+                row = conn.execute("SELECT ixc_contrato_id FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
+                ixc_cont_id = row[0] if row else 0
+                log.info(f"#{pid} Ativado no IXC contrato={ixc_cont_id}")
+            except Exception as _e:
+                erro_ativ = str(_e)
+                log.error(f"#{pid} Erro na ativacao supervisor: {_e}")
+
+            cpf = (p.get('cnpj_cpf') or '').strip()
+            nome_cli = p.get('razao','?')
+            primeiro_nome = nome_cli.split()[0].title()
+            fone = (p.get('whatsapp') or p.get('telefone_celular') or '').strip()
+            fone_digits = ''.join(filter(str.isdigit, fone))
+            if fone_digits and not fone_digits.startswith('55'):
+                fone_digits = '55' + fone_digits
+            url_central = "https://sistema.cliquedf.com.br/central_assinante_web/login"
+
+            if ixc_cont_id and not erro_ativ:
+                telegram(TELEGRAM_CHAT_ID,
+                    f"✅ *CADASTRO APROVADO — SUPERVISOR*\n\n"
+                    f"Cliente: *{nome_cli}*\n"
+                    f"Vendedor: {p.get('vendedor_nome','?')}\n"
+                    f"Plano: {p.get('plano_nome','?')}\n"
+                    f"Contrato IXC: #{ixc_cont_id}")
+                wa_msg = (
+                    f"Olá, {primeiro_nome}! 😊\n\n"
+                    f"Seu contrato com a *Cliquedf* está pronto para assinatura.\n\n"
+                    f"Acesse o link abaixo para assinar:\n"
+                    f"{url_central}\n\n"
+                    f"🔑 Login: {cpf}\n"
+                    f"🔑 Senha: {cpf}\n\n"
+                    f"Após assinar, sua internet será ativada automaticamente! 🚀"
+                )
+                if fone_digits:
+                    import urllib.parse
+                    wa_link = f"https://wa.me/{fone_digits}?text={urllib.parse.quote(wa_msg)}"
+                    telegram(TELEGRAM_CHAT_ID,
+                        f"📱 *ENVIAR PARA O CLIENTE VIA WHATSAPP*\n\n"
+                        f"Cliente: *{nome_cli}*\n"
+                        f"Fone: {fone}\n\n"
+                        f"[👆 Clique aqui para abrir o WhatsApp]({wa_link})")
+            else:
+                telegram(TELEGRAM_CHAT_ID,
+                    f"✅ *LIBERADO SUPERVISOR*\n\n"
+                    f"Cliente: *{nome_cli}*\n"
+                    f"Vendedor: {p.get('vendedor_nome','?')}\n\n"
+                    f"⚠️ Erro na ativação: {erro_ativ or 'verifique o painel'}")
+
+            log.info(f"#{pid} LIBERADO SUPERVISOR — contrato={ixc_cont_id}")
             continue
         resultado = consultar_cpf(p.get("cnpj_cpf",""))
 

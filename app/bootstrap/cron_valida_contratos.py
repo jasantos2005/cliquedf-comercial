@@ -94,11 +94,17 @@ def main():
                 problemas.append(f"assinatura_digital={cc['assinatura_digital']} (esperado: S)")
 
             # 2. Vendedor correto
-            vend_esperado = p['ixc_vendedor_id']
-            if cc['id_vendedor'] != vend_esperado:
-                problemas.append(f"id_vendedor={cc['id_vendedor']} ({cc['vendedor_nome']}) esperado={vend_esperado} ({p['vendedor_nome']})")
-            if cc['id_vendedor_ativ'] != vend_esperado:
-                problemas.append(f"id_vendedor_ativ={cc['id_vendedor_ativ']} ({cc['vendedor_ativ_nome']}) esperado={vend_esperado}")
+            # id_vendedor contrato = funcionario_ixc_id (colaborador)
+            # id_vendedor_ativ contrato = ixc_vendedor_id (vendedor)
+            vend_ativ_esperado = p['ixc_vendedor_id']
+            # Buscar funcionario_ixc_id do vendedor
+            import sqlite3 as _sq
+            _c = _sq.connect(str(__import__("pathlib").Path(__file__).resolve().parent.parent.parent / "hub_comercial.db"))
+            _row = _c.execute("SELECT funcionario_ixc_id FROM hc_vendedores WHERE id=? LIMIT 1", (vend_ativ_esperado,)).fetchone()
+            vend_resp_esperado = _row[0] if _row else vend_ativ_esperado
+            _c.close()
+            if cc['id_vendedor_ativ'] != vend_ativ_esperado:
+                problemas.append(f"id_vendedor_ativ={cc['id_vendedor_ativ']} ({cc['vendedor_ativ_nome']}) esperado={vend_ativ_esperado} ({p['vendedor_nome']})")
 
             # 3. Desconto fidelidade deve ser igual a taxa_instalacao no IXC
             taxa_ixc = float(cc['taxa_instalacao'] or 0)
