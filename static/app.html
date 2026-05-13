@@ -1250,6 +1250,13 @@ function docSlot(id,tipo,icon,title,sub,capture,req){
       <span style="font-size:10px;padding:2px 7px;border-radius:20px;margin-top:4px;display:inline-block;${req?'background:rgba(255,77,106,.1);color:var(--red);':'background:var(--surf2);color:var(--muted);'}">${req?'Obrigatório':'Opcional'}</span>
     </div>
     <input type="file" id="input-${id}" accept="image/*" ${capture?`capture="${capture}"`:''}  style="display:none;" onchange="onDoc(this,'${id}')">
+    <input type="file" id="input-${id}-galeria" accept="image/*" style="display:none;" onchange="onDoc(this,'${id}')">
+  </div>
+  <div id="menu-doc-${id}" style="display:none;position:fixed;bottom:0;left:0;right:0;background:var(--surf);border-top:1px solid var(--border);border-radius:16px 16px 0 0;padding:20px;z-index:999;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:16px;text-align:center;">${title}</div>
+    <button onclick="document.getElementById('menu-doc-${id}').style.display='none';document.getElementById('input-${id}').click();" style="width:100%;padding:14px;background:var(--surf2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;margin-bottom:10px;cursor:pointer;">📷 Tirar foto</button>
+    <button onclick="document.getElementById('menu-doc-${id}').style.display='none';document.getElementById('input-${id}-galeria').click();" style="width:100%;padding:14px;background:var(--surf2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;margin-bottom:10px;cursor:pointer;">🖼️ Escolher da galeria</button>
+    <button onclick="document.getElementById('menu-doc-${id}').style.display='none';" style="width:100%;padding:14px;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-size:14px;cursor:pointer;">Cancelar</button>
   </div>`;}
 
 function renderRevisao(){
