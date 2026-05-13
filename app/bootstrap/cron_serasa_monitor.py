@@ -84,7 +84,7 @@ def processar():
         SELECT p.*, v.nome AS vendedor_nome
         FROM hc_precadastros p
         LEFT JOIN hc_usuarios u ON u.id=p.id_vendedor_hub
-        LEFT JOIN hc_vendedores v ON v.id=u.ixc_funcionario_id
+        LEFT JOIN hc_vendedores v ON v.funcionario_ixc_id=u.ixc_funcionario_id
         WHERE p.status='aprovado' AND p.token_assinatura IS NULL
         ORDER BY p.atualizado_em ASC LIMIT 10
     """).fetchall()
