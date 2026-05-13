@@ -208,7 +208,7 @@ def inserir_cliente(p: dict) -> int:
             email, data_nascimento, cep, endereco, numero, bairro,
             complemento, referencia, cidade, uf,
             id_tipo_cliente, id_conta, filial_id,
-            senha, hotsite_acesso,
+            senha, hotsite_email, hotsite_acesso,
             ativo, status_internet, bloqueio_automatico, aviso_atraso,
             tipo_assinante, tipo_cliente_scm,
             data_cadastro, ultima_atualizacao,
@@ -228,7 +228,8 @@ def inserir_cliente(p: dict) -> int:
             %s, %s, %s, %s,
             %s,
             %s, %s, %s, %s,
-            %s, %s, %s
+            %s, %s, %s,
+            %s
         )
     """
     params = (
@@ -251,7 +252,8 @@ def inserir_cliente(p: dict) -> int:
         id_tipo_cli,
         IXC_ID_CONTA,
         IXC_ID_FILIAL,
-        _senha_padrao(cpf_raw),             # senha = CPF sem máscara
+        _senha_padrao(cpf_raw),             # senha = CPF com máscara
+        cpf_mask,                           # hotsite_email = CPF com máscara (login central)
         2,                                  # hotsite_acesso = 2 (central do assinante)
         "S", "A", "S", "S",                 # ativo, status_internet, bloqueio_automatico, aviso_atraso
         tipo_assin, tipo_scm,
@@ -330,7 +332,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             obs, tipo_localidade,
             descricao_aux_plano_venda, id_modelo,
             contrato, id_motivo_inclusao,
-            assinatura_digital
+            assinatura_digital, id_responsavel
         ) VALUES (
             %s, %s, %s, %s,
             %s, %s,
@@ -346,14 +348,14 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
             %s, %s,
             %s, %s,
             %s, %s,
-            %s
+            %s, %s
         )
     """
     params = (
         ixc_cliente_id, plano, "P", hoje_brt,
         "S", valor,
         IXC_ID_TIPO_CONTRATO, IXC_ID_FILIAL, IXC_ID_TIPO_DOC,  # 501
-        IXC_ID_CARTEIRA, vend_resp, vend,                        # id_carteira=6, id_vendedor(colab)=id_vendedor_ativ(vend)
+        IXC_ID_CARTEIRA, vend, vend,                             # id_carteira=6, id_vendedor=id_vendedor_ativ=tabela vendedor
         "AA", "S", "S",                  # status_internet=AA (Ag.Assinatura), bloq, aviso
         taxa,                            # taxa_instalacao
         taxa,                            # desconto_fidelidade = taxa_instalacao
@@ -371,6 +373,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         nome_plano,                      # contrato (nome do plano)
         id_motivo_incl,                  # 1=NV, 6=TIT, 8=Reativação
         "S",                             # assinatura_digital = S (obrigatorio)
+        _get_usuario_ixc_id(vend),          # id_responsavel = funcionario_ixc_id
     )
     return ixc_insert(sql, params)
 
