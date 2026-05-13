@@ -1234,7 +1234,8 @@ function renderPasso3(){
 
 function renderPasso4(){return`
 <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5;">Fotografe os documentos. RG/CNH e selfie são obrigatórios.</p>
-${docSlot('rg','rg_frente','📄','RG / CNH','Câmera traseira','environment',true)}
+${docSlot('rg','rg_frente','📄','RG / CNH (frente)','Câmera traseira','environment',true)}
+${docSlot('rg_verso','rg_verso','📄','RG (verso)','Número do RG fica no verso','environment',false)}
 ${docSlot('selfie','selfie_doc','🤳','Selfie com documento','Câmera frontal','user',true)}
 ${docSlot('comp','comp_residencia','🏠','Comprovante de residência','Opcional',null,false)}
 <div id="err-docs" style="display:none;font-size:12px;color:var(--red);margin-bottom:10px;">RG/CNH e selfie são obrigatórios</div>

@@ -179,7 +179,7 @@ async def preview_auditoria(dados: str = Form(...), user=Depends(requer_vendedor
 
 
 @router.post("/precadastro")
-async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:UploadFile=File(None),comp:UploadFile=File(None),db=Depends(get_db),user=Depends(requer_vendedor())):
+async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),rg_verso:UploadFile=File(None),selfie:UploadFile=File(None),comp:UploadFile=File(None),db=Depends(get_db),user=Depends(requer_vendedor())):
     try: f=json.loads(dados)
     except: raise HTTPException(400,"Dados inválidos.")
     if not rg or not selfie: raise HTTPException(400,"RG e selfie são obrigatórios.")
@@ -247,7 +247,7 @@ async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:
             dest.write_bytes(raw)
         kb = dest.stat().st_size // 1024
         cur.execute("INSERT INTO hc_precadastro_docs(precadastro_id,tipo,arquivo,tamanho_kb)VALUES(?,?,?,?)",(pid,tipo,f"uploads/{pid}/{tipo}{ext}",kb)); db.commit()
-    await salvar(rg,"rg_frente"); await salvar(selfie,"selfie_doc"); await salvar(comp,"comp_residencia")
+    await salvar(rg,"rg_frente"); await salvar(rg_verso,"rg_verso"); await salvar(selfie,"selfie_doc"); await salvar(comp,"comp_residencia")
     log.info(f"Pré-cadastro #{pid} protocolo={protocolo}")
     return {"id":pid,"protocolo":protocolo,"status":"enviado"}
 
