@@ -184,12 +184,16 @@ async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),selfie:
     except: raise HTTPException(400,"Dados inválidos.")
     if not rg or not selfie: raise HTTPException(400,"RG e selfie são obrigatórios.")
     protocolo=f"HC{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4].upper()}"
-    # ixc_funcionario_id no hc_usuarios = id do vendedor no IXC = id do hc_vendedores
+    # Buscar id correto da tabela hc_vendedores pelo funcionario_ixc_id do usuario
     user_id = int(user["sub"])
     usu_row = db.execute(
         "SELECT ixc_funcionario_id FROM hc_usuarios WHERE id=? LIMIT 1", (user_id,)
     ).fetchone()
-    ixc_vend_id = usu_row["ixc_funcionario_id"] if usu_row else None
+    func_id = usu_row["ixc_funcionario_id"] if usu_row else None
+    vend_row = db.execute(
+        "SELECT id FROM hc_vendedores WHERE funcionario_ixc_id=? AND ativo=1 LIMIT 1", (func_id,)
+    ).fetchone() if func_id else None
+    ixc_vend_id = vend_row["id"] if vend_row else func_id
 
     cur=db.cursor()
     cur.execute("""INSERT INTO hc_precadastros(status,id_vendedor_hub,ixc_vendedor_id,canal_venda,protocolo,tipo_pessoa,razao,cnpj_cpf,telefone_celular,whatsapp,email,data_nascimento,sexo,rg_orgao_emissor,nacionalidade,cep,endereco,numero,bairro,complemento,referencia,cidade_nome,uf_sigla,ixc_cidade_id,viabilidade_status,viabilidade_nivel,viabilidade_obs,viabilidade_checado_em,ixc_plano_id,plano_nome,plano_valor,taxa_instalacao,fidelidade,dia_vencimento,obs,criado_em,atualizado_em)VALUES('enviado',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now','-3 hours'),datetime('now','-3 hours'))""",

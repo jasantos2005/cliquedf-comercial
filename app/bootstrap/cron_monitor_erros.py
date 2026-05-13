@@ -112,27 +112,21 @@ def corrigir_cidade():
 
 
 def corrigir_sem_vendedor():
+    """Apenas alerta — nao corrige automaticamente para evitar vendedor errado."""
     conn = db()
     rows = conn.execute("""
-        SELECT id, razao, id_vendedor_hub FROM hc_precadastros
-        WHERE status = 'ativado' AND ixc_vendedor_id IS NULL
-        AND criado_em >= datetime('now', '-24 hours', '-3 hours')
+        SELECT p.id, p.razao, u.nome as usuario
+        FROM hc_precadastros p
+        LEFT JOIN hc_usuarios u ON u.id = p.id_vendedor_hub
+        WHERE p.ixc_vendedor_id IS NULL
+        AND p.criado_em >= datetime('now', '-24 hours', '-3 hours')
+        AND p.status NOT IN ('cancelado','excluido','reprovado')
     """).fetchall()
-    corrigidos = []
-    for p in rows:
-        usu = conn.execute(
-            "SELECT ixc_funcionario_id FROM hc_usuarios WHERE id=?",
-            (p["id_vendedor_hub"],)
-        ).fetchone()
-        if usu and usu["ixc_funcionario_id"]:
-            conn.execute("UPDATE hc_precadastros SET ixc_vendedor_id=? WHERE id=?",
-                         (usu["ixc_funcionario_id"], p["id"]))
-            corrigidos.append(f"#{p['id']} {p['razao']}")
-            log.info(f"Vendedor corrigido: {p['razao']}")
-    conn.commit()
     conn.close()
-    return corrigidos
-
+    alertas = []
+    for p in rows:
+        alertas.append(f"#{p['id']} {p['razao']} (usuario: {p['usuario'] or '?'})")
+    return alertas
 
 def erros_manuais():
     conn = db()
@@ -250,7 +244,7 @@ def main():
     # 3. Corrigir sem vendedor
     vendedores = corrigir_sem_vendedor()
     if vendedores:
-        linhas.append(f"*Vendedor corrigido automaticamente ({len(vendedores)}):*")
+        linhas.append(f"*⚠️ Cadastros sem vendedor ({len(vendedores)}):*")
         for v in vendedores:
             linhas.append(f"  ✅ {v}")
 
