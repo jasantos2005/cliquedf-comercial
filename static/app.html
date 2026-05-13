@@ -1499,7 +1499,7 @@ async function verificarViab(){
 }
 
 // DOCS
-function abrirDoc(tipo){document.getElementById(`input-${tipo}`).click();}
+function abrirDoc(tipo){document.getElementById('menu-doc-'+tipo).style.display='block';}
 async function onDoc(input,tipo){
   const file=input.files[0]; if(!file)return;
   const ic=document.getElementById(`ic-${tipo}`),sub=document.getElementById(`sub-${tipo}`),slot=document.getElementById(`slot-${tipo}`);
