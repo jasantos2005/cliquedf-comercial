@@ -3291,6 +3291,7 @@ async function api(path, opts = {}) {
     document.getElementById('shell').style.display = 'none';
     return Promise.reject('__expired__');
   }
+  if (r.status === 400) { throw new Error(data.detail || 'Requisição inválida.'); }
   if (!r.ok) { console.error('API erro', r.status, path, data); throw new Error(data.detail || String(r.status)); }
   return data;
 }
@@ -3633,8 +3634,8 @@ async function buscarContratoIxc() {
         <div style="grid-column:1/-1;"><span style="color:var(--muted);">Plano:</span>
           <strong style="color:var(--cyan);">${esc(r.plano_nome||'—')}</strong>
         </div>
-      </div>`;
-    document.getElementById('add-base-btn-confirmar').disabled = false;
+      </div>${r.aviso ? `<div style="margin-top:10px;padding:8px 12px;border-radius:6px;font-size:12px;background:rgba(255,180,0,.1);border:1px solid #ffb400;color:#ffb400;">${r.aviso === 'ja_realizado' ? '\u2705' : '\u26a0\ufe0f'} ${esc(r.aviso_msg||'')}</div>` : ''}` ;
+    document.getElementById('add-base-btn-confirmar').disabled = !!r.aviso;
   } catch(e) {
     prev.innerHTML = `<span style="color:var(--red);">❌ ${e.message||'Contrato não encontrado.'}</span>`;
     _addBaseData = null;

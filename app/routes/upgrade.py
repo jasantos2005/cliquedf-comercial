@@ -573,7 +573,7 @@ def _notif_telegram_negociacao(cl, status, obs, por):
 # ── Buscar contrato no IXC por ID ─────────────────────────────
 
 @router.get("/buscar-contrato/{contrato_id}")
-async def buscar_contrato_ixc(contrato_id: int, user=Depends(requer_backoffice())):
+async def buscar_contrato_ixc(contrato_id: int, db=Depends(get_db), user=Depends(requer_backoffice())):
     """Busca dados do contrato no IXC para adicionar na base de upgrade."""
     try:
         row = ixc_select_one("""
@@ -602,7 +602,25 @@ async def buscar_contrato_ixc(contrato_id: int, user=Depends(requer_backoffice()
             if hasattr(v, '__class__') and v.__class__.__name__ == 'Decimal': return float(v)
             return v
 
-        return {k: sv(v) for k, v in dict(row).items()}
+        result = {k: sv(v) for k, v in dict(row).items()}
+
+        # Verificar se já está na base ou no log
+        existe_base = db.execute(
+            'SELECT id FROM hc_upgrades_base WHERE ixc_contrato_id=?', (contrato_id,)
+        ).fetchone()
+        existe_log = db.execute(
+            'SELECT plano_novo_nome, realizado_em FROM hc_upgrades_log WHERE ixc_contrato_id=? ORDER BY id DESC LIMIT 1',
+            (contrato_id,)
+        ).fetchone()
+
+        if existe_base:
+            result['aviso'] = 'ja_na_base'
+            result['aviso_msg'] = 'Este contrato já está na base de upgrade (a realizar).'
+        elif existe_log:
+            result['aviso'] = 'ja_realizado'
+            result['aviso_msg'] = f"Upgrade já realizado para {existe_log['plano_novo_nome']} em {existe_log['realizado_em'][:10]}."
+
+        return result
 
     except HTTPException:
         raise
@@ -630,13 +648,20 @@ async def adicionar_base(
     user=Depends(requer_backoffice())
 ):
     """Adiciona manualmente um contrato na base de upgrade."""
-    # Verificar se já existe
-    existe = db.execute(
-        "SELECT id FROM hc_upgrades_base WHERE ixc_contrato_id=?",
+    # Verificar se já existe na base ou no log
+    existe_base = db.execute(
+        "SELECT id, cliente FROM hc_upgrades_base WHERE ixc_contrato_id=?",
         (payload.ixc_contrato_id,)
     ).fetchone()
-    if existe:
+    if existe_base:
         raise HTTPException(400, f"Contrato #{payload.ixc_contrato_id} já está na base de upgrade.")
+
+    existe_log = db.execute(
+        "SELECT id, cliente, plano_novo_nome, realizado_em FROM hc_upgrades_log WHERE ixc_contrato_id=? ORDER BY id DESC LIMIT 1",
+        (payload.ixc_contrato_id,)
+    ).fetchone()
+    if existe_log:
+        raise HTTPException(400, f"Contrato #{payload.ixc_contrato_id} já possui upgrade realizado em {existe_log['realizado_em']} para {existe_log['plano_novo_nome']}.")
 
     db.execute("""
         INSERT INTO hc_upgrades_base (
