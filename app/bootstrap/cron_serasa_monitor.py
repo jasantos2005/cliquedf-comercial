@@ -201,50 +201,67 @@ def processar():
             conn.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes)VALUES(?,99,'SERASA_OK','Serasa aprovado','ok',?)",(pid,f"{ocorr} ocorr R${valor:.2f} nivel={nivel}"))
             conn.commit()
 
-            # Gerar link de assinatura (ativação no IXC ocorre APÓS assinatura)
+            # Ativar no IXC — criar cliente + contrato + OS
+            ixc_cont_id = 0
+            erro_ativ = None
             try:
-                token = gerar_link(pid, conn)
-                link = f"{BASE_URL}/assinar/{token}"
-                log.info(f"#{pid} link gerado: {link}")
+                from app.engines.ativacao_engine import ativar_cliente
+                ativar_cliente(pid)
+                row = conn.execute("SELECT ixc_contrato_id FROM hc_precadastros WHERE id=?", (pid,)).fetchone()
+                ixc_cont_id = row[0] if row else 0
+                log.info(f"#{pid} Ativado no IXC contrato={ixc_cont_id}")
             except Exception as e:
-                log.error(f"#{pid} Erro ao gerar link: {e}")
-                continue
+                erro_ativ = str(e)
+                log.error(f"#{pid} Erro na ativacao: {e}")
 
+            cpf = (p.get('cnpj_cpf') or '').strip()
             nome_cli = p.get('razao','?')
+            primeiro_nome = nome_cli.split()[0].title()
             fone = (p.get('whatsapp') or p.get('telefone_celular') or '').strip()
             fone_digits = ''.join(filter(str.isdigit, fone))
             if fone_digits and not fone_digits.startswith('55'):
                 fone_digits = '55' + fone_digits
+            url_central = "https://sistema.cliquedf.com.br/central_assinante_web/login"
             serasa_txt = 'Sem restrições' if ocorr==0 else f'{ocorr} ocorrência(s) R$ {valor:,.2f}'
 
-            telegram(TELEGRAM_CHAT_ID,
-                f"✅ *CADASTRO APROVADO — SERASA OK*\n\n"
-                f"Cliente: *{nome_cli}*\n"
-                f"Vendedor: {p.get('vendedor_nome','?')}\n"
-                f"Plano: {p.get('plano_nome','?')}\n\n"
-                f"*Serasa:* {serasa_txt}\n\n"
-                f"✍️ *Link de assinatura:*\n{link}")
-
-            primeiro_nome = nome_cli.split()[0].title()
-            wa_msg = (
-                f"Olá, {primeiro_nome}! 😊\n\n"
-                f"Seu cadastro foi *aprovado*! Para concluir, assine seu contrato digital:\n\n"
-                f"✍️ {link}\n\n"
-                f"O link expira em 48h. Qualquer dúvida, estamos à disposição! 🚀"
-            )
-            if fone_digits:
-                import urllib.parse
-                wa_link = f"https://wa.me/{fone_digits}?text={urllib.parse.quote(wa_msg)}"
+            if ixc_cont_id and not erro_ativ:
                 telegram(TELEGRAM_CHAT_ID,
-                    f"📱 *ENVIAR PARA O CLIENTE VIA WHATSAPP*\n\n"
+                    f"✅ *CADASTRO APROVADO*\n\n"
                     f"Cliente: *{nome_cli}*\n"
-                    f"Fone: {fone}\n\n"
-                    f"[👆 Clique aqui para abrir o WhatsApp]({wa_link})")
+                    f"Vendedor: {p.get('vendedor_nome','?')}\n"
+                    f"Plano: {p.get('plano_nome','?')}\n"
+                    f"Contrato IXC: #{ixc_cont_id}\n\n"
+                    f"*Serasa:* {serasa_txt}")
+
+                wa_msg = (
+                    f"Olá, {primeiro_nome}! 😊\n\n"
+                    f"Seu contrato com a *Cliquedf* está pronto para assinatura.\n\n"
+                    f"Acesse o link abaixo para assinar:\n"
+                    f"{url_central}\n\n"
+                    f"🔑 Login: {cpf}\n"
+                    f"🔑 Senha: {cpf}\n\n"
+                    f"Após assinar, sua internet será ativada automaticamente! 🚀"
+                )
+                if fone_digits:
+                    import urllib.parse
+                    wa_link = f"https://wa.me/{fone_digits}?text={urllib.parse.quote(wa_msg)}"
+                    telegram(TELEGRAM_CHAT_ID,
+                        f"📱 *ENVIAR PARA O CLIENTE VIA WHATSAPP*\n\n"
+                        f"Cliente: *{nome_cli}*\n"
+                        f"Fone: {fone}\n\n"
+                        f"[👆 Clique aqui para abrir o WhatsApp]({wa_link})")
+                else:
+                    telegram(TELEGRAM_CHAT_ID,
+                        f"📱 *MENSAGEM PARA O CLIENTE*\n\n{wa_msg}")
             else:
                 telegram(TELEGRAM_CHAT_ID,
-                    f"📱 *MENSAGEM PARA O CLIENTE*\n\n{wa_msg}")
+                    f"✅ *CADASTRO APROVADO — SERASA OK*\n\n"
+                    f"Cliente: *{nome_cli}*\n"
+                    f"Vendedor: {p.get('vendedor_nome','?')}\n\n"
+                    f"*Serasa:* {serasa_txt}\n\n"
+                    f"⚠️ Erro na ativação: {erro_ativ or 'verifique o painel'}")
 
-            log.info(f"#{pid} APROVADO — link gerado, aguardando assinatura")
+            log.info(f"#{pid} APROVADO — contrato={ixc_cont_id}")
         else:
             motivo = f"{ocorr} ocorrência(s) no Serasa — R$ {valor:,.2f} em débitos"
             conn.execute("UPDATE hc_precadastros SET status='reprovado',atualizado_em=datetime('now','-3 hours') WHERE id=?",(pid,))
