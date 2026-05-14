@@ -30,6 +30,33 @@ def telegram(chat_id, msg):
             json={"chat_id":chat_id,"text":msg,"parse_mode":"Markdown"},timeout=10)
     except Exception as e: log.warning(f"Telegram: {e}")
 
+def gupshup_send(fone, nome_cliente):
+    """Envia template assinar_contrato via Gupshup"""
+    import requests
+    api_key = os.getenv("GUPSHUP_API_KEY", "sk_1754d387ef8242198516f69cd8f56c9e")
+    src = os.getenv("GUPSHUP_NUMBER", "557996645668")
+    app_name = os.getenv("GUPSHUP_APP", "ID9519N557996645668")
+    fone_digits = ''.join(filter(str.isdigit, fone))
+    if not fone_digits.startswith('55'):
+        fone_digits = '55' + fone_digits
+    payload = {
+        "channel": "whatsapp",
+        "source": src,
+        "destination": fone_digits,
+        "src.name": app_name,
+        "template": '{"id":"assinar_contrato","params":["' + nome_cliente + '"]}'
+    }
+    try:
+        r = requests.post(
+            "https://api.gupshup.io/sm/api/v1/template/msg",
+            headers={"apikey": api_key, "Content-Type": "application/x-www-form-urlencoded"},
+            data=payload, timeout=10)
+        log.info(f"Gupshup {fone_digits}: {r.status_code} {r.text[:100]}")
+        return r.status_code == 202
+    except Exception as e:
+        log.error(f"Gupshup erro: {e}")
+        return False
+
 def enviar_email(destinatario, nome_cliente, plano, link):
     import smtplib, os
     from email.mime.multipart import MIMEMultipart
@@ -250,6 +277,12 @@ def processar():
                         f"Cliente: *{nome_cli}*\n"
                         f"Fone: {fone}\n\n"
                         f"[👆 Clique aqui para abrir o WhatsApp]({wa_link})")
+                    # Envio automático via Gupshup
+                    ok = gupshup_send(fone, primeiro_nome)
+                    if ok:
+                        telegram(TELEGRAM_CHAT_ID, f"✅ *WhatsApp enviado automaticamente para {nome_cli}*")
+                    else:
+                        telegram(TELEGRAM_CHAT_ID, f"⚠️ Falha no envio automático WhatsApp para {nome_cli} — envie manualmente")
                 else:
                     telegram(TELEGRAM_CHAT_ID,
                         f"📱 *MENSAGEM PARA O CLIENTE*\n\n{wa_msg}")
