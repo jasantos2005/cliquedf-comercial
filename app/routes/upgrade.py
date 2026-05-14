@@ -584,15 +584,12 @@ async def buscar_contrato_ixc(contrato_id: int, user=Depends(requer_backoffice()
                 cl.telefone_celular,
                 cl.whatsapp,
                 ci.nome AS cidade,
-                ba.nome AS bairro,
                 cc.id_vd_contrato AS ixc_plano_id,
                 vd.nome AS plano_nome,
-                vd.valor_contrato AS plano_valor,
-                cc.dia_vencimento
+                vd.valor_contrato AS plano_valor
             FROM ixcprovedor.cliente_contrato cc
             JOIN ixcprovedor.cliente cl ON cl.id = cc.id_cliente
             LEFT JOIN ixcprovedor.cidade ci ON ci.id = cl.cidade
-            LEFT JOIN ixcprovedor.bairro ba ON ba.id = cl.id_bairro
             LEFT JOIN ixcprovedor.vd_contratos vd ON vd.id = cc.id_vd_contrato
             WHERE cc.id = %s AND cc.status = 'A'
         """, (contrato_id,))

@@ -3665,7 +3665,12 @@ async function confirmarAdicionarBase() {
     _carregarTabelaUpgrade(1);
     carregarKpisUpgrade();
   } catch(e) {
-    toast('Erro: ' + (e.message||''), 'err');
+    const msg = e.message || '';
+    if (msg.includes('já está na base')) {
+      toast('⚠️ Este contrato já está na base de upgrade.', 'warn');
+    } else {
+      toast('Erro: ' + msg, 'err');
+    }
   } finally {
     btn.textContent = '✅ Adicionar'; btn.disabled = false;
   }
