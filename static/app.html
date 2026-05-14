@@ -365,13 +365,13 @@ body.light-mode .field input,body.light-mode #login-screen{background:var(--surf
   </div>
   <div style="margin-bottom:10px;">
     <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Endereço</label>
-    <input id="of-endereco" type="text" placeholder="Rua, Avenida..."
+    <input id="of-endereco" type="text" oninput="onNormalizar(this)" placeholder="Rua, Avenida..."
       style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
     <div>
       <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Bairro</label>
-      <input id="of-bairro" type="text" placeholder="Bairro"
+      <input id="of-bairro" type="text" oninput="onNormalizar(this)" placeholder="Bairro"
         style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
     </div>
     <div>
@@ -387,7 +387,7 @@ body.light-mode .field input,body.light-mode #login-screen{background:var(--surf
   <div style="font-size:11px;font-weight:600;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 10px;">Cliente</div>
   <div style="margin-bottom:10px;">
     <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px;">Nome completo *</label>
-    <input id="of-nome" type="text" placeholder="Nome do cliente"
+    <input id="of-nome" type="text" oninput="onNormalizar(this)" placeholder="Nome do cliente"
       style="width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:14px;">
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
@@ -1109,12 +1109,12 @@ function renderPasso1(){return`
 </div>
 <div style="margin-bottom:16px;">
   <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Logradouro<span style="color:var(--red)">*</span></label>
-  <input id="f-endereco" type="text" class="fi" placeholder="Rua, Avenida..." style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
+  <input id="f-endereco" type="text" oninput="onNormalizar(this)" class="fi" placeholder="Rua, Avenida..." style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
   <div>
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Número<span style="color:var(--red)">*</span></label>
-    <input id="f-numero" type="text" placeholder="Ex: 100 ou SN" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
+    <input id="f-numero" type="text" oninput="onNormalizar(this)" placeholder="Ex: 100 ou SN" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
   </div>
   <div>
     <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Complemento</label>
@@ -1123,7 +1123,7 @@ function renderPasso1(){return`
 </div>
 <div style="margin-bottom:16px;">
   <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Bairro<span style="color:var(--red)">*</span></label>
-  <input id="f-bairro" type="text" class="fi" placeholder="Nome do bairro" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
+  <input id="f-bairro" type="text" oninput="onNormalizar(this)" class="fi" placeholder="Nome do bairro" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
 </div>
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:16px;">
   <div>
@@ -1155,7 +1155,7 @@ function renderPasso2(){return`
 </div>
 <div style="margin-bottom:16px;">
   <label id="lbl-razao" style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Nome completo<span style="color:var(--red)">*</span></label>
-  <input id="f-razao" type="text" autocapitalize="words" placeholder="Nome do cliente" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
+  <input id="f-razao" type="text" oninput="onNormalizar(this)" autocapitalize="words" placeholder="Nome do cliente" style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;font-size:15px;color:var(--text);outline:none;">
 </div>
 <div style="margin-bottom:16px;">
   <label id="lbl-cpf" style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">CPF<span style="color:var(--red)">*</span></label>
@@ -1503,6 +1503,14 @@ async function verificarViab(){
 }
 
 // DOCS
+function normalizarTexto(val){
+  return val.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/ç/gi,'c').replace(/Ç/g,'C').toUpperCase();
+}
+function onNormalizar(el){
+  const pos = el.selectionStart;
+  el.value = normalizarTexto(el.value);
+  try{ el.setSelectionRange(pos,pos); }catch(e){}
+}
 function abrirDoc(tipo){
   document.getElementById('menu-doc-'+tipo).style.display='block';
   document.getElementById('menu-doc-'+tipo+'-box').style.display='block';
