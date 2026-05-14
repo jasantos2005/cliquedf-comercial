@@ -141,8 +141,7 @@ def processar():
                 )
                 if fone_digits:
                     import urllib.parse
-                    wa_empresa = "5579996645668"
-                    wa_link = f"https://wa.me/{wa_empresa}?text={urllib.parse.quote(wa_msg)}"
+                    wa_link = f"https://wa.me/{fone_digits}?text={urllib.parse.quote(wa_msg)}"
                     telegram(TELEGRAM_CHAT_ID,
                         f"📱 *ENVIAR PARA O CLIENTE VIA WHATSAPP*\n\n"
                         f"Cliente: *{nome_cli}*\n"
@@ -230,8 +229,7 @@ def processar():
                 )
                 if fone_digits:
                     import urllib.parse
-                    wa_empresa = "5579996645668"
-                    wa_link = f"https://wa.me/{wa_empresa}?text={urllib.parse.quote(wa_msg)}"
+                    wa_link = f"https://wa.me/{fone_digits}?text={urllib.parse.quote(wa_msg)}"
                     telegram(TELEGRAM_CHAT_ID,
                         f"📱 *ENVIAR PARA O CLIENTE VIA WHATSAPP*\n\n"
                         f"Cliente: *{nome_cli}*\n"
