@@ -277,12 +277,7 @@ def processar():
                         f"Cliente: *{nome_cli}*\n"
                         f"Fone: {fone}\n\n"
                         f"[👆 Clique aqui para abrir o WhatsApp]({wa_link})")
-                    # Envio automático via Gupshup
-                    ok = gupshup_send(fone, primeiro_nome)
-                    if ok:
-                        telegram(TELEGRAM_CHAT_ID, f"✅ *WhatsApp enviado automaticamente para {nome_cli}*")
-                    else:
-                        telegram(TELEGRAM_CHAT_ID, f"⚠️ Falha no envio automático WhatsApp para {nome_cli} — envie manualmente")
+                    # Gupshup desativado temporariamente — envio manual pelo backoffice
                 else:
                     telegram(TELEGRAM_CHAT_ID,
                         f"📱 *MENSAGEM PARA O CLIENTE*\n\n{wa_msg}")
