@@ -568,3 +568,90 @@ def _notif_telegram_negociacao(cl, status, obs, por):
         )
     except Exception as e:
         log.warning(f"Telegram negociacao: {e}")
+
+
+# ── Buscar contrato no IXC por ID ─────────────────────────────
+
+@router.get("/buscar-contrato/{contrato_id}")
+async def buscar_contrato_ixc(contrato_id: int, user=Depends(requer_backoffice())):
+    """Busca dados do contrato no IXC para adicionar na base de upgrade."""
+    try:
+        row = ixc_select_one("""
+            SELECT
+                cc.id AS ixc_contrato_id,
+                cl.razao AS cliente,
+                cl.cnpj_cpf,
+                cl.telefone_celular,
+                cl.whatsapp,
+                ci.nome AS cidade,
+                ba.nome AS bairro,
+                cc.id_vd_contrato AS ixc_plano_id,
+                vd.nome AS plano_nome,
+                vd.valor_contrato AS plano_valor,
+                cc.dia_vencimento
+            FROM ixcprovedor.cliente_contrato cc
+            JOIN ixcprovedor.cliente cl ON cl.id = cc.id_cliente
+            LEFT JOIN ixcprovedor.cidade ci ON ci.id = cl.cidade
+            LEFT JOIN ixcprovedor.bairro ba ON ba.id = cl.id_bairro
+            LEFT JOIN ixcprovedor.vd_contratos vd ON vd.id = cc.id_vd_contrato
+            WHERE cc.id = %s AND cc.status = 'A'
+        """, (contrato_id,))
+
+        if not row:
+            raise HTTPException(404, "Contrato não encontrado ou inativo.")
+
+        def sv(v):
+            if v is None: return None
+            if hasattr(v, '__class__') and v.__class__.__name__ == 'Decimal': return float(v)
+            return v
+
+        return {k: sv(v) for k, v in dict(row).items()}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error(f"buscar_contrato_ixc #{contrato_id}: {e}")
+        raise HTTPException(500, str(e))
+
+
+# ── Adicionar contrato manualmente na base de upgrade ─────────
+
+class AdicionarBasePayload(BaseModel):
+    ixc_contrato_id: int
+    cliente:         str
+    cidade:          str
+    bairro:          Optional[str] = ""
+    telefone_celular: Optional[str] = ""
+    ixc_plano_id:    int
+    plano_nome:      str
+    dia_vencimento:  Optional[int] = 0
+
+@router.post("/base/adicionar")
+async def adicionar_base(
+    payload: AdicionarBasePayload,
+    db=Depends(get_db),
+    user=Depends(requer_backoffice())
+):
+    """Adiciona manualmente um contrato na base de upgrade."""
+    # Verificar se já existe
+    existe = db.execute(
+        "SELECT id FROM hc_upgrades_base WHERE ixc_contrato_id=?",
+        (payload.ixc_contrato_id,)
+    ).fetchone()
+    if existe:
+        raise HTTPException(400, f"Contrato #{payload.ixc_contrato_id} já está na base de upgrade.")
+
+    db.execute("""
+        INSERT INTO hc_upgrades_base (
+            ixc_contrato_id, cliente, cidade, bairro,
+            telefone_celular, ixc_plano_id, plano_nome,
+            dia_vencimento, status_negociacao
+        ) VALUES (?,?,?,?,?,?,?,?,'nao_contatado')
+    """, (
+        payload.ixc_contrato_id, payload.cliente, payload.cidade,
+        payload.bairro or "", payload.telefone_celular or "",
+        payload.ixc_plano_id, payload.plano_nome, payload.dia_vencimento or 0
+    ))
+    db.commit()
+    log.info(f"Base upgrade: #{payload.ixc_contrato_id} {payload.cliente} adicionado por {user['login']}")
+    return {"ok": True, "msg": f"Contrato #{payload.ixc_contrato_id} adicionado à base de upgrade."}

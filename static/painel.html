@@ -1062,6 +1062,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       <option value="cliente_ciente">✅ Cliente ciente</option>
       <option value="recusou">Recusou</option>
     </select>
+    <button class="btn btn-cyan" onclick="abrirModalAdicionarBase()" style="margin-left:auto;">➕ Adicionar cliente</button>
   </div>
   <!-- Tabela -->
   <div class="card">
@@ -1282,6 +1283,25 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
   </div>
 </div>
 
+<!-- MODAL ADICIONAR BASE UPGRADE -->
+<div class="overlay" id="modal-add-base">
+  <div class="modal" style="width:480px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 style="margin:0;">➕ Adicionar à base de upgrade</h3>
+      <button onclick="fecharModal('modal-add-base')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input id="add-base-contrato-id" type="number" placeholder="ID do contrato IXC"
+        style="flex:1;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;color:var(--text);outline:none;">
+      <button class="btn btn-cyan" onclick="buscarContratoIxc()">🔍 Buscar</button>
+    </div>
+    <div id="add-base-preview" style="display:none;background:var(--surf2);border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="fecharModal('modal-add-base')">Cancelar</button>
+      <button id="add-base-btn-confirmar" class="btn btn-cyan" onclick="confirmarAdicionarBase()" disabled>✅ Adicionar</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
@@ -3579,6 +3599,75 @@ async function aplicarUpgrade() {
     toast('Erro ao aplicar: ' + (e.message||''), 'err');
   } finally {
     btn.textContent = 'Aplicar upgrade no IXC'; btn.disabled = false;
+  }
+}
+
+// ── Adicionar cliente à base de upgrade ──────────────────────
+let _addBaseData = null;
+
+function abrirModalAdicionarBase() {
+  _addBaseData = null;
+  document.getElementById('add-base-contrato-id').value = '';
+  document.getElementById('add-base-preview').style.display = 'none';
+  document.getElementById('add-base-btn-confirmar').disabled = true;
+  document.getElementById('modal-add-base').classList.add('show');
+  setTimeout(() => document.getElementById('add-base-contrato-id').focus(), 100);
+}
+
+async function buscarContratoIxc() {
+  const id = document.getElementById('add-base-contrato-id').value.trim();
+  if (!id) { toast('Informe o ID do contrato.', 'err'); return; }
+  const prev = document.getElementById('add-base-preview');
+  prev.innerHTML = '<span style="color:var(--muted);">Buscando...</span>';
+  prev.style.display = 'block';
+  document.getElementById('add-base-btn-confirmar').disabled = true;
+  try {
+    const r = await api(`/api/upgrade/buscar-contrato/${id}`);
+    _addBaseData = r;
+    prev.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><span style="color:var(--muted);">Cliente:</span> <strong>${esc(r.cliente||'—')}</strong></div>
+        <div><span style="color:var(--muted);">Contrato:</span> #${r.ixc_contrato_id}</div>
+        <div><span style="color:var(--muted);">Cidade:</span> ${esc(r.cidade||'—')}</div>
+        <div><span style="color:var(--muted);">Telefone:</span> ${esc(r.telefone_celular||'—')}</div>
+        <div style="grid-column:1/-1;"><span style="color:var(--muted);">Plano:</span>
+          <strong style="color:var(--cyan);">${esc(r.plano_nome||'—')}</strong>
+        </div>
+      </div>`;
+    document.getElementById('add-base-btn-confirmar').disabled = false;
+  } catch(e) {
+    prev.innerHTML = `<span style="color:var(--red);">❌ ${e.message||'Contrato não encontrado.'}</span>`;
+    _addBaseData = null;
+  }
+}
+
+async function confirmarAdicionarBase() {
+  if (!_addBaseData) return;
+  const btn = document.getElementById('add-base-btn-confirmar');
+  btn.textContent = 'Adicionando...'; btn.disabled = true;
+  try {
+    const r = await api('/api/upgrade/base/adicionar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        ixc_contrato_id:  _addBaseData.ixc_contrato_id,
+        cliente:          _addBaseData.cliente,
+        cidade:           _addBaseData.cidade || '',
+        bairro:           _addBaseData.bairro || '',
+        telefone_celular: _addBaseData.telefone_celular || '',
+        ixc_plano_id:     _addBaseData.ixc_plano_id,
+        plano_nome:       _addBaseData.plano_nome,
+        dia_vencimento:   _addBaseData.dia_vencimento || 0,
+      })
+    });
+    fecharModal('modal-add-base');
+    toast('✅ ' + r.msg, 'ok');
+    _carregarTabelaUpgrade(1);
+    carregarKpisUpgrade();
+  } catch(e) {
+    toast('Erro: ' + (e.message||''), 'err');
+  } finally {
+    btn.textContent = '✅ Adicionar'; btn.disabled = false;
   }
 }
 
