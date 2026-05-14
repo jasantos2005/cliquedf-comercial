@@ -1264,9 +1264,20 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">📄 Faturas Abr/Mai</div>
       <div id="upg-boletos-body" style="font-size:12px;"></div>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
+    <!-- Seletor plano destino -->
+    <div id="upg-plano-section" style="margin-bottom:14px;display:none;">
+      <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Plano destino</label>
+      <select id="upg-plano-novo" onchange="atualizarPreviewUpgrade()"
+        style="width:100%;background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px;color:var(--text);outline:none;">
+        <option value="">— selecione o plano —</option>
+      </select>
+      <div id="upg-preview" style="margin-top:10px;padding:12px;border-radius:8px;display:none;text-align:center;"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
       <button class="btn btn-outline" onclick="salvarNegociacao()">Salvar negociação</button>
       <button class="btn btn-cyan" onclick="confirmarClienteCiente()" style="background:var(--green);">✅ Cliente ciente</button>
+      <button id="upg-btn-aplicar" class="btn btn-cyan" onclick="aplicarUpgrade()" disabled
+        style="background:var(--cyan);display:none;">🚀 Aplicar no IXC</button>
     </div>
   </div>
 </div>
@@ -3427,6 +3438,24 @@ async function abrirModalUpgrade(id) {
 
 
     document.getElementById('modal-upgrade').classList.add('show');
+    // Carregar planos destino
+    try {
+      const rp = await api('/api/upgrade/planos');
+      const sel = document.getElementById('upg-plano-novo');
+      sel.innerHTML = '<option value="">— selecione o plano —</option>';
+      (rp.planos || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.dataset.nome = p.nome;
+        opt.dataset.valor = p.valor || 0;
+        opt.textContent = p.nome + ' — R$ ' + fmtVal(p.valor || 0);
+        sel.appendChild(opt);
+      });
+      document.getElementById('upg-plano-section').style.display = 'block';
+      document.getElementById('upg-btn-aplicar').style.display = 'inline-flex';
+      document.getElementById('upg-preview').style.display = 'none';
+      document.getElementById('upg-btn-aplicar').disabled = true;
+    } catch(e) { console.error('Erro ao carregar planos:', e); }
     try {
       const rb = await api(`/api/upgrade/base/${id}/boletos`);
       const bolDiv = document.getElementById('upg-boletos');
@@ -3533,7 +3562,7 @@ async function aplicarUpgrade() {
   try {
     const r = await api('/api/upgrade/realizar', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('hc_p_token')},
       body: JSON.stringify({
         base_id:          _upgClienteAtivo.id,
         plano_novo_id:    parseInt(opt.value),
