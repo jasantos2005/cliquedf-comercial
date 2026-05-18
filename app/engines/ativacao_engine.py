@@ -296,7 +296,10 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
     taxa    = float(p.get("taxa_instalacao") or 0)
     valor   = float(p.get("plano_valor") or 0)
     fidel   = int(p.get("fidelidade") or 12)
-    venc    = int(p.get("dia_vencimento") or 10)
+    # Mapear dia de vencimento para ID da condicao_pagamento no IXC
+    _dia_map = {5: 31, 10: 32, 15: 33, 20: 34, 25: 35}
+    _dia = int(p.get("dia_vencimento") or 10)
+    venc    = _dia_map.get(_dia, 32)  # default 32 = dia 10
     plano   = p.get("ixc_plano_id") or 0
     vend    = p.get("ixc_vendedor_id") or 0          # id_vendedor_ativ = tabela vendedor
     vend_resp = _get_usuario_ixc_id(vend)             # id_vendedor = tabela colaborador
@@ -473,7 +476,7 @@ def enviar_documentos_ixc(precadastro_id: int, ixc_cliente_id: int) -> list:
     """
     ixc_url   = os.getenv("IXC_URL",   "https://sistema.cliquedf.com.br")
     ixc_user  = os.getenv("IXC_USER",  "64")
-    ixc_token = os.getenv("IXC_TOKEN", "90b12b22159c00f223eb3e0411f3f1999f68098d1a27127dbec670997ddd800c")
+    ixc_token = os.getenv("IXC_TOKEN", "fecc7c0a71a6779bab8b231c5382316ebf5396eef47bc94f59e5e431e0ca524a")
 
     auth_b64 = base64.b64encode(f"{ixc_user}:{ixc_token}".encode()).decode()
     headers  = {
@@ -505,12 +508,11 @@ def enviar_documentos_ixc(precadastro_id: int, ixc_cliente_id: int) -> list:
                 img_b64 = base64.b64encode(f.read()).decode()
 
             payload = {
-                "id_cliente":            str(ixc_cliente_id),
-                "descricao":             descricao,
-                "classificacao_arquivo": classificacao,
-                "local_arquivo":         img_b64,
-                "nome_arquivo":          nome_arquivo,
-                "tipo":                  "imagem" if classificacao == "I" else "documento",
+                "id_cliente":    str(ixc_cliente_id),
+                "descricao":     descricao,
+                "tipo_arquivo":  classificacao,
+                "local_arquivo": img_b64,
+                "nome_arquivo":  nome_arquivo,
             }
 
             resp = requests.post(endpoint, headers=headers, json=payload, timeout=30)
