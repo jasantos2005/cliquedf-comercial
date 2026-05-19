@@ -193,8 +193,10 @@ def processar():
                 cpf = p.get("cnpj_cpf","")
                 cpf_fmt = f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}" if len(cpf)==11 else cpf
                 # Identificar responsavel pela consulta baseado no horario
-                from datetime import datetime as _dt
-                hora_atual = _dt.now().hour + _dt.now().minute / 60
+                from datetime import datetime as _dt, timezone, timedelta
+                _brt = timezone(timedelta(hours=-3))
+                _agora_brt = _dt.now(_brt)
+                hora_atual = _agora_brt.hour + _agora_brt.minute / 60
                 if 8 <= hora_atual < 12 or 14 <= hora_atual < 18:
                     responsavel_consulta = "BRUNA"
                 elif 12 <= hora_atual < 14:
@@ -202,7 +204,7 @@ def processar():
                 else:
                     responsavel_consulta = "—"
 
-                hora_fmt = _dt.now().strftime("%H:%M")
+                hora_fmt = _agora_brt.strftime("%H:%M")
                 telegram(TELEGRAM_CHAT_ID,
                     f"🔍 *CONSULTA SERASA NECESSÁRIA*\n\n"
                     f"Cliente: *{p.get('razao','?')}*\n"
