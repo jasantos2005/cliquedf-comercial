@@ -293,7 +293,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
 
     Retorna o ID gerado pelo IXC.
     """
-    taxa    = float(p.get("taxa_instalacao") or 0)
+    taxa    = float(p.get("taxa_instalacao") or 350)  # default 350 se nao informado
     valor   = float(p.get("plano_valor") or 0)
     fidel   = int(p.get("fidelidade") or 12)
     # Mapear dia de vencimento para ID da condicao_pagamento no IXC
@@ -489,6 +489,7 @@ def enviar_documentos_ixc(precadastro_id: int, ixc_cliente_id: int) -> list:
 
     DOCS = [
         ("rg_frente.jpg",                 "Documento de Identidade (RG/CNH)", "I"),
+        ("rg_verso.jpg",                  "Documento de Identidade (Verso)",  "I"),
         ("comp_residencia.jpg",            "Comprovante de Endereco",          "I"),
         ("selfie_doc.jpg",                 "Selfie com Documento",             "I"),
         (f"contrato_{precadastro_id}.pdf", "Contrato Assinado",                "D"),

@@ -113,10 +113,12 @@ def main():
                 problemas.append(f"desconto_fidelidade={desc_ixc} diferente da taxa={taxa_ixc}")
 
             # 5. Condicao pagamento = dia escolhido
-            venc_hub = str(p['dia_vencimento'] or '')
-            venc_ixc = str(cc['condicao_pagamento_primeira_fat'] or '')
-            if venc_hub and venc_hub not in venc_ixc:
-                problemas.append(f"condicao_pagamento={venc_ixc} (Hub dia={venc_hub})")
+            _dia_map = {5: 31, 10: 32, 15: 33, 20: 34, 25: 35}
+            venc_hub = int(p['dia_vencimento'] or 10)
+            venc_ixc = int(cc['condicao_pagamento_primeira_fat'] or 0)
+            venc_esperado = _dia_map.get(venc_hub, venc_hub)
+            if venc_ixc and venc_ixc != venc_esperado:
+                problemas.append(f"condicao_pagamento={venc_ixc} esperado={venc_esperado} (Hub dia={venc_hub})")
 
             # 6. Mensagem OS tem campos obrigatorios
             msg_os = cc['os_msg'] or ''
