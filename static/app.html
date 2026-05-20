@@ -522,7 +522,7 @@ const API='';
 let token=localStorage.getItem('hc_token');
 let usuario=JSON.parse(localStorage.getItem('hc_usuario')||'null');
 let planos=[], telaAtual='inicio';
-let formPasso=1, formDados={}, formDocs={rg:null,selfie:null,comp:null};
+let formPasso=1, formDados={}, formDocs={rg:null,rg_verso:null,selfie:null,comp:null};
 let viabOk=false;
 
 // ── INIT ────────────────────────────────────────────────────
@@ -585,7 +585,7 @@ function navForm(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('s-form').classList.add('active');
   document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
-  formPasso=1; formDados={}; formDocs={rg:null,selfie:null,comp:null}; viabOk=false;
+  formPasso=1; formDados={}; formDocs={rg:null,rg_verso:null,selfie:null,comp:null}; viabOk=false;
   renderFormPasso(1);
 }
 
@@ -1581,6 +1581,7 @@ async function enviarCadastro(){
     const fd=new FormData();
     fd.append('dados',JSON.stringify(formDados));
     if(formDocs.rg) fd.append('rg',formDocs.rg,'rg.jpg');
+    if(formDocs.rg_verso) fd.append('rg_verso',formDocs.rg_verso,'rg_verso.jpg');
     if(formDocs.selfie) fd.append('selfie',formDocs.selfie,'selfie.jpg');
     if(formDocs.comp) fd.append('comp',formDocs.comp,'comp.jpg');
     // Se for correção, atualiza o cadastro existente
