@@ -296,10 +296,10 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
     taxa    = float(p.get("taxa_instalacao") or 350)  # default 350 se nao informado
     valor   = float(p.get("plano_valor") or 0)
     fidel   = int(p.get("fidelidade") or 12)
-    # Mapear dia de vencimento para ID da condicao_pagamento no IXC
+    # Mapear dia de vencimento para id_tipo_contrato no IXC
     _dia_map = {5: 31, 10: 32, 15: 33, 20: 34, 25: 35}
     _dia = int(p.get("dia_vencimento") or 10)
-    venc    = _dia_map.get(_dia, 32)  # default 32 = dia 10
+    venc    = _dia_map.get(_dia, 32)  # id_tipo_contrato correto
     plano   = p.get("ixc_plano_id") or 0
     vend    = p.get("ixc_vendedor_id") or 0          # id_vendedor_ativ = tabela vendedor
     vend_resp = _get_usuario_ixc_id(vend)             # id_vendedor = tabela colaborador
@@ -310,7 +310,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
 
     # Vencimento da primeira fatura — dia escolhido pelo cliente
     # Formato IXC: apenas o dia (ex: 5, 10, 20)
-    primeiro_venc = str(venc)
+    # primeiro_venc removido — id_tipo_contrato usa venc diretamente
 
     # Motivo de inclusão conforme tipo de OS
     os_assunto       = int(p.get("os_assunto") or IXC_ID_ASSUNTO_INSTALL)
@@ -357,7 +357,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
     params = (
         ixc_cliente_id, plano, "P", hoje_brt,
         "S", valor,
-        IXC_ID_TIPO_CONTRATO, IXC_ID_FILIAL, IXC_ID_TIPO_DOC,  # 501
+        venc, IXC_ID_FILIAL, IXC_ID_TIPO_DOC,                  # id_tipo_contrato=dia vencimento
         IXC_ID_CARTEIRA, vend, vend,                             # id_carteira=6, id_vendedor=id_vendedor_ativ=tabela vendedor
         "AA", "S", "S",                  # status_internet=AA (Ag.Assinatura), bloq, aviso
         taxa,                            # taxa_instalacao
@@ -370,7 +370,7 @@ def inserir_contrato(p: dict, ixc_cliente_id: int) -> int:
         IXC_ID_TIPO_DOC,                 # id_tipo_doc_ativ = 501
         IXC_ID_PRODUTO_ATIV,             # id_produto_ativ = 121
         1,                               # id_cond_pag_ativ = 1 (à vista)
-        primeiro_venc,                   # condicao_pagamento_primeira_fat
+        None,                            # condicao_pagamento_primeira_fat = NULL
         (p.get("obs") or "").replace("%", "%%"), "U",  # obs, tipo_localidade=U (urbano)
         nome_plano, 13,                  # descricao_aux_plano_venda, id_modelo=13
         nome_plano,                      # contrato (nome do plano)
