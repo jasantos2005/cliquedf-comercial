@@ -81,6 +81,34 @@ def consultar_cpf(cpf_cnpj: str) -> dict:
 
     registros = d.get("registros", [])
 
+    # PJ: IXC pode gravar cnpj_cpf vazio — buscar por id_lead via tabela contatos
+    if not registros:
+        try:
+            from app.services.ixc_db import ixc_select
+            cpf_raw = cpf_cnpj.replace(".","").replace("-","").replace("/","").strip()
+            contatos = ixc_select(
+                "SELECT id FROM ixcprovedor.contato WHERE REPLACE(REPLACE(REPLACE(cnpj_cpf,\'.\',\'\'),\'-\',\'\'),\'/\',\'\')=%s LIMIT 1",
+                (cpf_raw,)
+            )
+            if contatos:
+                id_lead = contatos[0]["id"]
+                rows = ixc_select(
+                    "SELECT id, data_hora_consulta, total_ocorrencias, valor_total, intermediador, id_lead "
+                    "FROM ixcprovedor.consulta_spc_serasa WHERE id_lead=%s ORDER BY id DESC LIMIT 1",
+                    (id_lead,)
+                )
+                if rows:
+                    registros = [{
+                        "id": rows[0]["id"],
+                        "data_hora_consulta": str(rows[0]["data_hora_consulta"]),
+                        "total_ocorrencias": int(rows[0]["total_ocorrencias"] or 0),
+                        "valor_total": float(rows[0]["valor_total"] or 0),
+                        "intermediador": rows[0]["intermediador"],
+                        "id_lead": rows[0]["id_lead"],
+                    }]
+        except Exception as e:
+            log.warning(f"Busca PJ por contato falhou: {e}")
+
     if registros:
         reg = registros[0]
         data_consulta = reg.get("data_hora_consulta", "")[:10]
