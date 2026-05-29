@@ -127,7 +127,7 @@ def _idade(nasc: str) -> int:
 
 # ── Função principal ──────────────────────────────────────────
 
-def auditar(f: dict, docs: list) -> dict:
+def auditar(f: dict, docs: list = None) -> dict:
     """
     Executa as 27 regras de auditoria sobre um pré-cadastro.
 
