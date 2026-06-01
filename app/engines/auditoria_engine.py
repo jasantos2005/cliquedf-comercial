@@ -297,8 +297,8 @@ def auditar(f: dict, docs: list = None) -> dict:
             add("R25", "ok")
 
     # R26 — Documentos obrigatórios ausentes
-    tem_doc    = any(d.get("tipo") in ("rg_frente", "cnh") for d in docs)
-    tem_selfie = any(d.get("tipo") == "selfie_doc" for d in docs)
+    tem_doc    = any(d.get("tipo") in ("rg_frente", "cnh") for d in (docs or []))
+    tem_selfie = any(d.get("tipo") == "selfie_doc" for d in (docs or []))
     levar      = "LEVAR CONTRATO" in obs
     if not tem_doc and not tem_selfie:
         add("R26",
