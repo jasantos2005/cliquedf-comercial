@@ -257,28 +257,40 @@ async def financeiro_resumo(db=Depends(get_db), user=Depends(requer_supervisor()
     valor_atraso = 0.0
     lista = []
 
-    for c in clientes:
+    # Buscar todos os financeiros de uma vez (evita N queries no MySQL)
+    ids = [row["ixc_cliente_id"] for row in clientes if row["ixc_cliente_id"]]
+    fat_map = {}
+    if ids:
         try:
-            fat = ixc_select("""
-                SELECT status, valor_aberto,
+            placeholders = ",".join(["%s"] * len(ids))
+            fats = ixc_select(f"""
+                SELECT id_cliente, valor_aberto,
                        DATEDIFF(NOW(), data_vencimento) AS dias
                 FROM ixcprovedor.fn_areceber
-                WHERE id_cliente=%s AND status='A'
-                ORDER BY data_vencimento ASC LIMIT 1
-            """, (c["ixc_cliente_id"],))
+                WHERE id_cliente IN ({placeholders}) AND status='A'
+                ORDER BY data_vencimento ASC
+            """, tuple(ids))
+            for fat in fats:
+                cid = fat["id_cliente"]
+                if cid not in fat_map:
+                    fat_map[cid] = fat
+        except:
+            pass
 
+    for c in clientes:
+        try:
+            fat = fat_map.get(c["ixc_cliente_id"])
             if not fat:
                 em_dia += 1
                 sit = "em_dia"; dias = 0; vab = 0
             else:
-                dias = int(fat[0]["dias"] or 0)
-                vab  = float(fat[0]["valor_aberto"] or 0)
+                dias = int(fat["dias"] or 0)
+                vab  = float(fat["valor_aberto"] or 0)
                 valor_atraso += vab
                 if dias <= 0:    em_dia += 1;      sit = "em_dia"
                 elif dias <= 15: atraso += 1;      sit = "atraso_leve"
                 elif dias <= 30: atraso += 1;      sit = "atraso_medio"
                 else:            inadimplente += 1; sit = "inadimplente"
-
             lista.append({**dict(c), "situacao": sit,
                           "dias_atraso": dias, "valor_aberto": round(vab,2)})
         except:
