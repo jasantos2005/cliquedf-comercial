@@ -576,6 +576,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       <div class="ni-sub" id="sub-vendedores">
         <div class="nis" onclick="navTo('vend-produtividade')">Produtividade</div>
         <div class="nis" onclick="navTo('vend-perfil')">Perfil do vendedor</div>
+        <div class="nis" onclick="navTo('mapa-vendas')">🗺️ Mapa de Vendas</div>
       </div>
       <div class="ni" id="ni-clientes" onclick="navTo('clientes')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
@@ -1428,6 +1429,7 @@ const PAGE_TITLES = {
 };
 
 function navTo(page) {
+  if (page === 'mapa-vendas') { setTimeout(carregarMapa, 100); }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById(`page-${page}`);
@@ -3859,5 +3861,109 @@ function toast(msg, tipo = '') {
 
 
 <button id="theme-btn" onclick="toggleTheme()" title="Alternar tema">☀️</button>
+
+<!-- MAPA DE VENDAS -->
+<div id="page-mapa-vendas" class="page" style="display:none;padding:0;">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <div style="padding:16px 16px 8px;background:var(--surf1);border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <span style="font-weight:700;font-size:16px;">🗺️ Mapa de Vendas</span>
+    <select id="mapa-vendedor" onchange="carregarMapa()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;">
+      <option value="">Todos os vendedores</option>
+    </select>
+    <input type="date" id="mapa-data" onchange="carregarMapa()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surf2);color:var(--text);font-size:13px;">
+    <span id="mapa-total" style="font-size:13px;color:var(--text2);"></span>
+  </div>
+  <div id="mapa-container" style="width:100%;height:calc(100vh - 120px);"></div>
+</div>
+
+<script>
+let _mapaIniciado = false;
+let _mapaObj = null;
+let _mapaMarkers = [];
+
+const CORES_VENDEDOR = {
+  'Cintia': '#e74c3c',
+  'Franciele': '#3498db',
+  'Marcos': '#2ecc71',
+  'Leide Aquino': '#f39c12',
+};
+
+async function carregarMapa() {
+  if (!_mapaIniciado) {
+    _mapaObj = L.map('mapa-container').setView([-10.32, -36.58], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(_mapaObj);
+    _mapaIniciado = true;
+
+    // Preencher vendedores
+    const sel = document.getElementById('mapa-vendedor');
+    const vends = await fetch(`${API}/api/vendedor/lista-vendedores`, {
+      headers: {Authorization: `Bearer ${token}`}
+    }).then(r => r.json()).catch(() => []);
+    vends.forEach && vends.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.ixc_id || v.id;
+      opt.textContent = v.nome;
+      sel.appendChild(opt);
+    });
+  }
+
+  // Limpar markers anteriores
+  _mapaMarkers.forEach(m => _mapaObj.removeLayer(m));
+  _mapaMarkers = [];
+
+  const vendedor = document.getElementById('mapa-vendedor').value;
+  const data = document.getElementById('mapa-data').value || new Date().toISOString().slice(0,10);
+
+  // Buscar cadastros com coordenadas
+  let url = `${API}/api/vendedor/mapa-vendas?data=${data}`;
+  if (vendedor) url += `&vendedor_id=${vendedor}`;
+
+  const pontos = await fetch(url, {
+    headers: {Authorization: `Bearer ${token}`}
+  }).then(r => r.json()).catch(() => []);
+
+  if (!pontos.length) {
+    document.getElementById('mapa-total').textContent = 'Nenhuma venda com localização nesta data';
+    return;
+  }
+
+  const bounds = [];
+  pontos.forEach((p, i) => {
+    if (!p.latitude || !p.longitude) return;
+    const cor = CORES_VENDEDOR[p.vendedor_nome] || '#9b59b6';
+    const icon = L.divIcon({
+      html: `<div style="background:${cor};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${i+1}</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      className: ''
+    });
+    const marker = L.marker([p.latitude, p.longitude], {icon})
+      .addTo(_mapaObj)
+      .bindPopup(`
+        <b>${p.razao || 'Cliente'}</b><br>
+        👤 ${p.vendedor_nome}<br>
+        📍 ${p.bairro}, ${p.cidade_nome}<br>
+        📋 ${p.plano_nome || ''}<br>
+        🕐 ${p.criado_em ? p.criado_em.slice(11,16) : ''}h
+      `);
+    _mapaMarkers.push(marker);
+    bounds.push([p.latitude, p.longitude]);
+  });
+
+  if (bounds.length) _mapaObj.fitBounds(bounds, {padding: [30, 30]});
+  document.getElementById('mapa-total').textContent = `${pontos.length} cadastros com localização`;
+  setTimeout(() => _mapaObj.invalidateSize(), 100);
+}
+
+// Inicializar data de hoje
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('mapa-data');
+  if (inp) inp.value = new Date().toISOString().slice(0,10);
+});
+</script>
+
 </body>
 </html>

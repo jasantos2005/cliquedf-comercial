@@ -334,3 +334,33 @@ async def cidades_cache(user=Depends(requer_vendedor())):
             return {"cidades": [dict(r) for r in cur.fetchall()]}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+@router.get("/mapa-vendas")
+async def mapa_vendas(data: str = None, vendedor_id: int = None, db=Depends(get_db), user=Depends(requer_vendedor())):
+    import datetime
+    if not data:
+        data = datetime.date.today().isoformat()
+    query = """
+        SELECT p.id, p.razao, p.bairro, p.cidade_nome, p.plano_nome,
+               p.latitude, p.longitude, p.criado_em,
+               p.ixc_vendedor_id,
+               v.nome as vendedor_nome
+        FROM hc_precadastros p
+        LEFT JOIN hc_vendedores_ativos v ON v.ixc_id = p.ixc_vendedor_id
+        WHERE date(p.criado_em) = ?
+        AND p.latitude IS NOT NULL AND p.latitude != 0
+        AND p.status NOT IN ('rascunho')
+    """
+    params = [data]
+    if vendedor_id:
+        query += " AND p.ixc_vendedor_id = ?"
+        params.append(vendedor_id)
+    query += " ORDER BY p.criado_em"
+    rows = db.execute(query, params).fetchall()
+    return [dict(r) for r in rows]
+
+@router.get("/lista-vendedores")
+async def lista_vendedores(db=Depends(get_db), user=Depends(requer_vendedor())):
+    rows = db.execute("SELECT ixc_id, nome FROM hc_vendedores_ativos WHERE ativo=1 ORDER BY nome").fetchall()
+    return [dict(r) for r in rows]
+
