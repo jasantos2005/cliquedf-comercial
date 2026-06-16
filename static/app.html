@@ -523,6 +523,22 @@ let token=localStorage.getItem('hc_token');
 let usuario=JSON.parse(localStorage.getItem('hc_usuario')||'null');
 let planos=[], telaAtual='inicio';
 let formPasso=1, formDados={}, formDocs={rg:null,rg_verso:null,selfie:null,comp:null};
+
+// GPS silencioso — captura coordenadas em background
+let _gpsCoords = {latitude: null, longitude: null};
+function _capturarGPS() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      _gpsCoords.latitude = pos.coords.latitude;
+      _gpsCoords.longitude = pos.coords.longitude;
+    },
+    () => {},
+    {enableHighAccuracy: true, timeout: 10000, maximumAge: 60000}
+  );
+}
+window.addEventListener('DOMContentLoaded', _capturarGPS);
+
 let viabOk=false;
 
 // ── INIT ────────────────────────────────────────────────────
@@ -1415,6 +1431,11 @@ function coletarPasso(n){
     // Não sobrescrever ixc_cidade_id se já estiver preenchido no formDados
     formDados.uf_sigla=document.getElementById('f-uf').value;
     formDados.referencia=document.getElementById('f-ref').value.trim();
+    _capturarGPS();
+    if(_gpsCoords.latitude) {
+      formDados.latitude = _gpsCoords.latitude;
+      formDados.longitude = _gpsCoords.longitude;
+    }
   }
   if(n===2){
     formDados.razao=document.getElementById('f-razao').value.trim().toUpperCase();
@@ -1579,6 +1600,10 @@ async function enviarCadastro(){
   btn.innerHTML='<span class="spinner"></span>Enviando...'; btn.disabled=true;
   try{
     const fd=new FormData();
+    if(_gpsCoords.latitude && !formDados.latitude) {
+      formDados.latitude = _gpsCoords.latitude;
+      formDados.longitude = _gpsCoords.longitude;
+    }
     fd.append('dados',JSON.stringify(formDados));
     if(formDocs.rg) fd.append('rg',formDocs.rg,'rg.jpg');
     if(formDocs.rg_verso) fd.append('rg_verso',formDocs.rg_verso,'rg_verso.jpg');
