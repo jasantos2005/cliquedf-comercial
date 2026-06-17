@@ -3798,7 +3798,7 @@ async function carregarUpgradeLog(pagina = 1) {
       <div class="kpi" style="--ac:var(--amber)"><div class="kv">${(b.em_contato||0)+(b.negociando||0)}</div><div class="kl">Em negociação</div></div>
       <div class="kpi" style="--ac:var(--red)"><div class="kv">${b.recusou||0}</div><div class="kl">Recusaram</div></div>
     `;
-    const rk = await api('/api/upgrade/ranking-operadores');
+    const rk = await api(`/api/upgrade/ranking-operadores?de=${de}&ate=${ate}`);
     const selOp = document.getElementById('upg-log-operador');
     const opsAtuais = Array.from(selOp.options).map(o => o.value);
     (rk.ranking||[]).forEach(op => {

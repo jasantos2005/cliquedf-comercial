@@ -456,8 +456,19 @@ async def boletos_cliente(id: int, db=Depends(get_db), user=Depends(requer_backo
 # ── Ranking operadores ────────────────────────────────────────
 
 @router.get("/ranking-operadores")
-async def ranking_operadores(db=Depends(get_db), user=Depends(requer_backoffice())):
-    rows = db.execute("""
+async def ranking_operadores(
+    de:  str = Query(""),
+    ate: str = Query(""),
+    db=Depends(get_db),
+    user=Depends(requer_backoffice())
+):
+    where, params = ["operador_contato IS NOT NULL"], []
+    if de:
+        where.append("date(data_contato) >= ?"); params.append(de)
+    if ate:
+        where.append("date(data_contato) <= ?"); params.append(ate)
+    w = " AND ".join(where)
+    rows = db.execute(f"""
         SELECT operador_contato as operador,
                COUNT(*) as total_contatos,
                SUM(status_negociacao='cliente_ciente') as clientes_cientes,
@@ -466,11 +477,11 @@ async def ranking_operadores(db=Depends(get_db), user=Depends(requer_backoffice(
                SUM(status_negociacao='negociando') as negociando,
                MAX(data_contato) as ultimo_contato
         FROM hc_upgrades_base
-        WHERE operador_contato IS NOT NULL
+        WHERE {w}
         GROUP BY operador_contato
         ORDER BY clientes_cientes DESC, total_contatos DESC
-    """).fetchall()
-    return {"ranking": [dict(r) for r in rows]}
+    """, params).fetchall()
+    return {{"ranking": [dict(r) for r in rows]}}
 
 
 # ── Resumo por plano anterior ─────────────────────────────────
