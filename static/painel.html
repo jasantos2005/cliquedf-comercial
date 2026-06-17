@@ -1093,9 +1093,9 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
   <!-- KPIs clientes cientes -->
   <div class="kpi-row" id="upg-log-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;"></div>
   <!-- Filtros -->
-  <div style="display:flex;gap:10px;margin-bottom:16px;">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
     <input id="upg-log-busca" type="text" placeholder="Buscar cliente..." oninput="carregarUpgradeLog()"
-      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;width:200px;">
+      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;width:180px;">
     <select id="upg-log-operador" onchange="carregarUpgradeLog()"
       style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
       <option value="">Todos os operadores</option>
@@ -1104,6 +1104,14 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
       <option value="">Todas as cidades</option>
     </select>
+    <span style="font-size:12px;color:var(--muted);">De:</span>
+    <input id="upg-log-de" type="date" onchange="carregarUpgradeLog()"
+      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
+    <span style="font-size:12px;color:var(--muted);">Até:</span>
+    <input id="upg-log-ate" type="date" onchange="carregarUpgradeLog()"
+      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text);outline:none;">
+    <button onclick="document.getElementById('upg-log-de').value='';document.getElementById('upg-log-ate').value='';carregarUpgradeLog();"
+      style="background:var(--surf2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted);cursor:pointer;">✕ Limpar datas</button>
   </div>
   <div class="card">
     <div class="table-wrap">
@@ -3778,6 +3786,8 @@ async function carregarUpgradeLog(pagina = 1) {
   const busca    = document.getElementById('upg-log-busca')?.value || '';
   const operador = document.getElementById('upg-log-operador')?.value || '';
   const cidade   = document.getElementById('upg-log-cidade')?.value || '';
+  const de       = document.getElementById('upg-log-de')?.value || '';
+  const ate      = document.getElementById('upg-log-ate')?.value || '';
   const tbody    = document.getElementById('upg-log-tbody');
   tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Carregando...</td></tr>';
   try {
@@ -3796,7 +3806,7 @@ async function carregarUpgradeLog(pagina = 1) {
         const o = document.createElement('option'); o.value = o.textContent = op.operador; selOp.appendChild(o);
       }
     });
-    let url = `/api/upgrade/base?pagina=${pagina}&status=cliente_ciente&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}&operador=${encodeURIComponent(operador)}`;
+    let url = `/api/upgrade/base?pagina=${pagina}&status=cliente_ciente&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}&operador=${encodeURIComponent(operador)}&de=${de}&ate=${ate}`;
     const r = await api(url);
     let clientes = r.clientes || [];
 
