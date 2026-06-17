@@ -481,7 +481,7 @@ async def ranking_operadores(
         GROUP BY operador_contato
         ORDER BY clientes_cientes DESC, total_contatos DESC
     """, params).fetchall()
-    return {{"ranking": [dict(r) for r in rows]}}
+    return {"ranking": [dict(r) for r in rows]}
 
 
 # ── Resumo por plano anterior ─────────────────────────────────
