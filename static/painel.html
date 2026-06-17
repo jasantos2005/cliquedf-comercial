@@ -1464,7 +1464,7 @@ function navTo(page) {
     usuarios: carregarUsuarios,
     'metas': carregarMetas,
   'upgrade-base': carregarUpgradeBase,
-    'upgrade-log':  () => { carregarUpgradeLog(); carregarRankingOperadores(); },
+    'upgrade-log':  () => { carregarUpgradeLog(); },
     permissoes: carregarPermissoes,
   };
   if (loaders[page]) loaders[page]();
@@ -3766,9 +3766,9 @@ async function salvarMeta(vendedorId, mes) {
   } catch(e) { toast('Erro ao salvar.', 'err'); }
 }
 
-async function carregarRankingOperadores() {
+async function carregarRankingOperadores(de='', ate='') {
   try {
-    const r = await api('/api/upgrade/ranking-operadores');
+    const r = await api(`/api/upgrade/ranking-operadores?de=${de}&ate=${ate}`);
     const el = document.getElementById('upg-ranking-operadores');
     if (!el) return;
     if (!r.ranking || !r.ranking.length) {
@@ -3798,14 +3798,7 @@ async function carregarUpgradeLog(pagina = 1) {
       <div class="kpi" style="--ac:var(--amber)"><div class="kv">${(b.em_contato||0)+(b.negociando||0)}</div><div class="kl">Em negociação</div></div>
       <div class="kpi" style="--ac:var(--red)"><div class="kv">${b.recusou||0}</div><div class="kl">Recusaram</div></div>
     `;
-    const rk = await api(`/api/upgrade/ranking-operadores?de=${de}&ate=${ate}`);
-    const selOp = document.getElementById('upg-log-operador');
-    const opsAtuais = Array.from(selOp.options).map(o => o.value);
-    (rk.ranking||[]).forEach(op => {
-      if (!opsAtuais.includes(op.operador)) {
-        const o = document.createElement('option'); o.value = o.textContent = op.operador; selOp.appendChild(o);
-      }
-    });
+    await carregarRankingOperadores(de, ate);
     let url = `/api/upgrade/base?pagina=${pagina}&status=cliente_ciente&busca=${encodeURIComponent(busca)}&cidade=${encodeURIComponent(cidade)}&operador=${encodeURIComponent(operador)}&de=${de}&ate=${ate}`;
     const r = await api(url);
     let clientes = r.clientes || [];
