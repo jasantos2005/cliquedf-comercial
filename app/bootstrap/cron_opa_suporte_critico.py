@@ -127,18 +127,32 @@ async def main():
             cliente_nome = detalhe['id_user'].get('nome', '?')
 
         # Determinar situação real
-        tem_motivo  = len(detalhe.get('motivos', [])) > 0
-        tem_obs     = len(detalhe.get('observacoes', [])) > 0
+        tem_obs  = len(detalhe.get('observacoes', [])) > 0
+        motivos  = detalhe.get('motivos', [])
+        # Verificar se motivo é falta de comunicação
+        FALTA_COM = '665a205084d5f75ec0b077de'
+        motivo_ids = []
+        for m in motivos:
+            mid = m.get('idMotivo')
+            if isinstance(mid, dict):
+                motivo_ids.append(mid.get('_id',''))
+            else:
+                motivo_ids.append(mid or '')
+        falta_comunicacao = FALTA_COM in motivo_ids
+        tem_motivo = len(motivos) > 0
+
         if not a.get('id_atendente'):
             situacao = '❌ SEM ATENDENTE — ninguém pegou!'
-        elif tem_motivo:
-            situacao = '⏳ Motivo registrado — aguardando cliente'
+        elif falta_comunicacao:
+            situacao = '📵 Cliente não respondeu — falta de comunicação'
         elif tem_obs:
-            situacao = '⏳ Observação registrada — em acompanhamento'
-        elif mins <= 30:
-            situacao = '🟢 Atendimento recente — provavelmente em conversa'
+            situacao = '⏳ Em acompanhamento — obs registrada'
+        elif tem_motivo:
+            situacao = '⏳ Motivo registrado — aguardando resolução'
+        elif mins <= 45:
+            situacao = '🟢 Em conversa ativa — atendente interagindo'
         else:
-            situacao = '⚠️ Sem registro interno — verificar conversa no Opa'
+            situacao = '⚠️ Sem interação registrada — verificar no Opa'
 
         info = {
             '_id':       _id,
