@@ -149,10 +149,10 @@ async def main():
             situacao = '⏳ Em acompanhamento — obs registrada'
         elif tem_motivo:
             situacao = '⏳ Motivo registrado — aguardando resolução'
-        elif mins <= 45:
-            situacao = '🟢 Em conversa ativa — atendente interagindo'
+        elif mins <= 90:
+            situacao = '🟡 Provável conversa ativa — sem registro interno ainda'
         else:
-            situacao = '⚠️ Sem interação registrada — verificar no Opa'
+            situacao = '⚠️ Longo sem registro — verificar conversa no Opa'
 
         info = {
             '_id':       _id,
