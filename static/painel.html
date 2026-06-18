@@ -428,6 +428,7 @@ body.light-mode .topbar,body.light-mode .sidebar,body.light-mode .modal-box{back
 body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 </head>
 <body>
 
@@ -541,6 +542,11 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <span class="ni-label">Dashboard do dia</span>
       </div>
 
+      <div class="ni" id="ni-atendimentos" onclick="navTo('atendimentos')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <span class="ni-label">Atendimentos</span>
+        <span class="ni-badge" id="badge-atend" style="display:none;">0</span>
+      </div>
       <div class="sb-group-label">COMERCIAL</div>
       <div class="ni" id="ni-auditoria" onclick="toggleSub('sub-auditoria','ni-auditoria')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
@@ -1140,6 +1146,108 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         Abrir HubRetenção →
       </a>
     </div>
+
+<!-- PAGE: ATENDIMENTOS -->
+<div class="page" id="page-atendimentos">
+
+  <!-- BANNER ALERTAS -->
+  <div id="atend-banner" style="display:none;background:#c0021a;color:#fff;padding:9px 16px;border-radius:8px;margin-bottom:16px;font-size:13px;font-weight:500;overflow:hidden;white-space:nowrap;">
+    <span id="atend-banner-text"></span>
+  </div>
+
+  <!-- HEADER -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:20px;font-weight:800;">Monitor de Atendimentos</div>
+      <div style="font-size:13px;color:var(--muted);" id="atend-subtitulo">Carregando...</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <input type="date" id="atend-data" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;"/>
+      <button class="btn" onclick="carregarAtendimentos()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Atualizar
+      </button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div id="atend-live-dot" style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse2 2s infinite;"></div>
+        <span style="font-size:12px;color:var(--green);">Ao vivo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px;" id="atend-kpis">
+    <div class="kpi"><div class="kv" id="ak-total">—</div><div class="kl">Total</div></div>
+    <div class="kpi"><div class="kv" id="ak-fin" style="color:var(--green)">—</div><div class="kl">Finalizados</div></div>
+    <div class="kpi"><div class="kv" id="ak-ea" style="color:var(--amber)">—</div><div class="kl">Em andamento</div></div>
+    <div class="kpi"><div class="kv" id="ak-sem" style="color:var(--red)">—</div><div class="kl">Sem atendente</div></div>
+    <div class="kpi"><div class="kv" id="ak-tempo" style="color:var(--amber)">—</div><div class="kl">Tempo médio</div></div>
+    <div class="kpi"><div class="kv" id="ak-pct" style="color:var(--green)">—</div><div class="kl">Taxa finaliz.</div></div>
+  </div>
+
+  <!-- GRID PRINCIPAL -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+
+    <!-- Fila de espera -->
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">⏳ Fila de espera agora</div>
+      <div id="atend-fila">
+        <div style="color:var(--muted);padding:12px;text-align:center;">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Ranking -->
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">🏆 Ranking de atendentes</div>
+      <div id="atend-ranking">
+        <div style="color:var(--muted);padding:12px;text-align:center;">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Alertas -->
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">🚨 Alertas ativos</div>
+      <div id="atend-alertas">
+        <div style="color:var(--muted);padding:12px;text-align:center;">Carregando...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- GRID INFERIOR -->
+  <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:14px;">
+
+    <!-- Volume por hora -->
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">📊 Volume por hora</div>
+      <div style="position:relative;height:160px;">
+        <canvas id="atend-horas-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Motivos -->
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">💬 Motivos</div>
+      <div id="atend-motivos">
+        <div style="color:var(--muted);">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- Departamentos -->
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">📂 Departamentos</div>
+      <div id="atend-deptos">
+        <div style="color:var(--muted);">Carregando...</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+<style>
+@keyframes pulse2{0%,100%{opacity:1}50%{opacity:.3}}
+</style>
+</body>
+</html>
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /shell -->
@@ -1426,6 +1534,7 @@ function toggleSub(subId, niId) {
 
 // ── NAVEGAÇÃO ────────────────────────────────────────────────
 const PAGE_TITLES = {
+  atendimentos: 'Atendimentos',
   dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria', 'liberacoes': 'Liberações — Vendas Reprovadas',
   'vendas-lista': 'Vendas Realizadas — IXC', 'vendas-hub': 'Vendas — Hub Comercial',
   clientes: 'Clientes Ativados', ranking: 'Ranking de Vendedores',
@@ -1437,6 +1546,13 @@ const PAGE_TITLES = {
 };
 
 function navTo(page) {
+  if(page==='atendimentos'){
+    document.getElementById('filterbar').style.display='none';
+    _atendIniciar();
+  } else {
+    document.getElementById('filterbar').style.display='';
+    _atendParar();
+  }
   if (page === 'mapa-vendas') { setTimeout(carregarMapa, 100); }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
@@ -1466,6 +1582,7 @@ function navTo(page) {
   'upgrade-base': carregarUpgradeBase,
     'upgrade-log':  () => { carregarUpgradeLog(); },
     permissoes: carregarPermissoes,
+    atendimentos: carregarAtendimentos,
   };
   if (loaders[page]) loaders[page]();
 }
@@ -3082,6 +3199,106 @@ async function _tvCarregarTelas() {
     _tvTelas.push('<div style="color:var(--red);padding:32px;">Erro ao carregar auditoria IXC.</div>');
   }
 
+
+  // ── Tela OPA: Monitor de Atendimentos ──────────────────────
+  try {
+    const hoje2 = new Date();
+    const dataHoje = hoje2.getFullYear()+'-'+String(hoje2.getMonth()+1).padStart(2,'0')+'-'+String(hoje2.getDate()).padStart(2,'0');
+    const nomesOpa = {
+      '659c3d7dae4972531a907916':'Johnatan David',
+      '68c81c2e21ad7f45d635901f':'Amanda Gomes',
+      '682b6d07f497f37f8eb35338':'Karine Ferreira',
+      '6659e00cbd1e771abfd2aefc':'Rudinedja Santos',
+      '659c4448f2a21eee31c7ad36':'Manuela Tavares',
+    };
+    const deptosOpa = {
+      '5bf73d1d186f7d2b0d647a61':'Suporte',
+      '5bf73d1d186f7d2b0d647a60':'Comercial',
+      '5d1624085e74a002308aa25e':'Financeiro',
+      '5bf73d1d186f7d2b0d647a64':'Ag. Virtual',
+      '5d1629315e74a002308aa262':'Renegociações',
+    };
+
+    const resOpa = await api('/api/painel/opa/atendimentos?data='+dataHoje).catch(()=>({data:[]}));
+    const atends = resOpa.data || [];
+    const total   = atends.length;
+    const finalizados  = atends.filter(a=>a.status==='F').length;
+    const emAndamento  = atends.filter(a=>a.status==='EA').length;
+    const semAtendente = atends.filter(a=>a.status==='EA'&&!a.id_atendente).length;
+
+    let tempos = [];
+    atends.filter(a=>a.status==='F'&&a.date&&a.fim).forEach(a=>{
+      const m = (new Date(a.fim)-new Date(a.date))/60000;
+      if(m>0) tempos.push(m);
+    });
+    const tMedio = tempos.length ? Math.round(tempos.reduce((s,v)=>s+v,0)/tempos.length) : 0;
+    const pct = total ? Math.round(finalizados/total*100) : 0;
+
+    const rank = {};
+    atends.forEach(a=>{
+      if(!a.id_atendente) return;
+      if(!rank[a.id_atendente]) rank[a.id_atendente]={total:0,fin:0};
+      rank[a.id_atendente].total++;
+      if(a.status==='F') rank[a.id_atendente].fin++;
+    });
+    const rankArr = Object.entries(rank)
+      .map(([id,v])=>({nome:nomesOpa[id]||id.slice(0,8),total:v.total,fin:v.fin,pct:Math.round(v.fin/v.total*100)}))
+      .sort((a,b)=>b.total-a.total).slice(0,5);
+
+    const fila = atends.filter(a=>a.status==='EA'&&!a.id_atendente).slice(0,5);
+    const filaHtml = fila.length ? fila.map(a=>{
+      const mins = Math.round((new Date()-new Date(a.date))/60000);
+      const cor  = mins>=20?'var(--red)':mins>=10?'var(--amber)':'var(--green)';
+      const dep  = deptosOpa[a.setor]||'?';
+      const proto = esc(a.protocolo||'?');
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">'
+        +'<div style="flex:1;font-size:13px;">'+proto+' · '+dep+'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+cor+';">'+mins+' min</div>'
+        +'</div>';
+    }).join('') : '<div style="color:var(--muted);padding:12px;">Nenhum cliente aguardando</div>';
+
+    const rankHtml = rankArr.length ? rankArr.map((v,i)=>{
+      const medal = i<3?['🥇','🥈','🥉'][i]:(i+1)+'º';
+      const pctCor = v.pct>=80?'var(--green)':v.pct>=50?'var(--amber)':'var(--red)';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">'
+        +'<div style="font-size:20px;width:28px;text-align:center;">'+medal+'</div>'
+        +'<div style="flex:1;font-size:14px;font-weight:700;">'+esc(v.nome)+'</div>'
+        +'<div style="font-size:20px;font-weight:900;color:var(--cyan);">'+v.total+'</div>'
+        +'<div style="font-size:12px;padding:2px 8px;border-radius:4px;background:rgba(0,0,0,.2);color:'+pctCor+';">'+v.pct+'%</div>'
+        +'</div>';
+    }).join('') : '<div style="color:var(--muted);padding:16px;">Sem dados ainda</div>';
+
+    const corTM  = tMedio>120?'var(--red)':tMedio>60?'var(--amber)':'var(--green)';
+    const corSem = semAtendente>0?'var(--red)':'var(--green)';
+    const alertaBanner = semAtendente>0
+      ? '<div style="background:rgba(220,38,38,.15);border:1px solid var(--red);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--red);font-weight:600;">🚨 '+semAtendente+' cliente(s) sem atendente agora</div>'
+      : '<div style="background:rgba(0,200,100,.1);border:1px solid var(--green);border-radius:8px;padding:8px 14px;font-size:12px;color:var(--green);font-weight:600;">✅ Tudo sob controle</div>';
+
+    _tvTelas.push(
+      '<div style="display:flex;flex-direction:column;height:100%;gap:14px;">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;">'
+      +'<div style="font-size:20px;font-weight:800;">📞 Monitor de Atendimentos — Hoje</div>'
+      +alertaBanner
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">'
+      +'<div class="tv-kpi" style="--ac:var(--cyan)"><div class="tv-v">'+total+'</div><div class="tv-l">Total hoje</div></div>'
+      +'<div class="tv-kpi" style="--ac:var(--green)"><div class="tv-v">'+finalizados+'</div><div class="tv-l">Finalizados ('+pct+'%)</div></div>'
+      +'<div class="tv-kpi" style="--ac:var(--amber)"><div class="tv-v">'+emAndamento+'</div><div class="tv-l">Em andamento</div></div>'
+      +'<div class="tv-kpi" style="--ac:'+corSem+'"><div class="tv-v">'+semAtendente+'</div><div class="tv-l">Sem atendente</div></div>'
+      +'<div class="tv-kpi" style="--ac:'+corTM+'"><div class="tv-v">'+tMedio+'<span style="font-size:18px;">m</span></div><div class="tv-l">Tempo médio</div></div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;overflow:hidden;">'
+      +'<div class="card" style="overflow:auto;"><div class="sec-title" style="margin-bottom:12px;">🏆 Ranking de atendentes</div>'+rankHtml+'</div>'
+      +'<div class="card" style="overflow:auto;"><div class="sec-title" style="margin-bottom:12px;">⏳ Fila de espera agora</div>'+filaHtml+'</div>'
+      +'</div>'
+      +'</div>'
+    );
+  } catch(e) {
+    console.error('TV tela OPA:', e);
+    _tvTelas.push('<div style="color:var(--red);padding:32px;">Erro ao carregar monitor: '+e.message+'</div>');
+  }
+
+    // ── Telas vendedores ──────────────────────────────────────────
   // ── Telas 2-N: Um vendedor por tela ──────────────────────────────────────
   const _agora2 = new Date(); const hoje = _agora2.getFullYear()+'-'+String(_agora2.getMonth()+1).padStart(2,'0')+'-'+String(_agora2.getDate()).padStart(2,'0');
   const anoInicio = hoje.slice(0,4) + '-01-01';
@@ -3966,7 +4183,225 @@ document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('mapa-data');
   if (inp) inp.value = new Date().toISOString().slice(0,10);
 });
+
+// ── ATENDIMENTOS ─────────────────────────────────────────────
+const _atendNomes = {
+  '659c3d7dae4972531a907916':'Johnatan David',
+  '68c81c2e21ad7f45d635901f':'Amanda Gomes',
+  '682b6d07f497f37f8eb35338':'Karine Ferreira',
+  '6659e00cbd1e771abfd2aefc':'Rudinedja Santos',
+  '659c4448f2a21eee31c7ad36':'Manuela Tavares',
+  '5d1642ad4b16a50312cc8f4d':'Caique (bot)',
+};
+const _atendDeptos = {
+  '5bf73d1d186f7d2b0d647a61':'Suporte',
+  '5bf73d1d186f7d2b0d647a60':'Comercial',
+  '5d1624085e74a002308aa25e':'Financeiro',
+  '5bf73d1d186f7d2b0d647a64':'Ag. Virtual',
+  '5d1629315e74a002308aa262':'Renegociações',
+};
+const _atendMotivos = {
+  '65a18e3bae4972531a90d0a1':'Resolvido no atend.',
+  '665a205084d5f75ec0b077de':'Falta de comunicação',
+  '65a18e11ae4972531a90d06d':'2ª via de boleto',
+  '65a18d45f2a21eee31c88395':'Comprovante pgto.',
+  '65a18e4ef2a21eee31c88491':'Orientação/Dúvida',
+  '65a18da2ae4972531a90d014':'Dúv. visita técnica',
+  '65a18e2ef2a21eee31c8846e':'Transf. outro setor',
+  '65a18d38ae4972531a90cfae':'Central do cliente',
+  '65a18d55ae4972531a90cfd3':'Promessa de pgto.',
+  '65a18d64f2a21eee31c883cc':'Mudança de endereço',
+  '6643c64684d5f75ec0a9155a':'Verificar conexão',
+  '65a18dd2ae4972531a90d030':'Troca SSID/Senha',
+};
+let _atendChart = null;
+let _atendTimer = null;
+
+async function carregarAtendimentos() {
+  const inp = document.getElementById('atend-data');
+  const data = inp ? inp.value : '';
+  const url  = '/api/painel/opa/atendimentos' + (data ? '?data='+data : '');
+  const hoje = new Date().toISOString().slice(0,10);
+  const ehHoje = !data || data === hoje;
+
+  document.getElementById('atend-subtitulo').textContent =
+    (data && data !== hoje) ? 'Histórico: '+data : 'Atualizado: '+new Date().toLocaleTimeString('pt-BR');
+
+  let atends = [];
+  try {
+    const r = await api(url);
+    atends = r.data || [];
+  } catch(e) { return; }
+
+  const total = atends.length;
+  const fin   = atends.filter(a=>a.status==='F').length;
+  const ea    = atends.filter(a=>a.status==='EA').length;
+  const sem   = atends.filter(a=>a.status==='EA'&&!a.id_atendente).length;
+  const pct   = total ? Math.round(fin/total*100) : 0;
+
+  let tempos = [];
+  atends.filter(a=>a.status==='F'&&a.date&&a.fim).forEach(a=>{
+    const m = (new Date(a.fim)-new Date(a.date))/60000;
+    if(m>0) tempos.push(m);
+  });
+  const tMedio = tempos.length ? Math.round(tempos.reduce((s,v)=>s+v,0)/tempos.length) : 0;
+
+  document.getElementById('ak-total').textContent  = total;
+  document.getElementById('ak-fin').textContent    = fin;
+  document.getElementById('ak-ea').textContent     = ea;
+  document.getElementById('ak-sem').textContent    = sem;
+  document.getElementById('ak-tempo').textContent  = tMedio+'m';
+  document.getElementById('ak-pct').textContent    = pct+'%';
+  document.getElementById('ak-sem').style.color    = sem>0?'var(--red)':'var(--green)';
+  document.getElementById('ak-tempo').style.color  = tMedio>120?'var(--red)':tMedio>60?'var(--amber)':'var(--green)';
+
+  // Badge menu
+  const badge = document.getElementById('badge-atend');
+  if(sem>0){ badge.textContent=sem; badge.style.display=''; }
+  else { badge.style.display='none'; }
+
+  // Banner alertas
+  const banner = document.getElementById('atend-banner');
+  const bannerAlertas = [];
+  // Buscar fila AG (aguardando atendente)
+  let filaAG = [];
+  try { const rFila = await api('/api/painel/opa/fila'); filaAG = rFila.data || []; } catch(e) {}
+  const totalFila = sem + filaAG.length;
+  if(totalFila>0) bannerAlertas.push('🚨 '+totalFila+' cliente(s) aguardando atendente agora');
+  const longos = atends.filter(a=>a.status==='EA'&&a.id_atendente&&a.date&&(new Date()-new Date(a.date))/60000>60).length;
+  if(longos>0) bannerAlertas.push('⚠️ '+longos+' atendimento(s) aberto(s) há mais de 1h');
+  if(tMedio>120) bannerAlertas.push('⚠️ Tempo médio crítico: '+tMedio+' min');
+  if(bannerAlertas.length){
+    banner.style.display='block';
+    document.getElementById('atend-banner-text').textContent = bannerAlertas.join('   |   ');
+  } else {
+    banner.style.display='none';
+  }
+
+  // Fila
+  const fila = atends.filter(a=>a.status==='EA'&&!a.id_atendente).slice(0,6);
+  // Adicionar fila AG ao array de fila
+  const filaComAG = [...fila, ...filaAG.slice(0, 6)];
+  // Atualizar card sem atendente com total real
+  document.getElementById('ak-sem').textContent = totalFila;
+  document.getElementById('ak-sem').style.color = totalFila>0?'var(--red)':'var(--green)';
+
+  const filaEl = document.getElementById('atend-fila');
+  if(!filaComAG.length){
+    filaEl.innerHTML='<div style="color:var(--green);padding:12px;text-align:center;">✅ Nenhum cliente aguardando</div>';
+  } else {
+    filaEl.innerHTML = filaComAG.map(a=>{
+      const mins = Math.round((new Date()-new Date(a.date))/60000);
+      const cor  = mins>=20?'var(--red)':mins>=10?'var(--amber)':'var(--green)';
+      const dep  = _atendDeptos[a.setor]||'?';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
+        +'<div style="flex:1;">'
+        +'<div style="font-size:13px;font-weight:600;">'+esc(a.protocolo||'?')+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);">'+dep+'</div>'
+        +'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+cor+';">'+mins+' min</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  // Ranking
+  const rank = {};
+  atends.forEach(a=>{
+    if(!a.id_atendente) return;
+    if(!rank[a.id_atendente]) rank[a.id_atendente]={total:0,fin:0};
+    rank[a.id_atendente].total++;
+    if(a.status==='F') rank[a.id_atendente].fin++;
+  });
+  const rankArr = Object.entries(rank)
+    .map(([id,v])=>({nome:_atendNomes[id]||id.slice(0,8),total:v.total,fin:v.fin,pct:Math.round(v.fin/v.total*100)}))
+    .sort((a,b)=>b.total-a.total).slice(0,5);
+  const medals = ['🥇','🥈','🥉','4º','5º'];
+  document.getElementById('atend-ranking').innerHTML = rankArr.map((v,i)=>{
+    const cor = v.pct>=80?'var(--green)':v.pct>=50?'var(--amber)':'var(--red)';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
+      +'<span style="font-size:18px;width:24px;">'+medals[i]+'</span>'
+      +'<span style="flex:1;font-size:13px;font-weight:600;">'+esc(v.nome)+'</span>'
+      +'<span style="font-size:16px;font-weight:800;color:var(--cyan);">'+v.total+'</span>'
+      +'<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surf2);color:'+cor+';">'+v.pct+'%</span>'
+      +'</div>';
+  }).join('') || '<div style="color:var(--muted);padding:12px;">Sem dados</div>';
+
+  // Alertas
+  const alertasEl = [];
+  if(sem>0) alertasEl.push({icon:'🚨',tipo:'danger',titulo:sem+' cliente(s) sem atendente',sub:'Aguardando há mais de 15 min'});
+  if(longos>0) alertasEl.push({icon:'⚠️',tipo:'warning',titulo:longos+' atend. longos (>1h)',sub:'Suporte parado = cliente sem internet'});
+  if(tMedio>120) alertasEl.push({icon:'⚠️',tipo:'warning',titulo:'Tempo médio: '+tMedio+' min',sub:'Meta: abaixo de 45 min'});
+  if(!alertasEl.length) alertasEl.push({icon:'✅',tipo:'ok',titulo:'Tudo sob controle',sub:'Nenhum alerta ativo no momento'});
+  const corAlerta = {danger:'var(--red)',warning:'var(--amber)',ok:'var(--green)'};
+  document.getElementById('atend-alertas').innerHTML = alertasEl.map(a=>
+    '<div style="display:flex;gap:10px;padding:10px;border-radius:8px;background:var(--surf2);margin-bottom:8px;">'
+    +'<span style="font-size:18px;">'+a.icon+'</span>'
+    +'<div><div style="font-size:13px;font-weight:600;color:'+corAlerta[a.tipo]+';">'+a.titulo+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);">'+a.sub+'</div></div>'
+    +'</div>'
+  ).join('');
+
+  // Volume por hora
+  const horas = Array(24).fill(0);
+  atends.forEach(a=>{ try{ const h=(new Date(a.date).getHours()-3+24)%24; horas[h]++; }catch(e){} });
+  const labels = Array.from({length:24},(_,i)=>i+'h');
+  const colors = horas.map(v=>v>=12?'#E24B4A':v>=8?'#BA7517':'#378ADD');
+  if(_atendChart) _atendChart.destroy();
+  const ctx = document.getElementById('atend-horas-chart');
+  if(ctx) _atendChart = new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{data:horas,backgroundColor:colors,borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{font:{size:9},color:'#888'},grid:{color:'rgba(255,255,255,.05)'}},
+              y:{ticks:{font:{size:10},color:'#888'},grid:{color:'rgba(255,255,255,.05)'},beginAtZero:true}}}
+  });
+
+  // Motivos
+  const motivosCont = {};
+  atends.forEach(a=>(a.motivos||[]).forEach(m=>{ motivosCont[m.idMotivo]=(motivosCont[m.idMotivo]||0)+1; }));
+  const motivosArr = Object.entries(motivosCont).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const maxM = motivosArr[0]?motivosArr[0][1]:1;
+  document.getElementById('atend-motivos').innerHTML = motivosArr.map(([id,cnt])=>{
+    const nome = _atendMotivos[id]||id.slice(0,12);
+    const w = Math.round(cnt/maxM*100);
+    const cor = nome.includes('Falta')?'#E24B4A':nome.includes('Resolvido')?'#1D9E75':'#378ADD';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);">'
+      +'<span style="flex:1;font-size:12px;">'+nome+'</span>'
+      +'<div style="width:70px;height:5px;background:var(--surf2);border-radius:3px;">'
+      +'<div style="width:'+w+'%;height:5px;border-radius:3px;background:'+cor+';"></div></div>'
+      +'<span style="font-size:12px;font-weight:600;width:20px;text-align:right;">'+cnt+'</span>'
+      +'</div>';
+  }).join('') || '<div style="color:var(--muted);font-size:12px;">Sem dados</div>';
+
+  // Departamentos
+  const deptosCont = {};
+  atends.forEach(a=>{ const d=_atendDeptos[a.setor]||'?'; deptosCont[d]=(deptosCont[d]||0)+1; });
+  const deptosArr = Object.entries(deptosCont).sort((a,b)=>b[1]-a[1]);
+  const dCores = ['#378ADD','#1D9E75','#BA7517','#8B5CF6','#E24B4A'];
+  document.getElementById('atend-deptos').innerHTML = deptosArr.map(([nome,cnt],i)=>{
+    const pct2 = total ? Math.round(cnt/total*100) : 0;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">'
+      +'<div style="width:8px;height:8px;border-radius:50%;background:'+dCores[i%5]+';flex-shrink:0;"></div>'
+      +'<span style="flex:1;font-size:13px;">'+nome+'</span>'
+      +'<span style="font-size:11px;color:var(--muted);">'+pct2+'%</span>'
+      +'<span style="font-size:13px;font-weight:600;">'+cnt+'</span>'
+      +'</div>';
+  }).join('') || '<div style="color:var(--muted);">Sem dados</div>';
+}
+
+function _atendIniciar() {
+  const inp = document.getElementById('atend-data');
+  if(inp) inp.value = new Date().toISOString().slice(0,10);
+  carregarAtendimentos();
+  if(_atendTimer) clearInterval(_atendTimer);
+  _atendTimer = setInterval(carregarAtendimentos, 30000);
+}
+function _atendParar() {
+  if(_atendTimer){ clearInterval(_atendTimer); _atendTimer=null; }
+}
+
 </script>
 
-</body>
-</html>
+
+
+

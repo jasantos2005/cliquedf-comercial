@@ -1241,3 +1241,51 @@ async def teste_foto(foto: UploadFile = FastAPIFile(...)):
     kb = dest.stat().st_size // 1024
     return {"ok": True, "width": img.width, "height": img.height,
             "kb": kb, "url": "/uploads/teste_foto.jpg"}
+
+
+
+# ── OPA Suite: Monitor de Atendimentos ──────────────────────────
+import httpx
+
+OPA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY1OWMzYjk5ZjJhMjFlZWUzMWM3YWEzYSIsImlhdCI6MTc3MDgzODM5OH0.VNIC3HqVGIxuHQoesd-5jftTVkEMd6jionH9pkyKeAM'
+OPA_BASE  = 'https://cliquedf.opasuite.com.br/api/v1'
+
+@router.get('/opa/atendimentos')
+async def opa_atendimentos(data: str = None):
+    from datetime import date
+    import json
+    if not data:
+        data = str(date.today())
+    payload = {"filter": {"dataInicialAbertura": data, "dataFinalAbertura": data}, "options": {"limit": 200}}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.request(
+                method='GET',
+                url=f'{OPA_BASE}/atendimento',
+                headers={'Authorization': f'Bearer {OPA_TOKEN}', 'Content-Type': 'application/json'},
+                content=json.dumps(payload).encode()
+            )
+        return r.json()
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'data': []}
+
+@router.get('/opa/fila')
+async def opa_fila():
+    import json
+    from datetime import date
+    hoje = str(date.today())
+    payload = {"filter": {"status": "AG"}, "options": {"limit": 100}}
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.request(
+                method='GET',
+                url=f'{OPA_BASE}/atendimento',
+                headers={'Authorization': f'Bearer {OPA_TOKEN}', 'Content-Type': 'application/json'},
+                content=json.dumps(payload).encode()
+            )
+        data = r.json()
+        # Filtrar apenas os de hoje
+        atends = [a for a in data.get('data', []) if a.get('date','')[:10] == hoje]
+        return {'status': 'success', 'data': atends}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'data': []}
