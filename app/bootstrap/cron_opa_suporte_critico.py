@@ -118,13 +118,27 @@ async def main():
         proto     = a.get('protocolo', '?')
         canal_cli = a.get('canal_cliente', '').replace('@c.us', '')
 
-        # Buscar nome do cliente no detalhe
+        # Buscar nome do cliente e situação real no detalhe
         detalhe = await buscar_detalhe(_id)
         cliente_nome = '?'
         if isinstance(detalhe.get('id_cliente'), dict):
             cliente_nome = detalhe['id_cliente'].get('nome', '?')
         elif isinstance(detalhe.get('id_user'), dict):
             cliente_nome = detalhe['id_user'].get('nome', '?')
+
+        # Determinar situação real
+        tem_motivo  = len(detalhe.get('motivos', [])) > 0
+        tem_obs     = len(detalhe.get('observacoes', [])) > 0
+        if not a.get('id_atendente'):
+            situacao = '❌ SEM ATENDENTE — ninguém pegou!'
+        elif tem_motivo:
+            situacao = '⏳ Motivo registrado — aguardando cliente'
+        elif tem_obs:
+            situacao = '⏳ Observação registrada — em acompanhamento'
+        elif mins <= 30:
+            situacao = '🟢 Atendimento recente — provavelmente em conversa'
+        else:
+            situacao = '⚠️ Sem registro interno — verificar conversa no Opa'
 
         info = {
             '_id':       _id,
@@ -134,6 +148,7 @@ async def main():
             'canal':     canal_cli,
             'status':    status,
             'cliente':   cliente_nome,
+            'situacao':  situacao,
         }
 
         if mins >= LIMITE_GRAVE:
@@ -159,7 +174,8 @@ async def main():
                 f"🔴 *{r['proto']}* — *{h}h{m:02d}min* parado\n"
                 f"   🧑 Cliente: *{r['cliente'][:30]}*\n"
                 f"   👤 Atendente: *{atd}*\n"
-                f"   📱 {r['canal']} | {st}"
+                f"   📋 {r['situacao']}\n"
+                f"   📱 {r['canal']}"
             )
             novos_ids.append(r['_id'])
 
@@ -185,7 +201,8 @@ async def main():
                 f"⚠️ *{r['proto']}* — *{h}h{m:02d}min* parado\n"
                 f"   🧑 Cliente: *{r['cliente'][:30]}*\n"
                 f"   👤 Atendente: *{atd}*\n"
-                f"   📱 {r['canal']} | {st}"
+                f"   📋 {r['situacao']}\n"
+                f"   📱 {r['canal']}"
             )
             novos_ids.append(r['_id'])
 
