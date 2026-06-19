@@ -9,3 +9,6 @@ __pycache__/
 .DS_Store
 comercial.db
 *.xlsx
+*.patch
+*.db-shm
+*.db-wal
