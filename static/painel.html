@@ -547,6 +547,11 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <span class="ni-label">Atendimentos</span>
         <span class="ni-badge" id="badge-atend" style="display:none;">0</span>
       </div>
+      <div class="ni" id="ni-pendencias" onclick="navTo('pendencias')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="ni-label">Pendências</span>
+        <span class="ni-badge" id="badge-pend" style="display:none;background:#E24B4A;">0</span>
+      </div>
       <div class="sb-group-label">COMERCIAL</div>
       <div class="ni" id="ni-auditoria" onclick="toggleSub('sub-auditoria','ni-auditoria')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
@@ -1355,6 +1360,131 @@ function abrirListaAtend(tipo) {
   }
 }
 </script>
+
+<!-- PAGE: PENDÊNCIAS -->
+<div class="page" id="page-pendencias">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:20px;font-weight:800;">⏳ Pendências</div>
+      <div style="font-size:13px;color:var(--muted);" id="pend-sub">Carregando...</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <select id="pend-atend" onchange="renderPend()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;">
+        <option value="">Todos atendentes</option>
+      </select>
+      <select id="pend-depto" onchange="renderPend()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;">
+        <option value="">Todos deptos</option>
+        <option>Suporte</option><option>Comercial</option>
+        <option>Financeiro</option><option>Ag. Virtual</option><option>Renegociações</option>
+      </select>
+      <button class="btn" onclick="carregarPendencias()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div class="card" style="overflow:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--muted);">
+          <th style="padding:10px 12px;text-align:left;">Protocolo</th>
+          <th style="padding:10px 12px;text-align:left;">Cliente</th>
+          <th style="padding:10px 12px;text-align:left;">Atendente</th>
+          <th style="padding:10px 12px;text-align:left;">Depto</th>
+          <th style="padding:10px 12px;text-align:left;">Abertura</th>
+          <th style="padding:10px 12px;text-align:left;">Tempo</th>
+          <th style="padding:10px 12px;text-align:left;">Status</th>
+        </tr>
+      </thead>
+      <tbody id="pend-tbody">
+        <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+var _pendData = [];
+var _pendNomes = {};
+
+function carregarPendencias() {
+  document.getElementById('pend-sub').textContent = 'Carregando...';
+  var hoje = new Date().toISOString().slice(0,10);
+  api('/api/painel/opa/atendimentos?data='+hoje).then(function(r){
+    _pendData = (r.data||[]).filter(function(a){ return a.status==='EA'||a.status==='AG'; });
+
+    // Badge no menu
+    var b = document.getElementById('badge-pend');
+    if(b){ b.textContent=_pendData.length; b.style.display=_pendData.length?'':'none'; }
+
+    // Popular filtro atendentes
+    var sel = document.getElementById('pend-atend');
+    var cur = sel.value;
+    var atds = {};
+    _pendData.forEach(function(a){ if(a.id_atendente) atds[a.id_atendente]=_atendNomes[a.id_atendente]||'?'; });
+    sel.innerHTML = '<option value="">Todos atendentes</option>';
+    Object.keys(atds).sort(function(a,b){return atds[a].localeCompare(atds[b]);}).forEach(function(id){
+      var o=document.createElement('option'); o.value=id; o.textContent=atds[id];
+      if(id===cur) o.selected=true; sel.appendChild(o);
+    });
+
+    document.getElementById('pend-sub').textContent = _pendData.length+' pendente(s) — '+new Date().toLocaleTimeString('pt-BR');
+    renderPend();
+
+    // Buscar nomes em batch
+    var tels = _pendData.map(function(a){return (a.canal_cliente||'').replace('@c.us','');}).filter(Boolean);
+    if(tels.length){
+      fetch('/api/painel/opa/clientes-nomes',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({tels:tels})
+      }).then(function(r){return r.json();}).then(function(r){
+        _pendNomes=r.nomes||{}; renderPend();
+      }).catch(function(){});
+    }
+  }).catch(function(){
+    document.getElementById('pend-sub').textContent='Erro ao carregar';
+  });
+}
+
+function renderPend() {
+  var fa = document.getElementById('pend-atend').value;
+  var fd = document.getElementById('pend-depto').value;
+  var lista = _pendData.filter(function(a){
+    if(fa && a.id_atendente!==fa) return false;
+    if(fd && (_atendDeptos[a.setor]||'?')!==fd) return false;
+    return true;
+  }).sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+
+  var tbody = document.getElementById('pend-tbody');
+  if(!lista.length){
+    tbody.innerHTML='<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Nenhuma pendência</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(function(a){
+    var mins = Math.round((new Date()-new Date(a.date))/60000);
+    var h=Math.floor(mins/60), m=mins%60;
+    var cor = mins>=120?'var(--red)':mins>=60?'var(--amber)':'var(--green)';
+    var dep = _atendDeptos[a.setor]||'?';
+    var atd = _atendNomes[a.id_atendente]||'<em style="color:var(--red)">Sem atendente</em>';
+    var tel = (a.canal_cliente||'').replace('@c.us','');
+    var nome = _pendNomes[tel]||tel||'?';
+    var dt = new Date(a.date).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+    var st = a.status==='AG'
+      ? '<span style="color:var(--red);font-size:11px;">🔴 Aguardando</span>'
+      : '<span style="color:var(--amber);font-size:11px;">🟡 Em andamento</span>';
+    return '<tr onclick="mostrarAtend(this)" data-id="'+a._id+'" data-proto="'+(a.protocolo||'?')+'" data-tel="'+tel
+      +'" data-atd="'+(_atendNomes[a.id_atendente]||'Sem atendente')+'" data-dep="'+dep
+      +'" data-mins="'+mins+'" data-st="'+a.status
+      +'" style="border-bottom:1px solid var(--border);cursor:pointer;">'
+      +'<td style="padding:10px 12px;font-weight:600;color:var(--cyan);">'+(a.protocolo||'?')+'</td>'
+      +'<td style="padding:10px 12px;">'+nome+'</td>'
+      +'<td style="padding:10px 12px;">'+atd+'</td>'
+      +'<td style="padding:10px 12px;">'+dep+'</td>'
+      +'<td style="padding:10px 12px;color:var(--muted);font-size:12px;">'+dt+'</td>'
+      +'<td style="padding:10px 12px;font-weight:700;color:'+cor+';">'+(h>0?h+'h':'')+m+'min</td>'
+      +'<td style="padding:10px 12px;">'+st+'</td>'
+      +'</tr>';
+  }).join('');
+}
+</script>
 </body>
 </html>
     </div><!-- /content -->
@@ -1644,6 +1774,7 @@ function toggleSub(subId, niId) {
 // ── NAVEGAÇÃO ────────────────────────────────────────────────
 const PAGE_TITLES = {
   atendimentos: 'Atendimentos',
+  pendencias: 'Pendências',
   dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria', 'liberacoes': 'Liberações — Vendas Reprovadas',
   'vendas-lista': 'Vendas Realizadas — IXC', 'vendas-hub': 'Vendas — Hub Comercial',
   clientes: 'Clientes Ativados', ranking: 'Ranking de Vendedores',
@@ -1692,6 +1823,7 @@ function navTo(page) {
     'upgrade-log':  () => { carregarUpgradeLog(); },
     permissoes: carregarPermissoes,
     atendimentos: carregarAtendimentos,
+    pendencias: () => carregarPendencias(),
   };
   if (loaders[page]) loaders[page]();
 }
