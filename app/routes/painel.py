@@ -1404,11 +1404,15 @@ async def opa_historico_os(body: dict):
             sql = (
                 "SELECT o.id, o.id_assunto, o.status, o.data_abertura, o.data_fechamento,"
                 " c.telefone_celular, c.fone, c.whatsapp, f.funcionario as tecnico,"
+                " o.mensagem as obs_abertura,"
                 " CASE o.id_assunto"
                 " WHEN 16 THEN 'Manutencao'"
                 " WHEN 20 THEN 'Sem acesso'"
                 " WHEN 21 THEN 'Internet lenta'"
-                " ELSE 'Outro' END as assunto"
+                " ELSE 'Outro' END as assunto,"
+                " (SELECT m.mensagem FROM su_oss_chamado_mensagem m"
+                "  WHERE m.id_chamado = o.id AND m.status = 'F'"
+                "  ORDER BY m.data DESC LIMIT 1) as obs_fechamento"
                 " FROM su_oss_chamado o"
                 " JOIN cliente c ON c.id = o.id_cliente"
                 " LEFT JOIN funcionarios f ON f.id = o.id_tecnico"
@@ -1429,6 +1433,8 @@ async def opa_historico_os(body: dict):
                 'data_abertura': str(row['data_abertura']) if row['data_abertura'] else None,
                 'data_fechamento': str(row['data_fechamento']) if row['data_fechamento'] else None,
                 'tecnico': row['tecnico'],
+                'obs_abertura': (row.get('obs_abertura') or '')[:200],
+                'obs_fechamento': (row.get('obs_fechamento') or '')[:300],
             }
             for campo in ['telefone_celular', 'fone', 'whatsapp']:
                 val = row.get(campo) or ''
