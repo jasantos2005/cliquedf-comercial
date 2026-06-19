@@ -1326,24 +1326,26 @@ function abrirListaAtend(tipo) {
       return '<div onclick="mostrarAtend(this)" data-id="'+a._id+'" data-proto="'+(a.protocolo||'?')+'" data-tel="'+tel+'" data-atd="'+atd+'" data-dep="'+dep+'" data-mins="'+mins+'" data-st="'+a.status+'" style="display:flex;align-items:center;gap:10px;padding:10px;background:#1e1e2e;border-radius:8px;cursor:pointer;">'
         +'<div style="flex:1;">'
         +'<div style="font-size:13px;font-weight:600;color:#fff;">'+(a.protocolo||'?')+'</div>'
-        +'<div style="font-size:12px;color:#ccc;" id="nlst-'+a._id+'">?</div>'
+        +'<div style="font-size:12px;color:#ccc;" id="nlst-'+a._id+'">📱 '+(a.canal_cliente||'?').replace('@c.us','')+'</div>'
         +'<div style="font-size:11px;color:#888;">'+dep+' · '+atd+'</div>'
         +'</div>'
         +'<div style="font-size:13px;font-weight:700;color:'+cor+';">'+(h>0?h+'h':'')+m+'min ›</div>'
         +'</div>';
     }).join('');
-    // Buscar nomes em paralelo
-    filtrados.forEach(function(a){
-      api('/api/painel/opa/atendimento/'+a._id).then(function(r){
-        var d=r.data||{},nome='?';
-        if(d.id_cliente&&typeof d.id_cliente==='object') nome=d.id_cliente.nome||'?';
-        else if(d.id_user&&typeof d.id_user==='object') nome=d.id_user.nome||'?';
-        var el=document.getElementById('nlst-'+a._id);
-        if(el) el.textContent=nome;
-      }).catch(function(){});
-    });
+
   }
   document.getElementById('modal-lista-atend').style.display='flex';
+  // Buscar nomes no IXC pelo telefone
+  filtrados.forEach(function(a){
+    var tel=(a.canal_cliente||'').replace('@c.us','');
+    if(!tel) return;
+    fetch('/api/painel/opa/cliente-nome?tel='+encodeURIComponent(tel))
+      .then(function(r){return r.json();})
+      .then(function(r){
+        var el=document.getElementById('nlst-'+a._id);
+        if(el&&r.nome&&r.nome!=='?') el.textContent=r.nome;
+      }).catch(function(){});
+  });
 }
 </script>
 </body>

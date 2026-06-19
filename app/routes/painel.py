@@ -1289,3 +1289,33 @@ async def opa_fila():
         return {'status': 'success', 'data': atends}
     except Exception as e:
         return {'status': 'error', 'message': str(e), 'data': []}
+
+@router.get('/opa/cliente-nome')
+async def opa_cliente_nome(tel: str = ''):
+    from app.services.ixc_db import ixc_select
+    if not tel or len(tel) < 8:
+        return {'nome': '?'}
+    try:
+        digits = ''.join(c for c in tel if c.isdigit())
+        suffix = digits[-9:]
+        r = ixc_select(
+            "SELECT razao FROM cliente WHERE telefone_celular LIKE %s OR fone LIKE %s OR whatsapp LIKE %s LIMIT 1",
+            (f'%{suffix}', f'%{suffix}', f'%{suffix}')
+        )
+        nome = r[0]['razao'] if r else '?'
+        return {'nome': nome}
+    except:
+        return {'nome': '?'}
+
+@router.get('/opa/atendimento/{atend_id}')
+async def opa_atendimento_detalhe(atend_id: str):
+    import json
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f'{OPA_BASE}/atendimento/{atend_id}',
+                headers={'Authorization': f'Bearer {OPA_TOKEN}', 'Content-Type': 'application/json'}
+            )
+        return r.json()
+    except Exception as e:
+        return {'status': 'error', 'message': str(e), 'data': {}}
