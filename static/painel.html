@@ -4418,20 +4418,23 @@ async function carregarAtendimentos() {
   const rank = {};
   atends.forEach(a=>{
     if(!a.id_atendente) return;
-    if(!rank[a.id_atendente]) rank[a.id_atendente]={total:0,fin:0};
+    if(!rank[a.id_atendente]) rank[a.id_atendente]={total:0,fin:0,ea:0};
     rank[a.id_atendente].total++;
     if(a.status==='F') rank[a.id_atendente].fin++;
+    if(a.status==='EA') rank[a.id_atendente].ea++;
   });
   const rankArr = Object.entries(rank)
-    .map(([id,v])=>({nome:_atendNomes[id]||id.slice(0,8),total:v.total,fin:v.fin,pct:Math.round(v.fin/v.total*100)}))
+    .map(([id,v])=>({nome:_atendNomes[id]||id.slice(0,8),total:v.total,fin:v.fin,ea:v.ea,pct:Math.round(v.fin/v.total*100)}))
     .sort((a,b)=>b.total-a.total).slice(0,5);
   const medals = ['🥇','🥈','🥉','4º','5º'];
   document.getElementById('atend-ranking').innerHTML = rankArr.map((v,i)=>{
     const cor = v.pct>=80?'var(--green)':v.pct>=50?'var(--amber)':'var(--red)';
+    const corEA = v.ea>3?'var(--red)':v.ea>0?'var(--amber)':'var(--muted)';
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
       +'<span style="font-size:18px;width:24px;">'+medals[i]+'</span>'
       +'<span style="flex:1;font-size:13px;font-weight:600;">'+esc(v.nome)+'</span>'
-      +'<span style="font-size:16px;font-weight:800;color:var(--cyan);">'+v.total+'</span>'
+      +'<span style="font-size:15px;font-weight:800;color:var(--cyan);min-width:24px;text-align:right;">'+v.total+'</span>'
+      +'<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surf2);color:'+corEA+';min-width:32px;text-align:center;" title="Em andamento">⏳'+v.ea+'</span>'
       +'<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--surf2);color:'+cor+';">'+v.pct+'%</span>'
       +'</div>';
   }).join('') || '<div style="color:var(--muted);padding:12px;">Sem dados</div>';
