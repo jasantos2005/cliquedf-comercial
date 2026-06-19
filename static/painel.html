@@ -1335,17 +1335,24 @@ function abrirListaAtend(tipo) {
 
   }
   document.getElementById('modal-lista-atend').style.display='flex';
-  // Buscar nomes no IXC pelo telefone
-  filtrados.forEach(function(a){
-    var tel=(a.canal_cliente||'').replace('@c.us','');
-    if(!tel) return;
-    fetch('/api/painel/opa/cliente-nome?tel='+encodeURIComponent(tel))
-      .then(function(r){return r.json();})
-      .then(function(r){
+  // Buscar todos os nomes em 1 única chamada
+  var tels = filtrados.map(function(a){ return (a.canal_cliente||'').replace('@c.us',''); }).filter(Boolean);
+  if(tels.length){
+    fetch('/api/painel/opa/clientes-nomes', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({tels:tels})
+    }).then(function(r){return r.json();})
+    .then(function(r){
+      var nomes=r.nomes||{};
+      filtrados.forEach(function(a){
+        var tel=(a.canal_cliente||'').replace('@c.us','');
+        var nome=nomes[tel];
         var el=document.getElementById('nlst-'+a._id);
-        if(el&&r.nome&&r.nome!=='?') el.textContent=r.nome;
-      }).catch(function(){});
-  });
+        if(el&&nome&&nome!=='?') el.textContent=nome;
+      });
+    }).catch(function(){});
+  }
 }
 </script>
 </body>

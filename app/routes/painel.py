@@ -1319,3 +1319,41 @@ async def opa_atendimento_detalhe(atend_id: str):
         return r.json()
     except Exception as e:
         return {'status': 'error', 'message': str(e), 'data': {}}
+
+@router.post('/opa/clientes-nomes')
+async def opa_clientes_nomes(body: dict):
+    from app.services.ixc_db import ixc_conn
+    tels = body.get('tels', [])
+    if not tels:
+        return {'nomes': {}}
+    try:
+        tel_map = {}
+        for tel in tels:
+            digits = ''.join(c for c in tel if c.isdigit())
+            suffix = digits[-9:] if len(digits) >= 9 else digits
+            if suffix:
+                tel_map[tel] = suffix
+        if not tel_map:
+            return {'nomes': {}}
+        sufixos = list(set(tel_map.values()))
+        conds = ' OR '.join(['telefone_celular LIKE %s OR fone LIKE %s OR whatsapp LIKE %s'] * len(sufixos))
+        params = []
+        for s in sufixos:
+            params += [f'%{s}%', f'%{s}%', f'%{s}%']
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            cur.execute(f"SELECT razao, telefone_celular, fone, whatsapp FROM cliente WHERE {conds}", params)
+            rows = cur.fetchall()
+        sufixo_nome = {}
+        for row in rows:
+            for campo in ['telefone_celular', 'fone', 'whatsapp']:
+                val = ''.join(c for c in (row.get(campo) or '') if c.isdigit())
+                if val:
+                    suf = val[-9:]
+                    if suf not in sufixo_nome:
+                        sufixo_nome[suf] = row['razao']
+        resultado = {tel: sufixo_nome.get(suf, '?') for tel, suf in tel_map.items()}
+        return {'nomes': resultado}
+    except Exception as e:
+        return {'nomes': {}}
+
