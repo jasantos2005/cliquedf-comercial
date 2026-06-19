@@ -1330,9 +1330,15 @@ async def opa_clientes_nomes(body: dict):
         tel_map = {}
         for tel in tels:
             digits = ''.join(c for c in tel if c.isdigit())
-            suffix = digits[-9:] if len(digits) >= 9 else digits
-            if suffix:
-                tel_map[tel] = suffix
+            # Sufixo de 9 digitos: ex 999010781
+            suffix9 = digits[-9:] if len(digits) >= 9 else digits
+            # Sufixo com hifen: ex 9901-0781 (últimos 8 dígitos com hifen no meio)
+            s8 = digits[-8:] if len(digits) >= 8 else digits
+            suffix_hifen = s8[:4] + '-' + s8[4:] if len(s8) == 8 else s8
+            # Sufixo 5 digitos (antes do hifen): ex 99901
+            suffix5 = digits[-9:-4] if len(digits) >= 9 else digits
+            if suffix9:
+                tel_map[tel] = (suffix9, suffix_hifen, suffix5)
         if not tel_map:
             return {'nomes': {}}
         sufixos = list(set(tel_map.values()))
@@ -1357,3 +1363,99 @@ async def opa_clientes_nomes(body: dict):
     except Exception as e:
         return {'nomes': {}}
 
+
+@router.post('/opa/historico-os')
+async def opa_historico_os(body: dict):
+    from app.services.ixc_db import ixc_conn
+    tels = body.get('tels', [])
+    if not tels:
+        return {'historico': {}}
+    try:
+        tel_map = {}
+        for tel in tels:
+            digits = ''.join(c for c in tel if c.isdigit())
+            # Sufixo de 9 digitos: ex 999010781
+            suffix9 = digits[-9:] if len(digits) >= 9 else digits
+            # Sufixo com hifen: ex 9901-0781 (últimos 8 dígitos com hifen no meio)
+            s8 = digits[-8:] if len(digits) >= 8 else digits
+            suffix_hifen = s8[:4] + '-' + s8[4:] if len(s8) == 8 else s8
+            # Sufixo 5 digitos (antes do hifen): ex 99901
+            suffix5 = digits[-9:-4] if len(digits) >= 9 else digits
+            if suffix9:
+                tel_map[tel] = (suffix9, suffix_hifen, suffix5)
+
+        if not tel_map:
+            return {'historico': {}}
+
+        # Criar lista de sufixos únicos
+        sufixos_map = {}
+        for tel, (s9, shifen, s5) in tel_map.items():
+            for s in [s9, shifen, s5]:
+                if s:
+                    sufixos_map[s] = tel
+        sufixos = list(sufixos_map.keys())
+        conds = ' OR '.join(['c.telefone_celular LIKE %s OR c.fone LIKE %s OR c.whatsapp LIKE %s'] * len(sufixos))
+        params = []
+        for s in sufixos:
+            params += [f'%{s}%', f'%{s}%', f'%{s}%']
+
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            # Construir query sem f-string para evitar conflito com % do pymysql
+            sql = (
+                "SELECT o.id, o.id_assunto, o.status, o.data_abertura, o.data_fechamento,"
+                " c.telefone_celular, c.fone, c.whatsapp, f.funcionario as tecnico,"
+                " CASE o.id_assunto"
+                " WHEN 16 THEN 'Manutencao'"
+                " WHEN 20 THEN 'Sem acesso'"
+                " WHEN 21 THEN 'Internet lenta'"
+                " ELSE 'Outro' END as assunto"
+                " FROM su_oss_chamado o"
+                " JOIN cliente c ON c.id = o.id_cliente"
+                " LEFT JOIN funcionarios f ON f.id = o.id_tecnico"
+                " WHERE o.id_assunto IN (16, 20, 21)"
+                " AND (" + conds + ")"
+                " AND o.data_abertura < CURDATE()"
+                " ORDER BY o.data_abertura DESC"
+            )
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+
+        # Agrupar por múltiplos sufixos
+        sufixo_os = {}
+        for row in rows:
+            for campo in ['telefone_celular', 'fone', 'whatsapp']:
+                val_raw = row.get(campo) or ''
+                val = ''.join(c for c in val_raw if c.isdigit())
+                if val:
+                    s8 = val[-8:] if len(val) >= 8 else val
+                    hifen = s8[:4]+'-'+s8[4:] if len(s8)==8 else s8
+                    for suf in [val[-9:], val[-8:], hifen, val[-9:-4]]:
+                        if suf and suf not in sufixo_os:
+                            sufixo_os[suf] = []
+                    entry = {
+                        'id': row['id'],
+                        'assunto': row['assunto'],
+                        'status': row['status'],
+                        'data_abertura': str(row['data_abertura']) if row['data_abertura'] else None,
+                        'data_fechamento': str(row['data_fechamento']) if row['data_fechamento'] else None,
+                        'tecnico': row['tecnico'],
+                    }
+                    if entry not in sufixo_os[suf]:
+                        sufixo_os[suf].append(entry)
+
+        resultado = {}
+        for tel, (s9, shifen, s5) in tel_map.items():
+            os_list = sufixo_os.get(s9) or sufixo_os.get(shifen) or sufixo_os.get(s5) or []
+            # Deduplicar por ID
+            seen = set()
+            dedup = []
+            for o in os_list:
+                if o['id'] not in seen:
+                    seen.add(o['id'])
+                    dedup.append(o)
+            resultado[tel] = dedup
+
+        return {'historico': resultado}
+    except Exception as e:
+        return {'historico': {}, 'erro': str(e)}

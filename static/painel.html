@@ -552,6 +552,11 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <span class="ni-label">Pendências</span>
         <span class="ni-badge" id="badge-pend" style="display:none;background:#E24B4A;">0</span>
       </div>
+      <div class="ni" id="ni-reincidencia" onclick="navTo('reincidencia')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span class="ni-label">Reincidência</span>
+        <span class="ni-badge" id="badge-reinc" style="display:none;background:#E24B4A;">0</span>
+      </div>
       <div class="sb-group-label">COMERCIAL</div>
       <div class="ni" id="ni-auditoria" onclick="toggleSub('sub-auditoria','ni-auditoria')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
@@ -1485,6 +1490,158 @@ function renderPend() {
   }).join('');
 }
 </script>
+
+<!-- PAGE: REINCIDÊNCIA -->
+<div class="page" id="page-reincidencia">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:20px;font-weight:800;">⚠️ Radar de Reincidência</div>
+      <div style="font-size:13px;color:var(--muted);" id="reinc-sub">Clientes com histórico de OS de suporte</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <input type="date" id="reinc-data" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;"/>
+      <button class="btn" onclick="carregarReincidencia()">↻ Atualizar</button>
+    </div>
+  </div>
+  <div class="card" style="overflow:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--muted);">
+          <th style="padding:10px 12px;text-align:left;">Protocolo Opa</th>
+          <th style="padding:10px 12px;text-align:left;">Cliente</th>
+          <th style="padding:10px 12px;text-align:left;">Telefone</th>
+          <th style="padding:10px 12px;text-align:left;">Atendente</th>
+          <th style="padding:10px 12px;text-align:left;">Status</th>
+          <th style="padding:10px 12px;text-align:center;">OS Anteriores</th>
+          <th style="padding:10px 12px;text-align:left;">Última OS</th>
+        </tr>
+      </thead>
+      <tbody id="reinc-tbody">
+        <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Selecione uma data e clique em Atualizar</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL OS ANTERIORES -->
+<div id="modal-os-hist" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#161625;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:560px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:#fff;" id="mos-titulo">Histórico de OS</div>
+      <button onclick="document.getElementById('modal-os-hist').style.display='none'" style="background:#2a2a3a;border:none;border-radius:6px;color:#ccc;padding:4px 10px;cursor:pointer;">✕</button>
+    </div>
+    <div id="mos-corpo" style="overflow-y:auto;flex:1;"></div>
+  </div>
+</div>
+
+<script>
+var _reincCache = [];
+
+function carregarReincidencia() {
+  var inp = document.getElementById('reinc-data');
+  if(!inp.value) inp.value = new Date().toISOString().slice(0,10);
+  var data = inp.value;
+  document.getElementById('reinc-sub').textContent = 'Carregando...';
+  document.getElementById('reinc-tbody').innerHTML = '<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Carregando...</td></tr>';
+
+  api('/api/painel/opa/atendimentos?data='+data).then(function(r){
+    var atends = r.data||[];
+    _reincCache = atends;
+
+    // Buscar nomes e histórico OS em batch
+    var tels = atends.map(function(a){return (a.canal_cliente||'').replace('@c.us','');}).filter(Boolean);
+
+    Promise.all([
+      tels.length ? fetch('/api/painel/opa/clientes-nomes',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({tels:tels})
+      }).then(function(r){return r.json();}).catch(function(){return {nomes:{}};}) : Promise.resolve({nomes:{}}),
+      tels.length ? fetch('/api/painel/opa/historico-os',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({tels:tels})
+      }).then(function(r){return r.json();}).catch(function(){return {historico:{}};}) : Promise.resolve({historico:{}})
+    ]).then(function(results){
+      var nomes = results[0].nomes||{};
+      var historico = results[1].historico||{};
+
+      // Filtrar só quem tem OS anterior
+      var comOS = atends.filter(function(a){
+        var tel=(a.canal_cliente||'').replace('@c.us','');
+        return historico[tel] && historico[tel].length > 0;
+      });
+
+      var badge = document.getElementById('badge-reinc');
+      if(badge){ badge.textContent=comOS.length; badge.style.display=comOS.length?'':'none'; }
+      document.getElementById('reinc-sub').textContent = comOS.length+' cliente(s) com histórico de OS — '+atends.length+' atendimentos no dia';
+
+      if(!comOS.length){
+        document.getElementById('reinc-tbody').innerHTML='<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--muted);">Nenhum cliente reincidente hoje</td></tr>';
+        return;
+      }
+
+      document.getElementById('reinc-tbody').innerHTML = comOS.map(function(a){
+        var tel   = (a.canal_cliente||'').replace('@c.us','');
+        var nome  = nomes[tel]||tel||'?';
+        var atd   = _atendNomes[a.id_atendente]||'Sem atendente';
+        var dep   = _atendDeptos[a.setor]||'?';
+        var hist  = historico[tel]||[];
+        var ultima = hist[0]||{};
+        var st    = a.status==='F'?'<span style="color:var(--green);font-size:11px;">✅ Finalizado</span>'
+                  : a.status==='EA'?'<span style="color:var(--amber);font-size:11px;">🟡 Em andamento</span>'
+                  : '<span style="color:var(--red);font-size:11px;">🔴 Aguardando</span>';
+        var qtd   = hist.length;
+        var corQtd = qtd>=3?'var(--red)':qtd>=2?'var(--amber)':'var(--muted)';
+        var ultData = ultima.data_abertura ? new Date(ultima.data_abertura).toLocaleDateString('pt-BR') : '?';
+        var ultAssunto = ultima.assunto||'?';
+        var telEnc = tel.replace(/'/g,"\'");
+        var nomeEnc = nome.replace(/'/g,"\'").replace(/"/g,'&quot;');
+        return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-tel="'+telEnc+'" data-nome="'+nomeEnc+'" onclick="abrirHistOS(this.dataset.tel,this.dataset.nome)">'
+          +'<td style="padding:10px 12px;font-weight:600;color:var(--cyan);">'+(a.protocolo||'?')+'</td>'
+          +'<td style="padding:10px 12px;font-weight:600;">'+nome+'</td>'
+          +'<td style="padding:10px 12px;color:var(--muted);font-size:12px;">'+tel+'</td>'
+          +'<td style="padding:10px 12px;">'+atd+'</td>'
+          +'<td style="padding:10px 12px;">'+st+'</td>'
+          +'<td style="padding:10px 12px;text-align:center;font-weight:800;font-size:18px;color:'+corQtd+';">'+qtd+'</td>'
+          +'<td style="padding:10px 12px;font-size:12px;color:var(--muted);">'+ultAssunto+'<br>'+ultData+'</td>'
+          +'</tr>';
+      }).join('');
+
+      window._reincHistorico = historico;
+      window._reincNomes = nomes;
+    });
+  }).catch(function(){
+    document.getElementById('reinc-sub').textContent='Erro ao carregar';
+  });
+}
+
+function abrirHistOS(tel, nome) {
+  var hist = (window._reincHistorico||{})[tel]||[];
+  document.getElementById('mos-titulo').textContent = '📋 '+nome+' — Histórico de OS';
+  var corpo = document.getElementById('mos-corpo');
+  if(!hist.length){
+    corpo.innerHTML='<div style="color:var(--muted);padding:16px;">Sem histórico</div>';
+  } else {
+    corpo.innerHTML = hist.map(function(os){
+      var dt = os.data_abertura ? new Date(os.data_abertura).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '?';
+      var stCor = os.status==='F'?'var(--green)':os.status==='A'?'var(--amber)':'var(--muted)';
+      var stLabel = os.status==='F'?'Finalizada':os.status==='A'?'Aberta':os.status||'?';
+      return '<div style="padding:12px;background:#1e1e2e;border-radius:8px;margin-bottom:8px;">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'
+        +'<span style="font-weight:600;color:#fff;">OS #'+os.id+'</span>'
+        +'<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--surf2);color:'+stCor+';">'+stLabel+'</span>'
+        +'</div>'
+        +'<div style="font-size:13px;color:var(--cyan);margin-bottom:4px;">'+os.assunto+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);">Aberta em: '+dt+'</div>'
+        +(os.data_fechamento?'<div style="font-size:11px;color:var(--muted);">Fechada em: '+new Date(os.data_fechamento).toLocaleDateString('pt-BR')+'</div>':'')
+        +(os.tecnico?'<div style="font-size:11px;color:var(--muted);">Técnico: '+os.tecnico+'</div>':'')
+        +'</div>';
+    }).join('');
+  }
+  document.getElementById('modal-os-hist').style.display='flex';
+}
+</script>
 </body>
 </html>
     </div><!-- /content -->
@@ -1775,6 +1932,7 @@ function toggleSub(subId, niId) {
 const PAGE_TITLES = {
   atendimentos: 'Atendimentos',
   pendencias: 'Pendências',
+  reincidencia: 'Radar de Reincidência',
   dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria', 'liberacoes': 'Liberações — Vendas Reprovadas',
   'vendas-lista': 'Vendas Realizadas — IXC', 'vendas-hub': 'Vendas — Hub Comercial',
   clientes: 'Clientes Ativados', ranking: 'Ranking de Vendedores',
@@ -1824,6 +1982,7 @@ function navTo(page) {
     permissoes: carregarPermissoes,
     atendimentos: carregarAtendimentos,
     pendencias: () => carregarPendencias(),
+    reincidencia: () => carregarReincidencia(),
   };
   if (loaders[page]) loaders[page]();
 }
