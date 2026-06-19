@@ -1178,8 +1178,8 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
   <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px;" id="atend-kpis">
     <div class="kpi"><div class="kv" id="ak-total">—</div><div class="kl">Total</div></div>
     <div class="kpi"><div class="kv" id="ak-fin" style="color:var(--green)">—</div><div class="kl">Finalizados</div></div>
-    <div class="kpi"><div class="kv" id="ak-ea" style="color:var(--amber)">—</div><div class="kl">Em andamento</div></div>
-    <div class="kpi"><div class="kv" id="ak-sem" style="color:var(--red)">—</div><div class="kl">Sem atendente</div></div>
+    <div class="kpi" onclick="abrirListaAtend('EA')" style="cursor:pointer;"><div class="kv" id="ak-ea" style="color:var(--amber)">—</div><div class="kl">Em andamento ›</div></div>
+    <div class="kpi" onclick="abrirListaAtend('SEM')" style="cursor:pointer;"><div class="kv" id="ak-sem" style="color:var(--red)">—</div><div class="kl">Sem atendente ›</div></div>
     <div class="kpi"><div class="kv" id="ak-tempo" style="color:var(--amber)">—</div><div class="kl">Tempo médio</div></div>
     <div class="kpi"><div class="kv" id="ak-pct" style="color:var(--green)">—</div><div class="kl">Taxa finaliz.</div></div>
   </div>
@@ -1246,6 +1246,106 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
 <style>
 @keyframes pulse2{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
+
+<div id="modal-atend" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#161625;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:440px;max-width:95vw;">
+    <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:16px;" id="ma-proto"></div>
+    <div style="display:grid;gap:8px;font-size:13px;">
+      <div style="display:flex;justify-content:space-between;padding:8px;background:#1e1e2e;border-radius:6px;"><span style="color:#888">Cliente</span><span style="color:#fff;font-weight:600;" id="ma-cliente">—</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:#1e1e2e;border-radius:6px;"><span style="color:#888">Telefone</span><span style="color:#fff;" id="ma-tel">—</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:#1e1e2e;border-radius:6px;"><span style="color:#888">Atendente</span><span style="color:#fff;" id="ma-atd">—</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:#1e1e2e;border-radius:6px;"><span style="color:#888">Depto</span><span style="color:#fff;" id="ma-dep">—</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:#1e1e2e;border-radius:6px;"><span style="color:#888">Tempo</span><span style="font-weight:700;" id="ma-tempo">—</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px;background:#1e1e2e;border-radius:6px;"><span style="color:#888">Status</span><span id="ma-st">—</span></div>
+      <div id="ma-mot-row" style="display:none;padding:8px;background:rgba(186,117,23,.15);border:1px solid #BA7517;border-radius:6px;font-size:12px;color:#BA7517;"></div>
+    </div>
+    <button onclick="document.getElementById('modal-atend').style.display='none'" style="width:100%;margin-top:14px;padding:9px;background:#2a2a3a;border:none;border-radius:6px;color:#ccc;cursor:pointer;">Fechar</button>
+  </div>
+</div>
+
+<div id="modal-lista-atend" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9998;align-items:center;justify-content:center;">
+  <div style="background:#161625;border:1px solid #2a2a3a;border-radius:12px;padding:20px;width:520px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:#fff;" id="ml-titulo"></div>
+      <button onclick="document.getElementById('modal-lista-atend').style.display='none'" style="background:#2a2a3a;border:none;border-radius:6px;color:#ccc;padding:4px 10px;cursor:pointer;">✕</button>
+    </div>
+    <div id="ml-lista" style="overflow-y:auto;flex:1;display:grid;gap:6px;"></div>
+  </div>
+</div>
+
+<script>
+function mostrarAtend(el) {
+  var d = el.dataset;
+  var mins = parseInt(d.mins);
+  var h = Math.floor(mins/60), m = mins%60;
+  var cor = mins>=120?'#E24B4A':mins>=60?'#BA7517':'#1D9E75';
+  document.getElementById('ma-proto').textContent  = d.proto;
+  document.getElementById('ma-cliente').textContent = 'Buscando...';
+  document.getElementById('ma-tel').textContent    = d.tel;
+  document.getElementById('ma-atd').textContent    = d.atd;
+  document.getElementById('ma-dep').textContent    = d.dep;
+  document.getElementById('ma-tempo').textContent  = (h>0?h+'h':'')+m+'min';
+  document.getElementById('ma-tempo').style.color  = cor;
+  document.getElementById('ma-st').textContent     = d.st==='EA'?'Em andamento':d.st==='AG'?'Aguardando':d.st;
+  document.getElementById('ma-mot-row').style.display = 'none';
+  document.getElementById('modal-atend').style.display = 'flex';
+  api('/api/painel/opa/atendimento/'+d.id).then(function(r){
+    var info=r.data||{}, nome='?';
+    if(info.id_cliente&&typeof info.id_cliente==='object') nome=info.id_cliente.nome||'?';
+    else if(info.id_user&&typeof info.id_user==='object') nome=info.id_user.nome||'?';
+    document.getElementById('ma-cliente').textContent=nome;
+    var mots=info.motivos||[];
+    if(mots.length>0){
+      var mid=mots[mots.length-1].idMotivo;
+      var nm=typeof mid==='object'?mid.motivo:(mid||'?');
+      document.getElementById('ma-mot-row').textContent='Motivo: '+nm;
+      document.getElementById('ma-mot-row').style.display='block';
+    }
+  }).catch(function(){document.getElementById('ma-cliente').textContent='?';});
+}
+
+function abrirListaAtend(tipo) {
+  var atends = window.__atendCache || [];
+  var filtrados = atends.filter(function(a){
+    if(tipo==='SEM') return !a.id_atendente;
+    if(tipo==='EA')  return a.status==='EA' && a.id_atendente;
+    return false;
+  });
+  document.getElementById('ml-titulo').textContent = (tipo==='SEM'?'🚫 Sem atendente':'⏳ Em andamento')+' ('+filtrados.length+')';
+  var lista = document.getElementById('ml-lista');
+  if(!filtrados.length){
+    lista.innerHTML='<div style="color:#888;padding:16px;text-align:center;">Nenhum atendimento</div>';
+  } else {
+    lista.innerHTML = filtrados.map(function(a){
+      var mins=Math.round((new Date()-new Date(a.date))/60000);
+      var h=Math.floor(mins/60),m=mins%60;
+      var cor=mins>=120?'#E24B4A':mins>=60?'#BA7517':'#1D9E75';
+      var dep=(_atendDeptos&&_atendDeptos[a.setor])||'?';
+      var atd=(_atendNomes&&_atendNomes[a.id_atendente])||'Sem atendente';
+      var tel=(a.canal_cliente||'').replace('@c.us','');
+      return '<div onclick="mostrarAtend(this)" data-id="'+a._id+'" data-proto="'+(a.protocolo||'?')+'" data-tel="'+tel+'" data-atd="'+atd+'" data-dep="'+dep+'" data-mins="'+mins+'" data-st="'+a.status+'" style="display:flex;align-items:center;gap:10px;padding:10px;background:#1e1e2e;border-radius:8px;cursor:pointer;">'
+        +'<div style="flex:1;">'
+        +'<div style="font-size:13px;font-weight:600;color:#fff;">'+(a.protocolo||'?')+'</div>'
+        +'<div style="font-size:12px;color:#ccc;" id="nlst-'+a._id+'">?</div>'
+        +'<div style="font-size:11px;color:#888;">'+dep+' · '+atd+'</div>'
+        +'</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+cor+';">'+(h>0?h+'h':'')+m+'min ›</div>'
+        +'</div>';
+    }).join('');
+    // Buscar nomes em paralelo
+    filtrados.forEach(function(a){
+      api('/api/painel/opa/atendimento/'+a._id).then(function(r){
+        var d=r.data||{},nome='?';
+        if(d.id_cliente&&typeof d.id_cliente==='object') nome=d.id_cliente.nome||'?';
+        else if(d.id_user&&typeof d.id_user==='object') nome=d.id_user.nome||'?';
+        var el=document.getElementById('nlst-'+a._id);
+        if(el) el.textContent=nome;
+      }).catch(function(){});
+    });
+  }
+  document.getElementById('modal-lista-atend').style.display='flex';
+}
+</script>
 </body>
 </html>
     </div><!-- /content -->
@@ -4246,6 +4346,7 @@ async function carregarAtendimentos() {
   });
   const tMedio = tempos.length ? Math.round(tempos.reduce((s,v)=>s+v,0)/tempos.length) : 0;
 
+  window.__atendCache = atends;
   document.getElementById('ak-total').textContent  = total;
   document.getElementById('ak-fin').textContent    = fin;
   document.getElementById('ak-ea').textContent     = ea;
@@ -4294,12 +4395,12 @@ async function carregarAtendimentos() {
       const mins = Math.round((new Date()-new Date(a.date))/60000);
       const cor  = mins>=20?'var(--red)':mins>=10?'var(--amber)':'var(--green)';
       const dep  = _atendDeptos[a.setor]||'?';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">'
+      return '<div onclick="mostrarAtend(this)" data-id="'+a._id+'" data-proto="'+esc(a.protocolo||'?')+'" data-tel="'+(a.canal_cliente||'').replace(/@c\.us/,'')+'" data-atd="'+esc(_atendNomes[a.id_atendente]||'Sem atendente')+'" data-dep="'+dep+'" data-mins="'+mins+'" data-st="'+a.status+'" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;">'
         +'<div style="flex:1;">'
         +'<div style="font-size:13px;font-weight:600;">'+esc(a.protocolo||'?')+'</div>'
         +'<div style="font-size:11px;color:var(--muted);">'+dep+'</div>'
         +'</div>'
-        +'<div style="font-size:13px;font-weight:700;color:'+cor+';">'+mins+' min</div>'
+        +'<div style="font-size:13px;font-weight:700;color:'+cor+';">'+mins+' min ›</div>'
         +'</div>';
     }).join('');
   }
