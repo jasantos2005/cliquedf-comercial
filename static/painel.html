@@ -4453,7 +4453,7 @@ async function carregarAtendimentos() {
 
   // Volume por hora
   const horas = Array(24).fill(0);
-  atends.forEach(a=>{ try{ const h=(new Date(a.date).getHours()-3+24)%24; horas[h]++; }catch(e){} });
+  atends.forEach(a=>{ try{ const h=new Date(a.date).getHours(); horas[h]++; }catch(e){} });
   const labels = Array.from({length:24},(_,i)=>i+'h');
   const colors = horas.map(v=>v>=12?'#E24B4A':v>=8?'#BA7517':'#378ADD');
   if(_atendChart) _atendChart.destroy();
