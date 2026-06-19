@@ -1554,12 +1554,12 @@ function carregarReincidencia() {
     Promise.all([
       tels.length ? fetch('/api/painel/opa/clientes-nomes',{
         method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('hc_p_token')||'')},
         body:JSON.stringify({tels:tels})
       }).then(function(r){return r.json();}).catch(function(){return {nomes:{}};}) : Promise.resolve({nomes:{}}),
       tels.length ? fetch('/api/painel/opa/historico-os',{
         method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('hc_p_token')||'')},
         body:JSON.stringify({tels:tels})
       }).then(function(r){return r.json();}).catch(function(){return {historico:{}};}) : Promise.resolve({historico:{}})
     ]).then(function(results){

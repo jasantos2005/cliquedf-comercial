@@ -1330,15 +1330,17 @@ async def opa_clientes_nomes(body: dict):
         tel_map = {}
         for tel in tels:
             digits = ''.join(c for c in tel if c.isdigit())
-            # Sufixo de 9 digitos: ex 999010781
-            suffix9 = digits[-9:] if len(digits) >= 9 else digits
-            # Sufixo com hifen: ex 9901-0781 (últimos 8 dígitos com hifen no meio)
-            s8 = digits[-8:] if len(digits) >= 8 else digits
-            suffix_hifen = s8[:4] + '-' + s8[4:] if len(s8) == 8 else s8
-            # Sufixo 5 digitos (antes do hifen): ex 99901
-            suffix5 = digits[-9:-4] if len(digits) >= 9 else digits
-            if suffix9:
-                tel_map[tel] = (suffix9, suffix_hifen, suffix5)
+            # Remover prefixo 55 do Brasil
+            if digits.startswith('55') and len(digits) >= 12:
+                digits = digits[2:]
+            # Formatar igual IXC: (79) 99901-0781
+            if len(digits) == 11:  # DDD + 9 digitos
+                fmt = f'({digits[:2]}) {digits[2:7]}-{digits[7:]}'
+            elif len(digits) == 10:  # DDD + 8 digitos
+                fmt = f'({digits[:2]}) {digits[2:6]}-{digits[6:]}'
+            else:
+                fmt = digits
+            tel_map[tel] = fmt
         if not tel_map:
             return {'nomes': {}}
         sufixos = list(set(tel_map.values()))
@@ -1374,30 +1376,27 @@ async def opa_historico_os(body: dict):
         tel_map = {}
         for tel in tels:
             digits = ''.join(c for c in tel if c.isdigit())
-            # Sufixo de 9 digitos: ex 999010781
-            suffix9 = digits[-9:] if len(digits) >= 9 else digits
-            # Sufixo com hifen: ex 9901-0781 (últimos 8 dígitos com hifen no meio)
-            s8 = digits[-8:] if len(digits) >= 8 else digits
-            suffix_hifen = s8[:4] + '-' + s8[4:] if len(s8) == 8 else s8
-            # Sufixo 5 digitos (antes do hifen): ex 99901
-            suffix5 = digits[-9:-4] if len(digits) >= 9 else digits
-            if suffix9:
-                tel_map[tel] = (suffix9, suffix_hifen, suffix5)
+            # Remover prefixo 55 do Brasil
+            if digits.startswith('55') and len(digits) >= 12:
+                digits = digits[2:]
+            # Formatar igual IXC: (79) 99901-0781
+            if len(digits) == 11:  # DDD + 9 digitos
+                fmt = f'({digits[:2]}) {digits[2:7]}-{digits[7:]}'
+            elif len(digits) == 10:  # DDD + 8 digitos
+                fmt = f'({digits[:2]}) {digits[2:6]}-{digits[6:]}'
+            else:
+                fmt = digits
+            tel_map[tel] = fmt
 
         if not tel_map:
             return {'historico': {}}
 
-        # Criar lista de sufixos únicos
-        sufixos_map = {}
-        for tel, (s9, shifen, s5) in tel_map.items():
-            for s in [s9, shifen, s5]:
-                if s:
-                    sufixos_map[s] = tel
-        sufixos = list(sufixos_map.keys())
-        conds = ' OR '.join(['c.telefone_celular LIKE %s OR c.fone LIKE %s OR c.whatsapp LIKE %s'] * len(sufixos))
+        # Busca exata pelo telefone formatado
+        formatos = list(set(tel_map.values()))
+        conds = ' OR '.join(['c.telefone_celular = %s OR c.fone = %s OR c.whatsapp = %s'] * len(formatos))
         params = []
-        for s in sufixos:
-            params += [f'%{s}%', f'%{s}%', f'%{s}%']
+        for f in formatos:
+            params += [f, f, f]
 
         with ixc_conn() as conn:
             cur = conn.cursor()
@@ -1415,38 +1414,33 @@ async def opa_historico_os(body: dict):
                 " LEFT JOIN funcionarios f ON f.id = o.id_tecnico"
                 " WHERE o.id_assunto IN (16, 20, 21)"
                 " AND (" + conds + ")"
-                " AND o.data_abertura < CURDATE()"
-                " ORDER BY o.data_abertura DESC"
+                " ORDER BY o.data_abertura DESC LIMIT 50"
             )
             cur.execute(sql, params)
             rows = cur.fetchall()
 
-        # Agrupar por múltiplos sufixos
-        sufixo_os = {}
+        # Agrupar por telefone formatado
+        fmt_os = {}
         for row in rows:
+            entry = {
+                'id': row['id'],
+                'assunto': row['assunto'],
+                'status': row['status'],
+                'data_abertura': str(row['data_abertura']) if row['data_abertura'] else None,
+                'data_fechamento': str(row['data_fechamento']) if row['data_fechamento'] else None,
+                'tecnico': row['tecnico'],
+            }
             for campo in ['telefone_celular', 'fone', 'whatsapp']:
-                val_raw = row.get(campo) or ''
-                val = ''.join(c for c in val_raw if c.isdigit())
+                val = row.get(campo) or ''
                 if val:
-                    s8 = val[-8:] if len(val) >= 8 else val
-                    hifen = s8[:4]+'-'+s8[4:] if len(s8)==8 else s8
-                    for suf in [val[-9:], val[-8:], hifen, val[-9:-4]]:
-                        if suf and suf not in sufixo_os:
-                            sufixo_os[suf] = []
-                    entry = {
-                        'id': row['id'],
-                        'assunto': row['assunto'],
-                        'status': row['status'],
-                        'data_abertura': str(row['data_abertura']) if row['data_abertura'] else None,
-                        'data_fechamento': str(row['data_fechamento']) if row['data_fechamento'] else None,
-                        'tecnico': row['tecnico'],
-                    }
-                    if entry not in sufixo_os[suf]:
-                        sufixo_os[suf].append(entry)
+                    if val not in fmt_os:
+                        fmt_os[val] = []
+                    if entry not in fmt_os[val]:
+                        fmt_os[val].append(entry)
 
         resultado = {}
-        for tel, (s9, shifen, s5) in tel_map.items():
-            os_list = sufixo_os.get(s9) or sufixo_os.get(shifen) or sufixo_os.get(s5) or []
+        for tel, fmt in tel_map.items():
+            os_list = fmt_os.get(fmt) or []
             # Deduplicar por ID
             seen = set()
             dedup = []
