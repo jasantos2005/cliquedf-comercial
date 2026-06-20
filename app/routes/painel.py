@@ -1343,24 +1343,23 @@ async def opa_clientes_nomes(body: dict):
             tel_map[tel] = fmt
         if not tel_map:
             return {'nomes': {}}
-        sufixos = list(set(tel_map.values()))
-        conds = ' OR '.join(['telefone_celular LIKE %s OR fone LIKE %s OR whatsapp LIKE %s'] * len(sufixos))
+        # Busca exata pelo telefone formatado
+        formatos = list(set(tel_map.values()))
+        conds = ' OR '.join(['telefone_celular = %s OR fone = %s OR whatsapp = %s'] * len(formatos))
         params = []
-        for s in sufixos:
-            params += [f'%{s}%', f'%{s}%', f'%{s}%']
+        for f in formatos:
+            params += [f, f, f]
         with ixc_conn() as conn:
             cur = conn.cursor()
-            cur.execute(f"SELECT razao, telefone_celular, fone, whatsapp FROM cliente WHERE {conds}", params)
+            cur.execute('SELECT razao, telefone_celular, fone, whatsapp FROM cliente WHERE ' + conds, params)
             rows = cur.fetchall()
-        sufixo_nome = {}
+        fmt_nome = {}
         for row in rows:
             for campo in ['telefone_celular', 'fone', 'whatsapp']:
-                val = ''.join(c for c in (row.get(campo) or '') if c.isdigit())
-                if val:
-                    suf = val[-9:]
-                    if suf not in sufixo_nome:
-                        sufixo_nome[suf] = row['razao']
-        resultado = {tel: sufixo_nome.get(suf, '?') for tel, suf in tel_map.items()}
+                val = row.get(campo) or ''
+                if val and val not in fmt_nome:
+                    fmt_nome[val] = row['razao']
+        resultado = {tel: fmt_nome.get(fmt, '?') for tel, fmt in tel_map.items()}
         return {'nomes': resultado}
     except Exception as e:
         return {'nomes': {}}
