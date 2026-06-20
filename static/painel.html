@@ -3732,6 +3732,89 @@ async function _tvCarregarTelas() {
     _tvTelas.push('<div style="color:var(--red);padding:32px;">Erro ao carregar monitor: '+e.message+'</div>');
   }
 
+  // ── Tela Reincidência Crítica ────────────────────────────────
+  try {
+    const hoje2 = new Date().toISOString().slice(0,10);
+    const [opaR, histR] = await Promise.all([
+      api('/api/painel/opa/atendimentos?data='+hoje2),
+      fetch('/api/painel/opa/historico-os', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({tels: (await api('/api/painel/opa/atendimentos?data='+hoje2)).data
+          .map(function(a){return (a.canal_cliente||'').replace('@c.us','');}).filter(Boolean)})
+      }).then(function(r){return r.json();})
+    ]);
+    const atends = opaR.data||[];
+    const historico = histR.historico||{};
+    const nomes2 = await fetch('/api/painel/opa/clientes-nomes',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({tels:atends.map(function(a){return (a.canal_cliente||'').replace('@c.us','');}).filter(Boolean)})
+    }).then(function(r){return r.json();}).then(function(r){return r.nomes||{};});
+
+    const criticos = atends.filter(function(a){
+      const tel=(a.canal_cliente||'').replace('@c.us','');
+      return (historico[tel]||[]).length>=3 && a.status!=='F';
+    }).sort(function(a,b){
+      const tA=(a.canal_cliente||'').replace('@c.us','');
+      const tB=(b.canal_cliente||'').replace('@c.us','');
+      return (historico[tB]||[]).length-(historico[tA]||[]).length;
+    }).slice(0,10);
+
+    if(criticos.length>0){
+      const NOMES_ATD = {
+        '659c3d7dae4972531a907916':'Johnatan David',
+        '68c81c2e21ad7f45d635901f':'Amanda Gomes',
+        '682b6d07f497f37f8eb35338':'Karine Ferreira',
+        '6659e00cbd1e771abfd2aefc':'Rudinedja Santos',
+        '659c4448f2a21eee31c7ad36':'Manuela Tavares',
+      };
+      const linhas = criticos.map(function(a){
+        const tel=(a.canal_cliente||'').replace('@c.us','');
+        const nome=nomes2[tel]||tel;
+        const qtd=(historico[tel]||[]).length;
+        const atd=NOMES_ATD[a.id_atendente]||'Sem atendente';
+        const cor=qtd>=5?'var(--red)':'var(--amber)';
+        const st=a.status==='AG'?'🔴 Aguardando':'🟡 Em andamento';
+        return '<tr style="border-bottom:1px solid var(--border);">'
+          +'<td style="padding:12px;font-size:16px;font-weight:700;color:var(--cyan);">'+(a.protocolo||'?')+'</td>'
+          +'<td style="padding:12px;font-size:16px;font-weight:700;">'+esc(nome)+'</td>'
+          +'<td style="padding:12px;font-size:14px;">'+esc(atd)+'</td>'
+          +'<td style="padding:12px;font-size:14px;">'+st+'</td>'
+          +'<td style="padding:12px;font-size:24px;font-weight:900;color:'+cor+';text-align:center;">'+qtd+'</td>'
+          +'</tr>';
+      }).join('');
+
+      _tvTelas.push(`
+        <div style="display:flex;flex-direction:column;height:100%;gap:16px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:32px;">⚠️</span>
+            <div>
+              <div style="font-size:26px;font-weight:900;color:var(--red);">CLIENTES EM RISCO — Reincidência</div>
+              <div style="font-size:14px;color:var(--muted);">${criticos.length} cliente(s) com 3+ OS anteriores em atendimento agora</div>
+            </div>
+          </div>
+          <div class="card" style="flex:1;overflow:auto;">
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="border-bottom:2px solid var(--border);color:var(--muted);font-size:13px;">
+                  <th style="padding:10px;text-align:left;">Protocolo</th>
+                  <th style="padding:10px;text-align:left;">Cliente</th>
+                  <th style="padding:10px;text-align:left;">Atendente</th>
+                  <th style="padding:10px;text-align:left;">Status</th>
+                  <th style="padding:10px;text-align:center;">OS Ant.</th>
+                </tr>
+              </thead>
+              <tbody>${linhas}</tbody>
+            </table>
+          </div>
+        </div>
+      `);
+    }
+  } catch(e) {
+    console.error('TV tela reincidência:', e);
+  }
+
     // ── Telas vendedores ──────────────────────────────────────────
   // ── Telas 2-N: Um vendedor por tela ──────────────────────────────────────
   const _agora2 = new Date(); const hoje = _agora2.getFullYear()+'-'+String(_agora2.getMonth()+1).padStart(2,'0')+'-'+String(_agora2.getDate()).padStart(2,'0');
