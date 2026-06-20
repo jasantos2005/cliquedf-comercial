@@ -1537,14 +1537,49 @@ async def opa_webhook(req: _Request):
             atualizado_em=excluded.atualizado_em''',
             (atend_id,protocolo,canal_cli,id_atd,nome_atd,depto,status,agora))
 
-        # Registrar evento na tabela de mensagens como log
+        # Interpretar evento com descrição clara
+        if event_type == 'waitingForCustomerResponse':
+            descricao = f'📵 Cliente parou de responder | Atendente: {nome_atd or "?"}'
+        elif event_type == 'customerServiceEvent':
+            if status == 'EA' and nome_atd:
+                descricao = f'👤 {nome_atd} assumiu o atendimento'
+            elif status == 'AG' and not nome_atd:
+                descricao = '🔴 Cliente entrou na fila — sem atendente'
+            elif status == 'F':
+                descricao = f'✅ Atendimento finalizado por {nome_atd or "?"}'
+            elif status == 'AG' and nome_atd:
+                descricao = f'⏳ {nome_atd} aguardando cliente'
+            else:
+                descricao = f'📋 {event_type} | status={status} | {nome_atd}'
+        else:
+            descricao = f'{event_type} | status={status} | {nome_atd}'
         conn.execute('''INSERT INTO opa_mensagens
             (atend_id,protocolo,canal_cliente,remetente,tipo,mensagem,data_hora,criado_em)
             VALUES (?,?,?,?,?,?,?,?)''',
-            (atend_id,protocolo,canal_cli,'sistema',event_type,
-             f'Evento: {event_type} | status={status} | atendente={nome_atd}',agora,agora))
+            (atend_id,protocolo,canal_cli,'sistema',event_type,descricao,agora,agora))
         conn.commit()
     finally:
         conn.close()
 
     return {'status': 'ok'}
+
+@router.get('/opa/timeline/{atend_id}')
+async def opa_timeline(atend_id: str):
+    import sqlite3 as sq, os
+    db = os.path.join(os.path.dirname(__file__), '../../hub_comercial.db')
+    conn = sq.connect(os.path.abspath(db))
+    conn.row_factory = sq.Row
+    try:
+        eventos = conn.execute(
+            'SELECT tipo, mensagem, data_hora FROM opa_mensagens WHERE atend_id=? ORDER BY data_hora',
+            (atend_id,)
+        ).fetchall()
+        atend = conn.execute(
+            'SELECT * FROM opa_atendimentos WHERE atend_id=?', (atend_id,)
+        ).fetchone()
+        return {
+            'atendimento': dict(atend) if atend else {},
+            'timeline': [dict(e) for e in eventos]
+        }
+    finally:
+        conn.close()
