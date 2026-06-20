@@ -1583,3 +1583,36 @@ async def opa_timeline(atend_id: str):
         }
     finally:
         conn.close()
+
+@router.post('/opa/aguardando')
+async def opa_aguardando(body: dict):
+    """Retorna quem está aguardando em cada atendimento baseado nos eventos do webhook"""
+    import sqlite3 as sq, os
+    atend_ids = body.get('ids', [])
+    if not atend_ids:
+        return {'aguardando': {}}
+    db = os.path.join(os.path.dirname(__file__), '../../hub_comercial.db')
+    conn = sq.connect(os.path.abspath(db))
+    conn.row_factory = sq.Row
+    resultado = {}
+    ATENDENTES = ['Amanda','Karine','Johnatan','Manuela','Rudinedja','Leide']
+    try:
+        for atend_id in atend_ids:
+            # Buscar por atend_id ou protocolo
+            row = conn.execute(
+                'SELECT tipo, mensagem FROM opa_mensagens WHERE atend_id=? OR protocolo=? ORDER BY data_hora DESC LIMIT 1',
+                (atend_id, atend_id)
+            ).fetchone()
+            if not row:
+                resultado[atend_id] = {'quem': 'atendente', 'label': '👤 Atendente'}
+            elif row['tipo'] == 'waitingForCustomerResponse':
+                resultado[atend_id] = {'quem': 'cliente', 'label': '📵 Cliente'}
+            elif 'assumiu' in (row['mensagem'] or ''):
+                resultado[atend_id] = {'quem': 'cliente', 'label': '📵 Cliente'}
+            elif any(n in (row['mensagem'] or '') for n in ATENDENTES):
+                resultado[atend_id] = {'quem': 'cliente', 'label': '📵 Cliente'}
+            else:
+                resultado[atend_id] = {'quem': 'atendente', 'label': '👤 Atendente'}
+    finally:
+        conn.close()
+    return {'aguardando': resultado}

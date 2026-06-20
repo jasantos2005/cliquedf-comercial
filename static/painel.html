@@ -1396,6 +1396,7 @@ function abrirListaAtend(tipo) {
           <th style="padding:10px 12px;text-align:left;">Abertura</th>
           <th style="padding:10px 12px;text-align:left;">Tempo</th>
           <th style="padding:10px 12px;text-align:left;">Status</th>
+          <th style="padding:10px 12px;text-align:left;">Aguardando</th>
         </tr>
       </thead>
       <tbody id="pend-tbody">
@@ -1486,6 +1487,7 @@ function renderPend() {
       +'<td style="padding:10px 12px;color:var(--muted);font-size:12px;">'+dt+'</td>'
       +'<td style="padding:10px 12px;font-weight:700;color:'+cor+';">'+(h>0?h+'h':'')+m+'min</td>'
       +'<td style="padding:10px 12px;">'+st+'</td>'
+      +'<td style="padding:10px 12px;font-size:12px;" id="pag-'+(a.protocolo||a._id)+'">⏳</td>'
       +'</tr>';
   }).join('');
 }
