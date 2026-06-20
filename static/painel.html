@@ -1498,8 +1498,21 @@ function renderPend() {
       <div style="font-size:20px;font-weight:800;">⚠️ Radar de Reincidência</div>
       <div style="font-size:13px;color:var(--muted);" id="reinc-sub">Clientes com histórico de OS de suporte</div>
     </div>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <input type="date" id="reinc-data" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;"/>
+      <select id="reinc-risco" onchange="filtrarReinc()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;">
+        <option value="">Todos os riscos</option>
+        <option value="5">🔴 Crítico (5+)</option>
+        <option value="3">🟠 Alto (3-4)</option>
+        <option value="2">🟡 Médio (2)</option>
+        <option value="1">🟢 Baixo (1)</option>
+      </select>
+      <select id="reinc-status" onchange="filtrarReinc()" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;">
+        <option value="">Todos status</option>
+        <option value="EA">Em andamento</option>
+        <option value="AG">Aguardando</option>
+        <option value="F">Finalizado</option>
+      </select>
       <button class="btn" onclick="carregarReincidencia()">↻ Atualizar</button>
     </div>
   </div>
@@ -1574,6 +1587,14 @@ function carregarReincidencia() {
 
       var badge = document.getElementById('badge-reinc');
       if(badge){ badge.textContent=comOS.length; badge.style.display=comOS.length?'':'none'; }
+      // Ordenar por qtd OS (maior primeiro)
+      comOS.sort(function(a,b){
+        var tA=(a.canal_cliente||'').replace('@c.us','');
+        var tB=(b.canal_cliente||'').replace('@c.us','');
+        return (historico[tB]||[]).length-(historico[tA]||[]).length;
+      });
+      window.__reincCache={comOS:comOS,historico:historico,nomes:nomes};
+
       document.getElementById('reinc-sub').textContent = comOS.length+' cliente(s) com histórico de OS — '+atends.length+' atendimentos no dia';
 
       if(!comOS.length){
