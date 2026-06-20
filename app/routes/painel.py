@@ -1458,3 +1458,92 @@ async def opa_historico_os(body: dict):
         return {'historico': resultado}
     except Exception as e:
         return {'historico': {}, 'erro': str(e)}
+
+# ── WEBHOOK OPA ───────────────────────────────────────────────
+from fastapi import Request as _Request
+import sqlite3 as _sq3, os as _os
+from datetime import datetime as _dt, timezone as _tz, timedelta as _td
+
+_NOMES_ATD_WH = {
+    '659c3d7dae4972531a907916': 'Johnatan David',
+    '68c81c2e21ad7f45d635901f': 'Amanda Gomes',
+    '682b6d07f497f37f8eb35338': 'Karine Ferreira',
+    '6659e00cbd1e771abfd2aefc': 'Rudinedja Santos',
+    '659c4448f2a21eee31c7ad36': 'Manuela Tavares',
+    '5d1642ad4b16a50312cc8f4d': 'Caique (bot)',
+}
+_DEPTOS_WH = {
+    '5bf73d1d186f7d2b0d647a61': 'Suporte',
+    '5bf73d1d186f7d2b0d647a60': 'Comercial',
+    '5d1624085e74a002308aa25e': 'Financeiro',
+    '5bf73d1d186f7d2b0d647a64': 'Ag. Virtual',
+    '5d1629315e74a002308aa262': 'Renegociacoes',
+}
+
+@router.post('/opa/webhook')
+async def opa_webhook(req: _Request):
+    BRT = _tz(_td(hours=-3))
+    agora = _dt.now(BRT).strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        body = await req.json()
+    except:
+        return {'status': 'ok'}
+
+    event = body.get('event', {})
+    event_type = event.get('type', '')
+    data = event.get('data', {})
+
+    # Ignorar verificacao
+    if event_type == 'verification':
+        return {'status': 'ok'}
+
+    # Extrair dados do atendimento
+    atend_id  = data.get('_id', '')
+    protocolo = data.get('protocol', '')
+    canal_cli = (data.get('customerChannel') or '').replace('@c.us', '')
+    id_atd    = data.get('attendantId', '')
+    nome_atd  = _NOMES_ATD_WH.get(id_atd, '')
+    depto_id  = data.get('departmentId', '')
+    depto     = _DEPTOS_WH.get(depto_id, depto_id[:8] if depto_id else '')
+    status    = data.get('status', '')
+
+    # Payload da acao (customerServiceEvent)
+    payload = data.get('payload', {})
+    if payload:
+        atend_id  = atend_id  or payload.get('_id', '')
+        protocolo = protocolo or payload.get('protocol', '')
+        canal_cli = canal_cli or (payload.get('customerChannel') or '').replace('@c.us', '')
+        id_atd    = id_atd    or payload.get('attendantId', '')
+        nome_atd  = nome_atd  or _NOMES_ATD_WH.get(id_atd, '')
+        depto_id  = depto_id  or payload.get('departmentId', '')
+        depto     = depto     or _DEPTOS_WH.get(depto_id, '')
+        status    = status    or payload.get('status', '')
+
+    if not atend_id:
+        return {'status': 'ok'}
+
+    # Salvar no SQLite
+    db = _os.path.join(_os.path.dirname(__file__), '../../hub_comercial.db')
+    conn = _sq3.connect(_os.path.abspath(db))
+    try:
+        conn.execute('''INSERT INTO opa_atendimentos
+            (atend_id,protocolo,canal_cliente,id_atendente,nome_atendente,setor,status,atualizado_em)
+            VALUES (?,?,?,?,?,?,?,?)
+            ON CONFLICT(atend_id) DO UPDATE SET
+            status=excluded.status,
+            id_atendente=COALESCE(NULLIF(excluded.id_atendente,\'\'),id_atendente),
+            nome_atendente=COALESCE(NULLIF(excluded.nome_atendente,\'\'),nome_atendente),
+            atualizado_em=excluded.atualizado_em''',
+            (atend_id,protocolo,canal_cli,id_atd,nome_atd,depto,status,agora))
+
+        # Registrar evento na tabela de mensagens como log
+        conn.execute('''INSERT INTO opa_mensagens
+            (atend_id,protocolo,canal_cliente,remetente,tipo,mensagem,data_hora,criado_em)
+            VALUES (?,?,?,?,?,?,?,?)''',
+            (atend_id,protocolo,canal_cli,'sistema',event_type,
+             f'Evento: {event_type} | status={status} | atendente={nome_atd}',agora,agora))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {'status': 'ok'}
