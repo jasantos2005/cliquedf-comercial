@@ -1413,8 +1413,19 @@ var _pendNomes = {};
 function carregarPendencias() {
   document.getElementById('pend-sub').textContent = 'Carregando...';
   var hoje = new Date().toISOString().slice(0,10);
-  api('/api/painel/opa/atendimentos?data='+hoje).then(function(r){
-    _pendData = (r.data||[]).filter(function(a){ return a.status==='EA'||a.status==='AG'; });
+  // Buscar EA de hoje + AG de qualquer data (fila real)
+  Promise.all([
+    api('/api/painel/opa/atendimentos?data='+hoje),
+    api('/api/painel/opa/fila')
+  ]).then(function(results){
+    var atHoje = results[0].data||[];
+    var filaAG = results[1].data||[];
+    // EA de hoje + AG de qualquer data sem duplicar
+    var idsHoje = atHoje.map(function(a){return a._id;});
+    var agExtra = filaAG.filter(function(a){ return idsHoje.indexOf(a._id)===-1; });
+    var todos = atHoje.concat(agExtra);
+    var r = {data: todos};
+    _pendData = todos.filter(function(a){ return a.status==='EA'||a.status==='AG'; });
 
     // Badge no menu
     var b = document.getElementById('badge-pend');
