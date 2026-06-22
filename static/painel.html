@@ -1501,6 +1501,28 @@ function renderPend() {
       +'<td style="padding:10px 12px;font-size:12px;" id="pag-'+(a.protocolo||a._id)+'">⏳</td>'
       +'</tr>';
   }).join('');
+  // Buscar aguardando após renderizar
+  var protos = lista.map(function(a){return a.protocolo||a._id;}).filter(Boolean);
+  if(protos.length){
+    fetch('/api/painel/opa/aguardando',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({ids:protos})
+    }).then(function(r){return r.json();}).then(function(r){
+      var ag=r.aguardando||{};
+      Object.keys(ag).forEach(function(proto){
+        var el=document.getElementById('pag-'+proto);
+        if(el){
+          var info=ag[proto];
+          var cor=info.quem==='cliente'?'var(--amber)':info.quem==='atendente'?'var(--red)':'var(--muted)';
+          var icon=info.quem==='cliente'?'📵':'👤';
+          el.textContent=icon+' '+(info.quem==='cliente'?'Cliente':'Atendente');
+          el.style.color=cor;
+          el.style.fontWeight='600';
+        }
+      });
+    }).catch(function(){});
+  }
 }
 </script>
 
