@@ -1561,6 +1561,10 @@ async def opa_webhook(req: _Request):
     finally:
         conn.close()
 
+    # Finalizar ticket IXC se atendimento foi finalizado no Opa
+    if status == 'F' and protocolo:
+        _finalizar_ticket_ixc(protocolo)
+
     return {'status': 'ok'}
 
 @router.get('/opa/timeline/{atend_id}')
@@ -1616,3 +1620,27 @@ async def opa_aguardando(body: dict):
     finally:
         conn.close()
     return {'aguardando': resultado}
+
+# ── Finalizar ticket IXC quando Opa finaliza ─────────────────
+def _finalizar_ticket_ixc(protocolo_opa: str):
+    from app.services.ixc_db import ixc_conn as _conn
+    try:
+        with _conn() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id FROM su_ticket WHERE titulo LIKE %s AND status = 'T' LIMIT 1",
+                (f'%{protocolo_opa}%',)
+            )
+            ticket = cur.fetchone()
+            if not ticket:
+                return False
+            cur.execute(
+                "UPDATE su_ticket SET status='F', ultima_atualizacao=NOW() WHERE id=%s",
+                (ticket['id'],)
+            )
+            conn.commit()
+            print(f'[IXC] Ticket finalizado para {protocolo_opa}')
+            return True
+    except Exception as e:
+        print(f'[IXC] Erro: {e}')
+        return False
