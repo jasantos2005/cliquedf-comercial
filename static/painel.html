@@ -634,7 +634,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       </div>
       <div class="ni" id="ni-retencao" onclick="navTo('retencao')">
         <div class="ni-icon">🎯</div>
-        <div class="ni-label">Retenção</div>
+        <div class="ni-label">Alteração de Planos</div>
       </div>
       <div class="sb-section">Admin</div>
       <div class="ni" id="ni-usuarios" onclick="navTo('usuarios')">
@@ -1155,13 +1155,13 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
   </div>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-    <select id="ret-mes" onchange="retencaoCarregar()" style="min-width:180px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+    <select id="ret-mes" onchange="retencaoCarregar()" style="min-width:180px;background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;color-scheme:dark">
       <option value="">Selecione o mês...</option>
     </select>
     <input id="ret-busca" type="text" placeholder="Buscar cliente ou telefone..."
       oninput="retencaoFiltrarTabela()"
       style="min-width:200px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
-    <select id="ret-status-filtro" onchange="retencaoFiltrarTabela()" style="background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+    <select id="ret-status-filtro" onchange="retencaoFiltrarTabela()" style="background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;color-scheme:dark">
       <option value="">Todos os status</option>
       <option value="nao_contatado">Não contatado</option>
       <option value="em_contato">Em contato</option>
@@ -1170,7 +1170,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
       <option value="alterado">Alterado</option>
       <option value="recusou">Recusou</option>
     </select>
-    <select id="ret-cidade-filtro" onchange="retencaoFiltrarTabela()" style="background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+    <select id="ret-cidade-filtro" onchange="retencaoFiltrarTabela()" style="background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;color-scheme:dark">
       <option value="">Todas as cidades</option>
     </select>
   </div>
@@ -1208,7 +1208,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
 
 <!-- MODAL RETENÇÃO -->
 <div class="overlay" id="modal-retencao">
-  <div class="modal-box" style="width:480px;max-width:95vw">
+  <div class="modal-box" style="width:480px;max-width:95vw;background:#1a1a2e;border:1px solid rgba(255,255,255,0.1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
       <h3 id="modal-ret-titulo" style="margin:0">Atualizar contrato</h3>
       <button onclick="fecharModal('modal-retencao')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
@@ -1221,7 +1221,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
     </div>
     <div style="margin-bottom:14px">
       <label style="font-size:13px;color:var(--muted)">Status</label>
-      <select id="modal-ret-status" style="width:100%;margin-top:4px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px">
+      <select id="modal-ret-status" style="width:100%;margin-top:4px;background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px;color-scheme:dark">
         <option value="nao_contatado">📋 Não contatado</option>
         <option value="em_contato">📞 Em contato</option>
         <option value="negociando">🤝 Negociando</option>
@@ -1445,11 +1445,6 @@ function retFmtData(d) {
   return `${dia}/${m}/${a}`;
 }
 </script>
-      <div style="color:var(--muted);margin-bottom:24px">Clique para abrir o sistema de retenção</div>
-      <a href="/static/retencao.html" target="_blank"
-         style="background:#e8521a;color:#fff;padding:14px 32px;border-radius:10px;font-weight:700;font-size:1rem;text-decoration:none">
-        Abrir HubRetenção →
-      </a>
     </div>
 
 <!-- PAGE: ATENDIMENTOS -->
