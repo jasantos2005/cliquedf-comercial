@@ -429,7 +429,23 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-</head>
+<style>
+#modal-ret-plano-novo, #modal-ret-plano-novo option,
+#ret-mes, #ret-mes option,
+#ret-status-filtro, #ret-status-filtro option,
+#ret-cidade-filtro, #ret-cidade-filtro option,
+#modal-ret-status, #modal-ret-status option {
+  background: #1a1a2e !important;
+  color: #e2e2e2 !important;
+  color-scheme: dark;
+}
+#modal-ret-plano-novo option:checked,
+#ret-mes option:checked,
+#modal-ret-status option:checked {
+  background: #f97316 !important;
+  color: #fff !important;
+}
+</style></head>
 <body>
 
 <!-- ══ LOGIN ══════════════════════════════════════════════ -->
