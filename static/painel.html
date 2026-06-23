@@ -445,6 +445,22 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
   background: #f97316 !important;
   color: #fff !important;
 }
+</style><style>
+#modal-ret-plano-novo, #modal-ret-plano-novo option,
+#ret-mes, #ret-mes option,
+#ret-status-filtro, #ret-status-filtro option,
+#ret-cidade-filtro, #ret-cidade-filtro option,
+#modal-ret-status, #modal-ret-status option {
+  background: #1a1a2e !important;
+  color: #e2e2e2 !important;
+  color-scheme: dark;
+}
+#modal-ret-plano-novo option:checked,
+#ret-mes option:checked,
+#modal-ret-status option:checked {
+  background: #f97316 !important;
+  color: #fff !important;
+}
 </style></head>
 <body>
 
@@ -1461,7 +1477,6 @@ function retFmtData(d) {
   return `${dia}/${m}/${a}`;
 }
 </script>
-    </div>
 
 <!-- PAGE: ATENDIMENTOS -->
 <div class="page" id="page-atendimentos">

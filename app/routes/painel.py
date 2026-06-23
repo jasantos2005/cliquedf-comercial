@@ -1644,3 +1644,76 @@ def _finalizar_ticket_ixc(protocolo_opa: str):
     except Exception as e:
         print(f'[IXC] Erro: {e}')
         return False
+
+
+# ── ALTERAÇÃO DE PLANOS POR VENCIMENTO ─────────────────────────────────────
+@router.get("/retencao/meses")
+def retencao_meses(user=Depends(requer_backoffice())):
+    from app.services.ixc_db import ixc_conn
+    with ixc_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT DATE_FORMAT(cc.data_expiracao, '%Y-%m') AS mes, COUNT(*) AS total
+            FROM ixcprovedor.cliente_contrato cc
+            WHERE cc.status = 'A'
+              AND cc.data_expiracao >= DATE_FORMAT(NOW() - INTERVAL 2 MONTH, '%Y-%m-01')
+              AND cc.data_expiracao <= DATE_FORMAT(NOW() + INTERVAL 6 MONTH, '%Y-%m-28')
+            GROUP BY mes ORDER BY mes ASC
+        """)
+        rows = cur.fetchall()
+    meses_pt = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+    result = []
+    for r in rows:
+        mes = r['mes']; ano, m = mes.split('-')
+        result.append({"mes": mes, "label": f"{meses_pt[int(m)]}/{ano}", "total": r['total']})
+    return result
+
+
+@router.get("/retencao")
+def retencao_contratos(mes: str = "", user=Depends(requer_backoffice())):
+    from app.services.ixc_db import ixc_conn
+    import sqlite3 as _sq, calendar as _cal
+    from app.routes.retencao import DB_PATH
+    from datetime import date
+    if not mes:
+        mes = date.today().strftime("%Y-%m")
+    ano, m = mes.split('-')
+    data_ini = f"{ano}-{m}-01"
+    ultimo = _cal.monthrange(int(ano), int(m))[1]
+    data_fim = f"{ano}-{m}-{ultimo:02d}"
+    with ixc_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cc.id AS contrato_id, cl.id AS cliente_id, cl.razao AS cliente,
+                   vd.nome AS plano_nome, vd.valor_contrato AS plano_valor,
+                   cc.data_expiracao, cl.telefone_celular AS telefone,
+                   ci.nome AS cidade_nome
+            FROM ixcprovedor.cliente_contrato cc
+            JOIN  ixcprovedor.cliente cl      ON cl.id  = cc.id_cliente
+            JOIN  ixcprovedor.vd_contratos vd ON vd.id  = cc.id_vd_contrato
+            LEFT  JOIN ixcprovedor.cidade ci  ON ci.id  = cl.cidade
+            WHERE cc.status = 'A'
+              AND cc.data_expiracao >= %s AND cc.data_expiracao <= %s
+            ORDER BY cc.data_expiracao ASC, cl.razao ASC
+        """, (data_ini, data_fim))
+        rows = cur.fetchall()
+    acoes = {}
+    try:
+        con2 = _sq.connect(DB_PATH)
+        con2.row_factory = _sq.Row
+        for row in con2.execute("SELECT ixc_contrato_id, status_retencao, obs, responsavel FROM hc_retencao_acoes").fetchall():
+            acoes[row['ixc_contrato_id']] = dict(row)
+        con2.close()
+    except Exception:
+        pass
+    contratos = []
+    kpis = {"total": 0, "receita": 0.0, "pendentes": 0, "em_contato": 0, "retidos": 0, "cancelados": 0}
+    for r in rows:
+        cid = r['contrato_id']; acao = acoes.get(cid, {}); status = acao.get('status_retencao', 'nao_contatado'); valor = float(r['plano_valor'] or 0)
+        contratos.append({"contrato_id": cid, "cliente_id": r['cliente_id'], "cliente": r['cliente'], "plano_nome": r['plano_nome'], "plano_valor": valor, "data_expiracao": str(r['data_expiracao']), "telefone": r['telefone'], "cidade_nome": r['cidade_nome'], "status_retencao": status, "obs": acao.get('obs',''), "responsavel": acao.get('responsavel','')})
+        kpis['total'] += 1; kpis['receita'] += valor
+        if status == 'nao_contatado': kpis['pendentes'] += 1
+        elif status in ('em_contato','negociando','confirmado'): kpis['em_contato'] += 1
+        elif status == 'alterado': kpis['retidos'] += 1
+        elif status == 'recusou': kpis['cancelados'] += 1
+    return {"contratos": contratos, "kpis": kpis}
