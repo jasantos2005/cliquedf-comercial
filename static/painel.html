@@ -656,7 +656,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <span class="ni-label">Automacoes</span>
       </div>
       <div class="sb-section">Upgrade</div>
-      <div class="ni" id="ni-upgrade-base" onclick="navTo('upgrade-base')">
+      <div class="ni" id="ni-upgrade-base" onclick="alert('Este módulo foi substituído por Alteração de Planos. Acesse no menu abaixo.')" style="opacity:0.4;cursor:not-allowed">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
         <span class="ni-label">A Realizar</span>
       </div>
@@ -1190,9 +1190,15 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
     <select id="ret-mes" onchange="retencaoCarregar()" style="min-width:180px;background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;color-scheme:dark">
       <option value="">Selecione o mês...</option>
     </select>
-    <input id="ret-busca" type="text" placeholder="Buscar cliente ou telefone..."
-      oninput="retencaoFiltrarTabela()"
-      style="min-width:200px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+    <div style="display:flex;gap:0">
+      <input id="ret-busca" type="text" placeholder="Buscar no mês..."
+        oninput="retencaoFiltrarTabela()" onkeydown="if(event.key==='Enter')retencaoBuscaGlobal()"
+        style="min-width:200px;background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px 0 0 6px;padding:6px 10px">
+      <button onclick="retencaoBuscaGlobal()" title="Buscar em todos os meses"
+        style="background:#f97316;color:#fff;border:none;border-radius:0 6px 6px 0;padding:6px 14px;cursor:pointer;font-size:13px;white-space:nowrap">
+        🔍 Global
+      </button>
+    </div>
     <select id="ret-status-filtro" onchange="retencaoFiltrarTabela()" style="background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 10px;color-scheme:dark">
       <option value="">Todos os status</option>
       <option value="nao_contatado">Não contatado</option>
@@ -1512,6 +1518,60 @@ async function salvarRetencao() {
     fecharModal('modal-retencao');
     retencaoFiltrarTabela();
   } catch(e) { alert('Erro: '+e.message); }
+}
+
+async function retencaoBuscaGlobal() {
+  const q = document.getElementById('ret-busca').value.trim();
+  if (q.length < 2) { alert('Digite pelo menos 2 caracteres para buscar.'); return; }
+
+  const tbody = document.getElementById('ret-tbody');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px">🔍 Buscando em todos os meses...</td></tr>';
+
+  try {
+    const res = await api(`/api/alteracao-planos/buscar?q=${encodeURIComponent(q)}`);
+    const contratos = res.contratos || [];
+
+    if (!contratos.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Nenhum contrato encontrado para "' + q + '"</td></tr>';
+      return;
+    }
+
+    // Atualiza retencaoData temporariamente com resultado global
+    retencaoData = contratos;
+
+    const BADGE = {
+      pendente:      '<span style="background:#6b728022;color:#9ca3af;padding:2px 8px;border-radius:4px;font-size:11px">Pendente</span>',
+      nao_contatado: '<span style="background:#6b728022;color:#9ca3af;padding:2px 8px;border-radius:4px;font-size:11px">Não contatado</span>',
+      em_contato:    '<span style="background:#3b82f622;color:#60a5fa;padding:2px 8px;border-radius:4px;font-size:11px">Em contato</span>',
+      negociando:    '<span style="background:#8b5cf622;color:#a78bfa;padding:2px 8px;border-radius:4px;font-size:11px">Negociando</span>',
+      confirmado:    '<span style="background:#f59e0b22;color:#f59e0b;padding:2px 8px;border-radius:4px;font-size:11px">Confirmado</span>',
+      alterado:      '<span style="background:#10b98122;color:#10b981;padding:2px 8px;border-radius:4px;font-size:11px">Alterado</span>',
+      recusou:       '<span style="background:#ef444422;color:#ef4444;padding:2px 8px;border-radius:4px;font-size:11px">Recusou</span>',
+    };
+
+    tbody.innerHTML = contratos.map(c => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05)" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+        <td style="padding:8px 10px"><strong>${c.cliente}</strong><br><small style="color:var(--muted)">#${c.contrato_id}</small></td>
+        <td style="padding:8px 10px">${c.cidade_nome||'—'}</td>
+        <td style="padding:8px 10px;font-size:12px">${c.plano_nome||'—'}</td>
+        <td style="padding:8px 10px">${retFmtData(c.data_expiracao)}</td>
+        <td style="padding:8px 10px">${c.telefone||'—'}</td>
+        <td style="padding:8px 10px">${BADGE[c.status_alteracao||'pendente']}</td>
+        <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${c.responsavel||'—'}</td>
+        <td style="padding:8px 10px">
+          <button onclick="abrirModalRetencao(${c.contrato_id})"
+            style="background:#f97316;color:#fff;border:none;border-radius:6px;padding:4px 14px;cursor:pointer;font-size:12px">
+            Abrir
+          </button>
+        </td>
+      </tr>`).join('');
+
+    document.getElementById('ret-contador').textContent =
+      `🔍 Resultado global: ${contratos.length} contrato(s) encontrado(s) para "${q}"`;
+
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#ef4444">Erro: ${e.message}</td></tr>`;
+  }
 }
 
 function retFmtData(d) {

@@ -343,3 +343,74 @@ def _notif_aplicado(payload, diferenca, por):
                   json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5)
     except Exception as e:
         log.warning(f"Telegram aplicado: {e}")
+
+
+@router.get("/buscar")
+def buscar_global(
+    q: str = Query(..., min_length=2),
+    usuario=Depends(requer_backoffice()),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    termo = f"%{q}%"
+    sql = """
+        SELECT cc.id AS contrato_id, c.id AS cliente_id, c.razao AS cliente,
+               cc.id_vd_contrato AS plano_id,
+               cc.contrato AS plano_nome, vd.valor_contrato AS plano_valor,
+               cc.data_expiracao, c.telefone_celular AS telefone,
+               ci.nome AS cidade_nome
+        FROM cliente_contrato cc
+        INNER JOIN cliente c          ON c.id  = cc.id_cliente
+        INNER JOIN vd_contratos vd    ON vd.id = cc.id_vd_contrato
+        LEFT  JOIN cidade ci          ON ci.id = c.cidade
+        WHERE cc.status = 'A'
+          AND cc.data_expiracao >= CURDATE()
+          AND (c.razao LIKE %s OR c.telefone_celular LIKE %s OR c.cnpj_cpf LIKE %s)
+        ORDER BY cc.data_expiracao ASC
+        LIMIT 50
+    """
+    with ixc_conn() as ixc:
+        with ixc.cursor() as cur:
+            cur.execute(sql, (termo, termo, termo))
+            rows = cur.fetchall()
+
+    ids = [r["contrato_id"] for r in rows]
+    status_hub = {}
+    if ids:
+        ph = ",".join("?" * len(ids))
+        rows_hub = db.execute(
+            f"SELECT ixc_contrato_id, status_alteracao, obs, responsavel FROM hc_alteracao_planos WHERE ixc_contrato_id IN ({ph})", ids
+        ).fetchall()
+        for r in rows_hub:
+            status_hub[r["ixc_contrato_id"]] = dict(r)
+
+    resultado = []
+    for r in rows:
+        cid    = r["contrato_id"]
+        hub    = status_hub.get(cid, {})
+        pid    = r["plano_id"]
+        novo_plano = None
+        if pid in DEPARA_PLANOS:
+            nid = DEPARA_PLANOS[pid]
+            with ixc_conn() as ixc:
+                with ixc.cursor() as cur:
+                    cur.execute("SELECT id, nome, valor_contrato FROM vd_contratos WHERE id = %s", (nid,))
+                    np = cur.fetchone()
+                    if np:
+                        novo_plano = {"id": np["id"], "nome": np["nome"], "valor": float(np["valor_contrato"] or 0)}
+        resultado.append({
+            "contrato_id":      cid,
+            "cliente_id":       r["cliente_id"],
+            "cliente":          r["cliente"],
+            "plano_id":         pid,
+            "plano_nome":       r["plano_nome"],
+            "plano_valor":      float(r["plano_valor"] or 0),
+            "data_expiracao":   str(r["data_expiracao"]),
+            "telefone":         r["telefone"] or "",
+            "cidade_nome":      r["cidade_nome"] or "",
+            "status_alteracao": hub.get("status_alteracao", "pendente"),
+            "obs":              hub.get("obs", ""),
+            "responsavel":      hub.get("responsavel", ""),
+            "novo_plano":       novo_plano,
+        })
+
+    return {"total": len(resultado), "contratos": resultado}
