@@ -1148,8 +1148,303 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
     <div id="upg-log-paginacao" style="display:flex;gap:8px;justify-content:center;margin-top:14px;"></div>
   </div>
 </div>
-    <div id="page-retencao" class="page" style="padding:40px;text-align:center">
-      <div style="font-size:1.2rem;font-weight:700;margin-bottom:16px">🎯 HubRetenção</div>
+    <div id="page-retencao" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="margin:0">Alteração de Planos por Vencimento</h2>
+    <span id="ret-ultima-atualizacao" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+    <select id="ret-mes" onchange="retencaoCarregar()" style="min-width:180px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+      <option value="">Selecione o mês...</option>
+    </select>
+    <input id="ret-busca" type="text" placeholder="Buscar cliente ou telefone..."
+      oninput="retencaoFiltrarTabela()"
+      style="min-width:200px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+    <select id="ret-status-filtro" onchange="retencaoFiltrarTabela()" style="background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+      <option value="">Todos os status</option>
+      <option value="nao_contatado">Não contatado</option>
+      <option value="em_contato">Em contato</option>
+      <option value="negociando">Negociando</option>
+      <option value="confirmado">Confirmado</option>
+      <option value="alterado">Alterado</option>
+      <option value="recusou">Recusou</option>
+    </select>
+    <select id="ret-cidade-filtro" onchange="retencaoFiltrarTabela()" style="background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:6px 10px">
+      <option value="">Todas as cidades</option>
+    </select>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px">
+    <div class="kpi-card"><div class="kpi-val" id="ret-kpi-total">—</div><div class="kpi-lbl">Total no mês</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="ret-kpi-receita" style="font-size:16px">—</div><div class="kpi-lbl">Receita em risco</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="ret-kpi-pendente" style="color:#f59e0b">—</div><div class="kpi-lbl">Não contatados</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="ret-kpi-contato" style="color:#3b82f6">—</div><div class="kpi-lbl">Em contato</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="ret-kpi-retido" style="color:#10b981">—</div><div class="kpi-lbl">Alterados</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="ret-kpi-cancelado" style="color:#ef4444">—</div><div class="kpi-lbl">Recusaram</div></div>
+  </div>
+
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:var(--muted);text-align:left">
+          <th style="padding:8px 10px">Cliente</th>
+          <th style="padding:8px 10px">Cidade</th>
+          <th style="padding:8px 10px">Plano</th>
+          <th style="padding:8px 10px">Vencimento</th>
+          <th style="padding:8px 10px">Telefone</th>
+          <th style="padding:8px 10px">Status</th>
+          <th style="padding:8px 10px">Responsável</th>
+          <th style="padding:8px 10px">Ação</th>
+        </tr>
+      </thead>
+      <tbody id="ret-tbody">
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Selecione um mês para carregar os contratos</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="ret-contador" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+</div>
+
+<!-- MODAL RETENÇÃO -->
+<div class="overlay" id="modal-retencao">
+  <div class="modal-box" style="width:480px;max-width:95vw">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h3 id="modal-ret-titulo" style="margin:0">Atualizar contrato</h3>
+      <button onclick="fecharModal('modal-retencao')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:13px">
+      <div><span style="color:var(--muted)">Plano</span><br><strong id="modal-ret-plano"></strong></div>
+      <div><span style="color:var(--muted)">Valor</span><br><strong id="modal-ret-valor"></strong></div>
+      <div><span style="color:var(--muted)">Vencimento</span><br><strong id="modal-ret-vencimento"></strong></div>
+      <div><span style="color:var(--muted)">Telefone</span><br><strong id="modal-ret-telefone"></strong></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:13px;color:var(--muted)">Status</label>
+      <select id="modal-ret-status" style="width:100%;margin-top:4px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px">
+        <option value="nao_contatado">📋 Não contatado</option>
+        <option value="em_contato">📞 Em contato</option>
+        <option value="negociando">🤝 Negociando</option>
+        <option value="confirmado">✅ Confirmado — alterar plano</option>
+        <option value="recusou">❌ Recusou</option>
+      </select>
+    </div>
+    <div id="ret-plano-novo-wrap" style="margin-bottom:14px;display:none">
+      <label style="font-size:13px;color:var(--muted)">Novo plano (igual ou superior)</label>
+      <select id="modal-ret-plano-novo" style="width:100%;margin-top:4px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px">
+        <option value="">Carregando planos...</option>
+      </select>
+      <div id="ret-plano-diferenca" style="font-size:12px;color:#10b981;margin-top:4px"></div>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:13px;color:var(--muted)">Observação</label>
+      <textarea id="modal-ret-obs" rows="3" placeholder="Anotações sobre o contato..."
+        style="width:100%;margin-top:4px;background:var(--surf2);color:var(--text);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:8px;resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="fecharModal('modal-retencao')" style="background:rgba(255,255,255,0.08);color:var(--text);border:none;border-radius:6px;padding:8px 20px;cursor:pointer">Cancelar</button>
+      <button onclick="salvarRetencao()" style="background:#f97316;color:#fff;border:none;border-radius:6px;padding:8px 20px;cursor:pointer;font-weight:600">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let retencaoData = [];
+let retencaoContratoAtual = null;
+
+async function retencaoInicializar() {
+  try {
+    const meses = await api('/api/painel/retencao/meses');
+    const sel = document.getElementById('ret-mes');
+    sel.innerHTML = '<option value="">Selecione o mês...</option>';
+    meses.forEach(m => {
+      sel.innerHTML += `<option value="${m.mes}">${m.label} — ${m.total} contratos</option>`;
+    });
+    const hoje = new Date();
+    const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}`;
+    const opt = [...sel.options].find(o => o.value === mesAtual);
+    if (opt) { opt.selected = true; retencaoCarregar(); }
+  } catch(e) { console.error('retencaoInicializar', e); }
+}
+
+async function retencaoCarregar() {
+  const mes = document.getElementById('ret-mes').value;
+  if (!mes) return;
+  document.getElementById('ret-tbody').innerHTML =
+    '<tr><td colspan="8" style="text-align:center;padding:40px">Carregando...</td></tr>';
+  try {
+    const res = await api(`/api/painel/retencao?mes=${mes}`);
+    retencaoData = res.contratos;
+    const k = res.kpis;
+    document.getElementById('ret-kpi-total').textContent     = k.total;
+    document.getElementById('ret-kpi-receita').textContent   = 'R$ ' + k.receita.toLocaleString('pt-BR',{minimumFractionDigits:2});
+    document.getElementById('ret-kpi-pendente').textContent  = k.pendentes;
+    document.getElementById('ret-kpi-contato').textContent   = k.em_contato;
+    document.getElementById('ret-kpi-retido').textContent    = k.retidos;
+    document.getElementById('ret-kpi-cancelado').textContent = k.cancelados;
+    const cidades = [...new Set(retencaoData.map(c => c.cidade_nome).filter(Boolean))].sort();
+    const selCid = document.getElementById('ret-cidade-filtro');
+    selCid.innerHTML = '<option value="">Todas as cidades</option>';
+    cidades.forEach(c => selCid.innerHTML += `<option value="${c}">${c}</option>`);
+    document.getElementById('ret-ultima-atualizacao').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+    retencaoFiltrarTabela();
+  } catch(e) {
+    document.getElementById('ret-tbody').innerHTML =
+      `<tr><td colspan="8" style="text-align:center;padding:40px;color:#ef4444">Erro: ${e.message}</td></tr>`;
+  }
+}
+
+function retencaoFiltrarTabela() {
+  const busca  = (document.getElementById('ret-busca').value || '').toLowerCase();
+  const status = document.getElementById('ret-status-filtro').value || '';
+  const cidade = document.getElementById('ret-cidade-filtro').value || '';
+  const filtrados = retencaoData.filter(c => {
+    if (busca  && !c.cliente?.toLowerCase().includes(busca) && !c.telefone?.includes(busca)) return false;
+    if (status && c.status_retencao !== status) return false;
+    if (cidade && c.cidade_nome !== cidade) return false;
+    return true;
+  });
+  const BADGE = {
+    nao_contatado: '<span style="background:#6b728022;color:#9ca3af;padding:2px 8px;border-radius:4px;font-size:11px">Não contatado</span>',
+    em_contato:    '<span style="background:#3b82f622;color:#60a5fa;padding:2px 8px;border-radius:4px;font-size:11px">Em contato</span>',
+    negociando:    '<span style="background:#8b5cf622;color:#a78bfa;padding:2px 8px;border-radius:4px;font-size:11px">Negociando</span>',
+    confirmado:    '<span style="background:#f59e0b22;color:#f59e0b;padding:2px 8px;border-radius:4px;font-size:11px">Confirmado</span>',
+    alterado:      '<span style="background:#10b98122;color:#10b981;padding:2px 8px;border-radius:4px;font-size:11px">Alterado</span>',
+    recusou:       '<span style="background:#ef444422;color:#ef4444;padding:2px 8px;border-radius:4px;font-size:11px">Recusou</span>',
+  };
+  const tbody = document.getElementById('ret-tbody');
+  if (!filtrados.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Nenhum contrato encontrado</td></tr>';
+    document.getElementById('ret-contador').textContent = '';
+    return;
+  }
+  tbody.innerHTML = filtrados.map(c => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+      <td style="padding:8px 10px"><strong>${c.cliente}</strong><br><small style="color:var(--muted)">#${c.contrato_id}</small></td>
+      <td style="padding:8px 10px">${c.cidade_nome||'—'}</td>
+      <td style="padding:8px 10px;font-size:12px">${c.plano_nome||'—'}</td>
+      <td style="padding:8px 10px">${retFmtData(c.data_expiracao)}</td>
+      <td style="padding:8px 10px">${c.telefone||'—'}</td>
+      <td style="padding:8px 10px">${BADGE[c.status_retencao]||c.status_retencao}</td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${c.responsavel||'—'}</td>
+      <td style="padding:8px 10px">
+        <button onclick="abrirModalRetencao(${c.contrato_id})"
+          style="background:#f97316;color:#fff;border:none;border-radius:6px;padding:4px 14px;cursor:pointer;font-size:12px">
+          Abrir
+        </button>
+      </td>
+    </tr>`).join('');
+  document.getElementById('ret-contador').textContent =
+    `Exibindo ${filtrados.length} de ${retencaoData.length} contratos`;
+}
+
+function abrirModalRetencao(contratoId) {
+  const c = retencaoData.find(x => x.contrato_id === contratoId);
+  if (!c) return;
+  retencaoContratoAtual = c;
+  document.getElementById('modal-ret-titulo').textContent     = c.cliente;
+  document.getElementById('modal-ret-plano').textContent      = c.plano_nome||'—';
+  document.getElementById('modal-ret-valor').textContent      = 'R$ '+(c.plano_valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('modal-ret-vencimento').textContent = retFmtData(c.data_expiracao);
+  document.getElementById('modal-ret-telefone').textContent   = c.telefone||'—';
+  document.getElementById('modal-ret-status').value           = c.status_retencao||'pendente';
+  document.getElementById('modal-ret-obs').value              = c.obs||'';
+  document.getElementById('modal-retencao').classList.add('show');
+}
+
+let _retPlanos = [];
+
+async function retencaoCarregarPlanos(valorMinimo) {
+  const sel = document.getElementById('modal-ret-plano-novo');
+  sel.innerHTML = '<option value="">Carregando...</option>';
+  try {
+    if (!_retPlanos.length) {
+      const r = await api('/api/upgrade/planos');
+      _retPlanos = r.planos || [];
+    }
+    const filtrados = _retPlanos.filter(p => parseFloat(p.valor_contrato||0) >= valorMinimo);
+    sel.innerHTML = filtrados.length
+      ? filtrados.map(p => `<option value="${p.id}" data-valor="${p.valor_contrato}" data-nome="${p.nome}">${p.nome} — R$ ${parseFloat(p.valor_contrato).toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`).join('')
+      : '<option value="">Nenhum plano disponível</option>';
+    sel.onchange = () => {
+      const opt = sel.options[sel.selectedIndex];
+      const novoVal = parseFloat(opt.dataset.valor||0);
+      const diff = novoVal - valorMinimo;
+      const sinal = diff >= 0 ? '+' : '';
+      document.getElementById('ret-plano-diferenca').textContent =
+        diff !== 0 ? `Diferença: ${sinal}R$ ${diff.toFixed(2)}/mês` : '';
+    };
+    sel.dispatchEvent(new Event('change'));
+  } catch(e) { sel.innerHTML = '<option value="">Erro ao carregar</option>'; }
+}
+
+document.getElementById('modal-ret-status').addEventListener('change', function() {
+  const wrap = document.getElementById('ret-plano-novo-wrap');
+  if (this.value === 'confirmado') {
+    wrap.style.display = 'block';
+    if (retencaoContratoAtual) retencaoCarregarPlanos(retencaoContratoAtual.plano_valor || 0);
+  } else {
+    wrap.style.display = 'none';
+  }
+});
+
+async function salvarRetencao() {
+  if (!retencaoContratoAtual) return;
+  const c = retencaoContratoAtual;
+  const status = document.getElementById('modal-ret-status').value;
+  const obs    = document.getElementById('modal-ret-obs').value;
+
+  let plano_novo_id = 0, plano_novo_nome = '', plano_novo_valor = 0;
+  if (status === 'confirmado') {
+    const sel = document.getElementById('modal-ret-plano-novo');
+    const opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) { alert('Selecione o novo plano.'); return; }
+    plano_novo_id    = parseInt(opt.value);
+    plano_novo_nome  = opt.dataset.nome;
+    plano_novo_valor = parseFloat(opt.dataset.valor||0);
+  }
+
+  const payload = {
+    ixc_contrato_id:   c.contrato_id,
+    cliente:           c.cliente,
+    cidade_nome:       c.cidade_nome,
+    plano_atual_id:    c.plano_id || 0,
+    plano_atual_nome:  c.plano_nome,
+    plano_atual_valor: c.plano_valor,
+    plano_novo_id,
+    plano_novo_nome,
+    plano_novo_valor,
+    status_contato:    status,
+    obs,
+    apenas_registrar:  status !== 'confirmado',
+  };
+
+  try {
+    const r = await fetch('/api/painel/retencao/alterar-plano', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('hc_p_token')},
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Erro ao salvar');
+    const idx = retencaoData.findIndex(x => x.contrato_id === c.contrato_id);
+    if (idx >= 0) {
+      retencaoData[idx].status_retencao = status === 'confirmado' ? 'alterado' : status;
+      retencaoData[idx].obs = obs;
+      retencaoData[idx].responsavel = data.responsavel || retencaoData[idx].responsavel;
+    }
+    fecharModal('modal-retencao');
+    retencaoFiltrarTabela();
+    if (status === 'confirmado') alert(`✅ ${data.msg}`);
+  } catch(e) { alert('Erro: '+e.message); }
+}
+
+function retFmtData(d) {
+  if (!d || d==='0000-00-00') return '—';
+  const [a,m,dia] = d.split('-');
+  return `${dia}/${m}/${a}`;
+}
+</script>
       <div style="color:var(--muted);margin-bottom:24px">Clique para abrir o sistema de retenção</div>
       <a href="/static/retencao.html" target="_blank"
          style="background:#e8521a;color:#fff;padding:14px 32px;border-radius:10px;font-weight:700;font-size:1rem;text-decoration:none">
@@ -2009,7 +2304,7 @@ const PAGE_TITLES = {
     'vend-perfil': 'Vendedores — Perfil',
   financeiro: 'Financeiro', cancelamentos: 'Cancelamentos',
   usuarios: 'Usuários', permissoes: 'Permissões por Grupo',
-  'metas': 'Metas de Ativação', 'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados', 'retencao': 'Retenção de Clientes'
+  'metas': 'Metas de Ativação', 'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados', 'retencao': 'Alteração de Planos'
 };
 
 function navTo(page) {
@@ -2048,6 +2343,7 @@ function navTo(page) {
     'metas': carregarMetas,
   'upgrade-base': carregarUpgradeBase,
     'upgrade-log':  () => { carregarUpgradeLog(); },
+    'retencao': retencaoInicializar,
     permissoes: carregarPermissoes,
     atendimentos: carregarAtendimentos,
     pendencias: () => carregarPendencias(),
@@ -2742,7 +3038,7 @@ async function carregarVendasCidades(periodo) {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px;">
           <div style="text-align:center;"><div style="font-weight:700;color:var(--green);">${c.instalados||0}</div><div style="color:var(--text3);">Instalados</div></div>
-          <div style="text-align:center;"><div style="font-weight:700;color:var(--amber);">${c.pendentes||0}</div><div style="color:var(--text3);">Pendentes</div></div>
+          <div style="text-align:center;"><div style="font-weight:700;color:var(--amber);">${c.pendentes||0}</div><div style="color:var(--text3);">Não contatados</div></div>
           <div style="text-align:center;"><div style="font-weight:700;color:var(--text2);">${pctInst}%</div><div style="color:var(--text3);">Inst.</div></div>
         </div>
         <div style="margin-top:8px;font-size:10px;color:var(--text3);">👥 ${c.qtd_vendedores||0} vendedor(es) · Clique para detalhar →</div>
@@ -2784,7 +3080,7 @@ async function abrirCidade(cidadeId, cidadeNome) {
         <div class="kpi" style="--ac:var(--cyan)"><div class="kv">${total}</div><div class="kl">Total contratos</div></div>
         <div class="kpi" style="--ac:var(--green)"><div class="kv">${instalados}</div><div class="kl">Instalados</div></div>
         <div class="kpi" style="--ac:var(--amber)"><div class="kv">${pendentes}</div><div class="kl">Pendentes OS</div></div>
-        <div class="kpi" style="--ac:var(--red)"><div class="kv">${cancelados}</div><div class="kl">Cancelados</div></div>
+        <div class="kpi" style="--ac:var(--red)"><div class="kv">${cancelados}</div><div class="kl">Recusaram</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;">
         <div class="card">
@@ -3580,7 +3876,7 @@ async function _tvCarregarTelas() {
           </div>
           <div class="tv-kpi" style="--ac:var(--amber)">
             <div class="tv-v">${t.pendentes||0}</div>
-            <div class="tv-l">Pendentes</div>
+            <div class="tv-l">Não contatados</div>
           </div>
           <div class="tv-kpi" style="--ac:var(--purple)">
             <div class="tv-v">${t.aguard_assinatura||0}</div>
