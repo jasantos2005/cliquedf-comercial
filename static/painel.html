@@ -1358,13 +1358,13 @@ async function retencaoCarregarPlanos(valorMinimo) {
   const sel = document.getElementById('modal-ret-plano-novo');
   sel.innerHTML = '<option value="">Carregando...</option>';
   try {
-    if (!_retPlanos.length) {
+    if (true) {
       const r = await api('/api/upgrade/planos');
       _retPlanos = r.planos || [];
     }
-    const filtrados = _retPlanos.filter(p => parseFloat(p.valor_contrato||0) >= valorMinimo);
+    const vMin = parseFloat(valorMinimo)||0; const filtrados = _retPlanos.filter(p => parseFloat(p.valor||p.valor_contrato||0) >= vMin);
     sel.innerHTML = filtrados.length
-      ? filtrados.map(p => `<option value="${p.id}" data-valor="${p.valor_contrato}" data-nome="${p.nome}">${p.nome} — R$ ${parseFloat(p.valor_contrato).toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`).join('')
+      ? filtrados.map(p => `<option value="${p.id}" data-valor="${p.valor||p.valor_contrato||0}" data-nome="${p.nome}">${p.nome} — R$ ${parseFloat(p.valor||p.valor_contrato||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`).join('')
       : '<option value="">Nenhum plano disponível</option>';
     sel.onchange = () => {
       const opt = sel.options[sel.selectedIndex];
