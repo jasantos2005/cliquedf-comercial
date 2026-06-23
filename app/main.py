@@ -16,6 +16,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 from app.routes import auth, vendedor, vendedor_acompanhamento, auditoria, painel, assinatura, admin, upgrade, metas
 from app.routes.retencao import router as retencao_router
+from app.routes.alteracao_planos import router as alteracao_planos_router
 app.include_router(auth.router,       prefix="/api/auth",       tags=["Auth"])
 app.include_router(vendedor.router,   prefix="/api/vendedor",   tags=["Vendedor"])
 app.include_router(vendedor_acompanhamento.router, prefix="/api/vendedor", tags=["Vendedor"])
@@ -51,3 +52,4 @@ app.include_router(admin.router,       prefix="/api/admin",       tags=["Admin"]
 app.include_router(upgrade.router,     prefix="/api/upgrade",     tags=["Upgrade"])
 app.include_router(metas.router,  prefix="/api/metas", tags=["metas"])
 app.include_router(retencao_router)
+app.include_router(alteracao_planos_router)

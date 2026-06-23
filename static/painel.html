@@ -1286,7 +1286,7 @@ let retencaoContratoAtual = null;
 
 async function retencaoInicializar() {
   try {
-    const meses = await api('/api/painel/retencao/meses');
+    const meses = await api('/api/alteracao-planos/meses');
     const sel = document.getElementById('ret-mes');
     sel.innerHTML = '<option value="">Selecione o mês...</option>';
     meses.forEach(m => {
@@ -1305,7 +1305,7 @@ async function retencaoCarregar() {
   document.getElementById('ret-tbody').innerHTML =
     '<tr><td colspan="8" style="text-align:center;padding:40px">Carregando...</td></tr>';
   try {
-    const res = await api(`/api/painel/retencao?mes=${mes}`);
+    const res = await api(`/api/alteracao-planos?mes=${mes}`);
     retencaoData = res.contratos;
     const k = res.kpis;
     document.getElementById('ret-kpi-total').textContent     = k.total;
@@ -1332,11 +1332,12 @@ function retencaoFiltrarTabela() {
   const cidade = document.getElementById('ret-cidade-filtro').value || '';
   const filtrados = retencaoData.filter(c => {
     if (busca  && !c.cliente?.toLowerCase().includes(busca) && !c.telefone?.includes(busca)) return false;
-    if (status && c.status_retencao !== status) return false;
+    if (status && c.status_alteracao !== status) return false;
     if (cidade && c.cidade_nome !== cidade) return false;
     return true;
   });
   const BADGE = {
+    pendente:      '<span style="background:#6b728022;color:#9ca3af;padding:2px 8px;border-radius:4px;font-size:11px">Pendente</span>',
     nao_contatado: '<span style="background:#6b728022;color:#9ca3af;padding:2px 8px;border-radius:4px;font-size:11px">Não contatado</span>',
     em_contato:    '<span style="background:#3b82f622;color:#60a5fa;padding:2px 8px;border-radius:4px;font-size:11px">Em contato</span>',
     negociando:    '<span style="background:#8b5cf622;color:#a78bfa;padding:2px 8px;border-radius:4px;font-size:11px">Negociando</span>',
@@ -1357,7 +1358,7 @@ function retencaoFiltrarTabela() {
       <td style="padding:8px 10px;font-size:12px">${c.plano_nome||'—'}</td>
       <td style="padding:8px 10px">${retFmtData(c.data_expiracao)}</td>
       <td style="padding:8px 10px">${c.telefone||'—'}</td>
-      <td style="padding:8px 10px">${BADGE[c.status_retencao]||c.status_retencao}</td>
+      <td style="padding:8px 10px">${BADGE[c.status_alteracao||"pendente"]}</td>
       <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${c.responsavel||'—'}</td>
       <td style="padding:8px 10px">
         <button onclick="abrirModalRetencao(${c.contrato_id})"
@@ -1374,13 +1375,31 @@ function abrirModalRetencao(contratoId) {
   const c = retencaoData.find(x => x.contrato_id === contratoId);
   if (!c) return;
   retencaoContratoAtual = c;
-  document.getElementById('modal-ret-titulo').textContent     = c.cliente;
+  document.getElementById('modal-ret-titulo').textContent     = c.cliente + ' — #' + c.contrato_id;
   document.getElementById('modal-ret-plano').textContent      = c.plano_nome||'—';
   document.getElementById('modal-ret-valor').textContent      = 'R$ '+(c.plano_valor||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
   document.getElementById('modal-ret-vencimento').textContent = retFmtData(c.data_expiracao);
   document.getElementById('modal-ret-telefone').textContent   = c.telefone||'—';
-  document.getElementById('modal-ret-status').value           = c.status_retencao||'pendente';
+  document.getElementById('modal-ret-status').value           = c.status_alteracao||'pendente';
   document.getElementById('modal-ret-obs').value              = c.obs||'';
+
+  // Plano substituto fixo via de-para
+  const wrap = document.getElementById('ret-plano-novo-wrap');
+  const sel  = document.getElementById('modal-ret-plano-novo');
+  const statusAtual = document.getElementById('modal-ret-status').value;
+  wrap.style.display = 'block';
+  if (c.novo_plano) {
+    const diff  = (c.novo_plano.valor - (c.plano_valor||0)).toFixed(2);
+    const sinal = parseFloat(diff) >= 0 ? '+' : '';
+    sel.innerHTML = `<option value="${c.novo_plano.id}" data-valor="${c.novo_plano.valor}" data-nome="${c.novo_plano.nome}">${c.novo_plano.nome} — R$ ${c.novo_plano.valor.toLocaleString('pt-BR',{minimumFractionDigits:2})}</option>`;
+    document.getElementById('ret-plano-diferenca').textContent = `Diferença: ${sinal}R$ ${diff}/mês`;
+    document.getElementById('ret-plano-diferenca').style.color = parseFloat(diff) >= 0 ? '#10b981' : '#ef4444';
+  } else {
+    sel.innerHTML = '<option value="">Sem plano substituto configurado para este plano</option>';
+    document.getElementById('ret-plano-diferenca').textContent = 'Este plano não possui substituto no de-para configurado.';
+    document.getElementById('ret-plano-diferenca').style.color = '#f59e0b';
+  }
+
   document.getElementById('modal-retencao').classList.add('show');
 }
 
@@ -1410,64 +1429,88 @@ async function retencaoCarregarPlanos(valorMinimo) {
   } catch(e) { sel.innerHTML = '<option value="">Erro ao carregar</option>'; }
 }
 
+
 document.getElementById('modal-ret-status').addEventListener('change', function() {
   const wrap = document.getElementById('ret-plano-novo-wrap');
-  if (this.value === 'confirmado') {
-    wrap.style.display = 'block';
-    if (retencaoContratoAtual) retencaoCarregarPlanos(retencaoContratoAtual.plano_valor || 0);
-  } else {
-    wrap.style.display = 'none';
+  if (retencaoContratoAtual && retencaoContratoAtual.novo_plano) {
+    wrap.style.display = this.value === 'confirmado' ? 'block' : 'none';
   }
 });
-
 async function salvarRetencao() {
   if (!retencaoContratoAtual) return;
   const c = retencaoContratoAtual;
   const status = document.getElementById('modal-ret-status').value;
   const obs    = document.getElementById('modal-ret-obs').value;
 
-  let plano_novo_id = 0, plano_novo_nome = '', plano_novo_valor = 0;
+  // Se confirmado, usa de-para fixo e pede confirmação
   if (status === 'confirmado') {
-    const sel = document.getElementById('modal-ret-plano-novo');
-    const opt = sel.options[sel.selectedIndex];
-    if (!opt || !opt.value) { alert('Selecione o novo plano.'); return; }
-    plano_novo_id    = parseInt(opt.value);
-    plano_novo_nome  = opt.dataset.nome;
-    plano_novo_valor = parseFloat(opt.dataset.valor||0);
+    if (!c.novo_plano) {
+      alert('Este plano não possui um plano substituto configurado. Registre como "Em contato" ou "Recusou".');
+      return;
+    }
+    const diff = (c.novo_plano.valor - c.plano_valor).toFixed(2);
+    const sinal = diff >= 0 ? '+' : '';
+    const confirmar = confirm(
+      `Confirmar alteração de plano?\n\n` +
+      `Cliente: ${c.cliente}\n` +
+      `Contrato: #${c.contrato_id}\n\n` +
+      `DE: ${c.plano_nome} — R$ ${c.plano_valor.toFixed(2)}\n` +
+      `PARA: ${c.novo_plano.nome} — R$ ${c.novo_plano.valor.toFixed(2)}\n` +
+      `Diferença: ${sinal}R$ ${diff}/mês\n\n` +
+      `Esta ação será aplicada diretamente no IXC.`
+    );
+    if (!confirmar) return;
+
+    try {
+      const r = await fetch('/api/alteracao-planos/aplicar', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('hc_p_token')},
+        body: JSON.stringify({
+          ixc_contrato_id:   c.contrato_id,
+          cliente:           c.cliente,
+          cidade_nome:       c.cidade_nome,
+          plano_atual_id:    c.plano_id,
+          plano_atual_nome:  c.plano_nome,
+          plano_atual_valor: c.plano_valor,
+          plano_novo_id:     c.novo_plano.id,
+          plano_novo_nome:   c.novo_plano.nome,
+          plano_novo_valor:  c.novo_plano.valor,
+          obs,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || 'Erro ao aplicar');
+      const idx = retencaoData.findIndex(x => x.contrato_id === c.contrato_id);
+      if (idx >= 0) {
+        retencaoData[idx].status_alteracao = 'alterado';
+        retencaoData[idx].plano_nome  = c.novo_plano.nome;
+        retencaoData[idx].plano_valor = c.novo_plano.valor;
+        retencaoData[idx].obs = obs;
+      }
+      fecharModal('modal-retencao');
+      retencaoFiltrarTabela();
+      alert(`✅ ${data.msg}`);
+    } catch(e) { alert('Erro: '+e.message); }
+    return;
   }
 
-  const payload = {
-    ixc_contrato_id:   c.contrato_id,
-    cliente:           c.cliente,
-    cidade_nome:       c.cidade_nome,
-    plano_atual_id:    c.plano_id || 0,
-    plano_atual_nome:  c.plano_nome,
-    plano_atual_valor: c.plano_valor,
-    plano_novo_id,
-    plano_novo_nome,
-    plano_novo_valor,
-    status_contato:    status,
-    obs,
-    apenas_registrar:  status !== 'confirmado',
-  };
-
+  // Para outros status, só registra
   try {
-    const r = await fetch('/api/painel/retencao/alterar-plano', {
+    const r = await fetch(`/api/alteracao-planos/${c.contrato_id}/status`, {
       method: 'POST',
       headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('hc_p_token')},
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        status_alteracao: status, obs,
+        cliente: c.cliente, ixc_cliente_id: c.cliente_id,
+        plano_nome: c.plano_nome, plano_valor: c.plano_valor,
+        data_expiracao: c.data_expiracao, telefone: c.telefone, cidade_nome: c.cidade_nome,
+      }),
     });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.detail || 'Erro ao salvar');
+    if (!r.ok) throw new Error('Erro ao salvar');
     const idx = retencaoData.findIndex(x => x.contrato_id === c.contrato_id);
-    if (idx >= 0) {
-      retencaoData[idx].status_retencao = status === 'confirmado' ? 'alterado' : status;
-      retencaoData[idx].obs = obs;
-      retencaoData[idx].responsavel = data.responsavel || retencaoData[idx].responsavel;
-    }
+    if (idx >= 0) { retencaoData[idx].status_alteracao = status; retencaoData[idx].obs = obs; }
     fecharModal('modal-retencao');
     retencaoFiltrarTabela();
-    if (status === 'confirmado') alert(`✅ ${data.msg}`);
   } catch(e) { alert('Erro: '+e.message); }
 }
 
