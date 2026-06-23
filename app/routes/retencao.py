@@ -38,11 +38,12 @@ def listar_retencao(
     sql_ixc = """
         SELECT cc.id AS contrato_id, c.id AS cliente_id, c.razao AS cliente,
                cc.contrato AS plano_nome, vd.valor_contrato AS plano_valor,
-               cc.data_expiracao, c.fone_celular AS telefone, cid.nome AS cidade_nome
+               cc.data_expiracao, c.telefone_celular AS telefone,
+               ci.nome AS cidade_nome
         FROM cliente_contrato cc
-        INNER JOIN cliente c       ON c.id  = cc.id_cliente
-        INNER JOIN vd_contratos vd ON vd.id = cc.id_vd_contrato
-        LEFT  JOIN cidades cid     ON cid.id = cc.cidade
+        INNER JOIN cliente c          ON c.id  = cc.id_cliente
+        INNER JOIN vd_contratos vd    ON vd.id = cc.id_vd_contrato
+        LEFT  JOIN cidade ci          ON ci.id = c.cidade
         WHERE cc.status = 'A'
           AND cc.data_expiracao >= %s
           AND cc.data_expiracao <= %s
