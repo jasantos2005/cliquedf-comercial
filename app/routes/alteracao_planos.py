@@ -135,7 +135,7 @@ def listar_por_mes(
     if ids:
         ph = ",".join("?" * len(ids))
         rows_hub = db.execute(
-            f"SELECT ixc_contrato_id, status_alteracao, obs, responsavel FROM hc_alteracao_planos WHERE ixc_contrato_id IN ({ph})", ids
+            f"SELECT ixc_contrato_id, status_alteracao, obs, responsavel, score, score_faixa, data_retorno FROM hc_alteracao_planos WHERE ixc_contrato_id IN ({ph})", ids
         ).fetchall()
         for r in rows_hub:
             status_hub[r["ixc_contrato_id"]] = dict(r)
@@ -164,6 +164,9 @@ def listar_por_mes(
             "obs":            hub.get("obs", ""),
             "responsavel":    hub.get("responsavel", ""),
             "novo_plano":     novo_plano,
+            "score":          hub.get("score", 0),
+            "score_faixa":    hub.get("score_faixa", "media"),
+            "data_retorno":   hub.get("data_retorno", ""),
         }
 
         if cidade and cidade.lower() not in item["cidade_nome"].lower(): continue
@@ -386,7 +389,7 @@ def buscar_global(
     if ids:
         ph = ",".join("?" * len(ids))
         rows_hub = db.execute(
-            f"SELECT ixc_contrato_id, status_alteracao, obs, responsavel FROM hc_alteracao_planos WHERE ixc_contrato_id IN ({ph})", ids
+            f"SELECT ixc_contrato_id, status_alteracao, obs, responsavel, score, score_faixa, data_retorno FROM hc_alteracao_planos WHERE ixc_contrato_id IN ({ph})", ids
         ).fetchall()
         for r in rows_hub:
             status_hub[r["ixc_contrato_id"]] = dict(r)
@@ -489,3 +492,78 @@ def dashboard(
         "ranking":  [dict(r) for r in ranking],
         "evolucao": [dict(r) for r in evolucao],
     }
+
+
+class RetornoPayload(BaseModel):
+    data_retorno: str  # formato: YYYY-MM-DD HH:MM
+    obs: Optional[str] = ""
+    cliente: Optional[str] = ""
+    ixc_cliente_id: Optional[int] = None
+    plano_nome: Optional[str] = ""
+    plano_valor: Optional[float] = 0
+    data_expiracao: Optional[str] = ""
+    telefone: Optional[str] = ""
+    cidade_nome: Optional[str] = ""
+
+@router.post("/{contrato_id}/agendar-retorno")
+def agendar_retorno(
+    contrato_id: int,
+    payload: RetornoPayload,
+    usuario=Depends(requer_backoffice()),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    responsavel = usuario.get("nome", "") or usuario.get("login", "")
+
+    existe = db.execute("SELECT id FROM hc_alteracao_planos WHERE ixc_contrato_id=?", (contrato_id,)).fetchone()
+    if existe:
+        db.execute("""
+            UPDATE hc_alteracao_planos SET
+                status_alteracao='em_contato', data_retorno=?, obs=?,
+                responsavel=?, retorno_enviado=0, atualizado_em=?
+            WHERE ixc_contrato_id=?
+        """, (payload.data_retorno, payload.obs, responsavel, agora, contrato_id))
+    else:
+        db.execute("""
+            INSERT INTO hc_alteracao_planos
+                (ixc_contrato_id,ixc_cliente_id,cliente,plano_nome,plano_valor,
+                 data_expiracao,telefone,cidade_nome,status_alteracao,
+                 data_retorno,obs,responsavel,retorno_enviado,criado_em,atualizado_em)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            contrato_id, payload.ixc_cliente_id, payload.cliente,
+            payload.plano_nome, payload.plano_valor, payload.data_expiracao,
+            payload.telefone, payload.cidade_nome, "em_contato",
+            payload.data_retorno, payload.obs, responsavel, 0, agora, agora
+        ))
+    db.commit()
+
+    # Notifica no Telegram que retorno foi agendado
+    _notif_retorno_agendado(contrato_id, payload, responsavel)
+
+    return {"ok": True, "contrato_id": contrato_id, "data_retorno": payload.data_retorno}
+
+
+def _notif_retorno_agendado(contrato_id, payload, por):
+    import requests as _req
+    from dotenv import load_dotenv
+    from pathlib import Path as _Path
+    load_dotenv(_Path(__file__).resolve().parent.parent.parent / ".env")
+    token   = os.getenv("TELEGRAM_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id: return
+    msg = (
+        f"📆 *RETORNO AGENDADO*\n\n"
+        f"👤 *Cliente:* {payload.cliente}\n"
+        f"📋 *Contrato:* #{contrato_id}\n"
+        f"📞 *Telefone:* {payload.telefone}\n"
+        f"📦 *Plano:* {payload.plano_nome}\n"
+        f"🕐 *Retornar em:* {payload.data_retorno}\n"
+    )
+    if payload.obs: msg += f"💬 *Obs:* {payload.obs}\n"
+    msg += f"\n👨‍💼 *Por:* {por}"
+    try:
+        _req.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                  json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5)
+    except Exception as e:
+        log.warning(f"Telegram retorno agendado: {e}")

@@ -1235,6 +1235,7 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
           <th style="padding:8px 10px">Plano</th>
           <th style="padding:8px 10px">Vencimento</th>
           <th style="padding:8px 10px">Telefone</th>
+          <th style="padding:8px 10px">Score</th>
           <th style="padding:8px 10px">Status</th>
           <th style="padding:8px 10px">Responsável</th>
           <th style="padding:8px 10px">Ação</th>
@@ -1277,6 +1278,11 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <option value="">Carregando planos...</option>
       </select>
       <div id="ret-plano-diferenca" style="font-size:12px;color:#10b981;margin-top:4px"></div>
+    </div>
+    <div id="ret-retorno-wrap" style="margin-bottom:14px;display:none">
+      <label style="font-size:13px;color:var(--muted)">Agendar retorno</label>
+      <input type="datetime-local" id="modal-ret-data-retorno"
+        style="width:100%;margin-top:4px;background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:8px;color-scheme:dark">
     </div>
     <div style="margin-bottom:20px">
       <label style="font-size:13px;color:var(--muted)">Observação</label>
@@ -1336,6 +1342,16 @@ async function retencaoCarregar() {
   }
 }
 
+function scorebadge(faixa, score) {
+  const cores = {
+    alta:  {bg:'#10b98122', color:'#10b981', label:'🟢 Alta'},
+    media: {bg:'#f59e0b22', color:'#f59e0b', label:'🟡 Média'},
+    baixa: {bg:'#ef444422', color:'#ef4444', label:'🔴 Baixa'},
+  };
+  const {bg, color, label} = cores[faixa||'media'] || cores.media;
+  return `<span style="background:${bg};color:${color};padding:2px 8px;border-radius:4px;font-size:11px" title="Score: ${score||0}">${label}</span>`;
+}
+
 function retencaoFiltrarTabela() {
   const busca  = (document.getElementById('ret-busca').value || '').toLowerCase();
   const status = document.getElementById('ret-status-filtro').value || '';
@@ -1368,6 +1384,7 @@ function retencaoFiltrarTabela() {
       <td style="padding:8px 10px;font-size:12px">${c.plano_nome||'—'}</td>
       <td style="padding:8px 10px">${retFmtData(c.data_expiracao)}</td>
       <td style="padding:8px 10px">${c.telefone||'—'}</td>
+      <td style="padding:8px 10px">${scorebadge(c.score_faixa, c.score)}</td>
       <td style="padding:8px 10px">${BADGE[c.status_alteracao||"pendente"]}</td>
       <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${c.responsavel||'—'}</td>
       <td style="padding:8px 10px">
@@ -1410,6 +1427,14 @@ function abrirModalRetencao(contratoId) {
     document.getElementById('ret-plano-diferenca').style.color = '#f59e0b';
   }
 
+  // Mostra campo retorno se status for em_contato ou negociando
+  const retWrap = document.getElementById('ret-retorno-wrap');
+  const statusVal = c.status_alteracao || 'pendente';
+  if (retWrap) retWrap.style.display = ['em_contato','negociando'].includes(statusVal) ? 'block' : 'none';
+  // Preenche data_retorno se existir
+  const drInput = document.getElementById('modal-ret-data-retorno');
+  if (drInput) drInput.value = c.data_retorno ? c.data_retorno.replace(' ','T').substring(0,16) : '';
+
   document.getElementById('modal-retencao').classList.add('show');
 }
 
@@ -1445,6 +1470,9 @@ document.getElementById('modal-ret-status').addEventListener('change', function(
   if (retencaoContratoAtual && retencaoContratoAtual.novo_plano) {
     wrap.style.display = this.value === 'confirmado' ? 'block' : 'none';
   }
+  // Mostra campo de retorno apenas para em_contato e negociando
+  const retWrap = document.getElementById('ret-retorno-wrap');
+  if (retWrap) retWrap.style.display = ['em_contato','negociando'].includes(this.value) ? 'block' : 'none';
 });
 async function salvarRetencao() {
   if (!retencaoContratoAtual) return;
@@ -1504,6 +1532,29 @@ async function salvarRetencao() {
     return;
   }
 
+  // Se em_contato ou negociando com data_retorno, agenda retorno
+  const dataRetorno = document.getElementById('modal-ret-data-retorno')?.value || '';
+  if (['em_contato','negociando'].includes(status) && dataRetorno) {
+    try {
+      const r = await fetch(`/api/alteracao-planos/${c.contrato_id}/agendar-retorno`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','Authorization':'Bearer '+localStorage.getItem('hc_p_token')},
+        body: JSON.stringify({
+          data_retorno: dataRetorno.replace('T',' '),
+          obs, cliente: c.cliente, ixc_cliente_id: c.cliente_id,
+          plano_nome: c.plano_nome, plano_valor: c.plano_valor,
+          data_expiracao: c.data_expiracao, telefone: c.telefone, cidade_nome: c.cidade_nome,
+        }),
+      });
+      if (!r.ok) throw new Error('Erro ao agendar');
+      const idx = retencaoData.findIndex(x => x.contrato_id === c.contrato_id);
+      if (idx >= 0) { retencaoData[idx].status_alteracao = status; retencaoData[idx].obs = obs; retencaoData[idx].data_retorno = dataRetorno.replace('T',' '); }
+      fecharModal('modal-retencao');
+      retencaoFiltrarTabela();
+      return;
+    } catch(e) { alert('Erro ao agendar retorno: '+e.message); return; }
+  }
+
   // Para outros status, só registra
   try {
     const r = await fetch(`/api/alteracao-planos/${c.contrato_id}/status`, {
@@ -1560,6 +1611,7 @@ async function retencaoBuscaGlobal() {
         <td style="padding:8px 10px;font-size:12px">${c.plano_nome||'—'}</td>
         <td style="padding:8px 10px">${retFmtData(c.data_expiracao)}</td>
         <td style="padding:8px 10px">${c.telefone||'—'}</td>
+        <td style="padding:8px 10px">${scorebadge(c.score_faixa, c.score)}</td>
         <td style="padding:8px 10px">${BADGE[c.status_alteracao||'pendente']}</td>
         <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${c.responsavel||'—'}</td>
         <td style="padding:8px 10px">
@@ -1577,6 +1629,7 @@ async function retencaoBuscaGlobal() {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#ef4444">Erro: ${e.message}</td></tr>`;
   }
 }
+
 
 function retFmtData(d) {
   if (!d || d==='0000-00-00') return '—';
