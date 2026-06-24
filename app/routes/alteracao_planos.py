@@ -11,7 +11,7 @@ from datetime import datetime
 import sqlite3, calendar, os, logging
 
 from app.services.ixc_db import ixc_conn
-from app.services.auth import requer_backoffice
+from app.services.auth import requer_backoffice, requer_admin
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/alteracao-planos", tags=["alteracao-planos"])
@@ -274,18 +274,26 @@ def aplicar_alteracao(
         raise HTTPException(status_code=500, detail=f"Erro ao atualizar no IXC: {e}")
 
     # Atualiza status local
+    diferenca = round(payload.plano_novo_valor - payload.plano_atual_valor, 2)
     existe = db.execute("SELECT id FROM hc_alteracao_planos WHERE ixc_contrato_id=?", (payload.ixc_contrato_id,)).fetchone()
     if existe:
-        db.execute("UPDATE hc_alteracao_planos SET status_alteracao='alterado',obs=?,responsavel=?,atualizado_em=? WHERE ixc_contrato_id=?",
-                   (payload.obs, responsavel, agora, payload.ixc_contrato_id))
+        db.execute("""UPDATE hc_alteracao_planos SET
+            status_alteracao='alterado', obs=?, responsavel=?, atualizado_em=?,
+            plano_novo_nome=?, plano_novo_valor=?, diferenca_valor=?
+            WHERE ixc_contrato_id=?""",
+            (payload.obs, responsavel, agora,
+             payload.plano_novo_nome, payload.plano_novo_valor, diferenca,
+             payload.ixc_contrato_id))
     else:
         db.execute("""INSERT INTO hc_alteracao_planos
             (ixc_contrato_id,ixc_cliente_id,cliente,plano_nome,plano_valor,
+             plano_novo_nome,plano_novo_valor,diferenca_valor,
              cidade_nome,status_alteracao,obs,responsavel,criado_em,atualizado_em)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-            (payload.ixc_contrato_id, None, payload.cliente, payload.plano_atual_nome,
-             payload.plano_atual_valor, payload.cidade_nome,
-             "alterado", payload.obs, responsavel, agora, agora))
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (payload.ixc_contrato_id, None, payload.cliente,
+             payload.plano_atual_nome, payload.plano_atual_valor,
+             payload.plano_novo_nome, payload.plano_novo_valor, diferenca,
+             payload.cidade_nome, "alterado", payload.obs, responsavel, agora, agora))
     db.commit()
 
     _notif_aplicado(payload, diferenca, responsavel)
@@ -414,3 +422,70 @@ def buscar_global(
         })
 
     return {"total": len(resultado), "contratos": resultado}
+
+
+@router.get("/dashboard")
+def dashboard(
+    de: Optional[str] = Query(None),
+    ate: Optional[str] = Query(None),
+    usuario=Depends(requer_admin()),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    """Dashboard de alterações — apenas admin e desenvolvimento."""
+    where = "WHERE 1=1"
+    params = []
+    if de:
+        where += " AND atualizado_em >= ?"
+        params.append(de + " 00:00:00")
+    if ate:
+        where += " AND atualizado_em <= ?"
+        params.append(ate + " 23:59:59")
+
+    # KPIs gerais
+    kpis = db.execute(f"""
+        SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN status_alteracao = 'alterado'   THEN 1 ELSE 0 END) AS alterados,
+            SUM(CASE WHEN status_alteracao = 'em_contato' THEN 1 ELSE 0 END) AS em_contato,
+            SUM(CASE WHEN status_alteracao = 'negociando' THEN 1 ELSE 0 END) AS negociando,
+            SUM(CASE WHEN status_alteracao = 'recusou'    THEN 1 ELSE 0 END) AS recusou,
+            SUM(CASE WHEN status_alteracao = 'pendente'   THEN 1 ELSE 0 END) AS pendentes,
+            SUM(CASE WHEN status_alteracao != 'pendente'  THEN 1 ELSE 0 END) AS contatados,
+            ROUND(SUM(CASE WHEN status_alteracao = 'alterado' THEN diferenca_valor ELSE 0 END), 2) AS receita_gerada
+        FROM hc_alteracao_planos {where}
+    """, params).fetchone()
+
+    # Ranking por operador
+    ranking = db.execute(f"""
+        SELECT
+            responsavel,
+            COUNT(*) AS contatados,
+            SUM(CASE WHEN status_alteracao = 'alterado'   THEN 1 ELSE 0 END) AS alterados,
+            SUM(CASE WHEN status_alteracao = 'recusou'    THEN 1 ELSE 0 END) AS recusou,
+            SUM(CASE WHEN status_alteracao = 'em_contato' THEN 1 ELSE 0 END) AS em_contato,
+            SUM(CASE WHEN status_alteracao = 'negociando' THEN 1 ELSE 0 END) AS negociando,
+            ROUND(SUM(CASE WHEN status_alteracao = 'alterado' THEN diferenca_valor ELSE 0 END), 2) AS receita_gerada,
+            MAX(atualizado_em) AS ultimo_contato
+        FROM hc_alteracao_planos {where}
+        AND responsavel IS NOT NULL AND responsavel != ''
+        GROUP BY responsavel
+        ORDER BY alterados DESC, receita_gerada DESC
+    """, params).fetchall()
+
+    # Evolução diária
+    evolucao = db.execute(f"""
+        SELECT
+            DATE(atualizado_em) AS dia,
+            COUNT(*) AS contatos,
+            SUM(CASE WHEN status_alteracao = 'alterado' THEN 1 ELSE 0 END) AS alterados,
+            ROUND(SUM(CASE WHEN status_alteracao = 'alterado' THEN diferenca_valor ELSE 0 END), 2) AS receita
+        FROM hc_alteracao_planos {where}
+        AND status_alteracao != 'pendente'
+        GROUP BY dia ORDER BY dia ASC
+    """, params).fetchall()
+
+    return {
+        "kpis":     dict(kpis),
+        "ranking":  [dict(r) for r in ranking],
+        "evolucao": [dict(r) for r in evolucao],
+    }

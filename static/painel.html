@@ -668,6 +668,10 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <div class="ni-icon">🎯</div>
         <div class="ni-label">Alteração de Planos</div>
       </div>
+      <div class="ni" id="ni-alt-dashboard" onclick="navTo('alt-dashboard')" style="padding-left:32px;display:none" data-nivel-min="99">
+        <i class="ti ti-chart-bar"></i>
+        <span class="ni-label">Dashboard</span>
+      </div>
       <div class="sb-section">Admin</div>
       <div class="ni" id="ni-usuarios" onclick="navTo('usuarios')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -2135,6 +2139,119 @@ function abrirHistOS(tel, nome) {
   document.getElementById('modal-os-hist').style.display='flex';
 }
 </script>
+
+<!-- PAGE: DASHBOARD ALTERACAO PLANOS -->
+<div class="page" id="page-alt-dashboard">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <h2 style="margin:0">📊 Dashboard — Alteração de Planos</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="date" id="altd-de"  style="background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px">
+      <span style="color:var(--muted)">até</span>
+      <input type="date" id="altd-ate" style="background:#1e1e2e;color:#e2e2e2;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:5px 8px">
+      <button onclick="altDashboardCarregar()" style="background:#f97316;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer">Filtrar</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px">
+    <div class="kpi-card"><div class="kpi-val" id="altd-kpi-contatados" style="color:#3b82f6">—</div><div class="kpi-lbl">Contatados</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="altd-kpi-alterados"  style="color:#10b981">—</div><div class="kpi-lbl">Alterados</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="altd-kpi-negociando" style="color:#8b5cf6">—</div><div class="kpi-lbl">Negociando</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="altd-kpi-recusou"    style="color:#ef4444">—</div><div class="kpi-lbl">Recusaram</div></div>
+    <div class="kpi-card"><div class="kpi-val" id="altd-kpi-receita"    style="color:#f97316;font-size:16px">—</div><div class="kpi-lbl">Receita gerada</div></div>
+  </div>
+
+  <!-- Ranking -->
+  <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">🏆 Ranking de Operadores</div>
+  <div style="overflow-x:auto;margin-bottom:24px">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:var(--muted);text-align:left">
+          <th style="padding:8px 10px">#</th>
+          <th style="padding:8px 10px">Operador</th>
+          <th style="padding:8px 10px;text-align:center">Contatados</th>
+          <th style="padding:8px 10px;text-align:center">Alterados</th>
+          <th style="padding:8px 10px;text-align:center">Negociando</th>
+          <th style="padding:8px 10px;text-align:center">Recusaram</th>
+          <th style="padding:8px 10px;text-align:right">Receita gerada</th>
+          <th style="padding:8px 10px">Último contato</th>
+        </tr>
+      </thead>
+      <tbody id="altd-ranking-body">
+        <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Evolução diária -->
+  <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📅 Evolução Diária</div>
+  <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1);color:var(--muted);text-align:left">
+          <th style="padding:8px 10px">Dia</th>
+          <th style="padding:8px 10px;text-align:center">Contatos</th>
+          <th style="padding:8px 10px;text-align:center">Alterados</th>
+          <th style="padding:8px 10px;text-align:right">Receita</th>
+        </tr>
+      </thead>
+      <tbody id="altd-evolucao-body">
+        <tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted)">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function altDashboardCarregar() {
+  const de  = document.getElementById('altd-de')?.value  || '';
+  const ate = document.getElementById('altd-ate')?.value || '';
+  let url = '/api/alteracao-planos/dashboard';
+  const params = [];
+  if (de)  params.push('de='  + de);
+  if (ate) params.push('ate=' + ate);
+  if (params.length) url += '?' + params.join('&');
+
+  try {
+    const d = await api(url);
+
+    // KPIs
+    document.getElementById('altd-kpi-contatados').textContent = d.kpis.contatados || 0;
+    document.getElementById('altd-kpi-alterados').textContent  = d.kpis.alterados  || 0;
+    document.getElementById('altd-kpi-negociando').textContent = d.kpis.negociando || 0;
+    document.getElementById('altd-kpi-recusou').textContent    = d.kpis.recusou    || 0;
+    document.getElementById('altd-kpi-receita').textContent    = 'R$ ' + (d.kpis.receita_gerada||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+
+    // Ranking
+    const posIcons = ['🥇','🥈','🥉'];
+    document.getElementById('altd-ranking-body').innerHTML = d.ranking.length
+      ? d.ranking.map((r, i) => `
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05)" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background=''">
+          <td style="padding:8px 10px;font-weight:700;color:#f97316">${posIcons[i] || (i+1)+'o'}</td>
+          <td style="padding:8px 10px;font-weight:600">${r.responsavel}</td>
+          <td style="padding:8px 10px;text-align:center">${r.contatados}</td>
+          <td style="padding:8px 10px;text-align:center;color:#10b981;font-weight:700">${r.alterados}</td>
+          <td style="padding:8px 10px;text-align:center;color:#8b5cf6">${r.negociando||0}</td>
+          <td style="padding:8px 10px;text-align:center;color:#ef4444">${r.recusou||0}</td>
+          <td style="padding:8px 10px;text-align:right;color:#f97316;font-weight:700">R$ ${(r.receita_gerada||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+          <td style="padding:8px 10px;font-size:11px;color:var(--muted)">${r.ultimo_contato||'—'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--muted)">Nenhum dado no período</td></tr>';
+
+    // Evolução
+    document.getElementById('altd-evolucao-body').innerHTML = d.evolucao.length
+      ? d.evolucao.map(r => `
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05)">
+          <td style="padding:8px 10px">${r.dia}</td>
+          <td style="padding:8px 10px;text-align:center">${r.contatos}</td>
+          <td style="padding:8px 10px;text-align:center;color:#10b981;font-weight:700">${r.alterados}</td>
+          <td style="padding:8px 10px;text-align:right;color:#f97316">R$ ${(r.receita||0).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">Nenhum dado no período</td></tr>';
+
+  } catch(e) { console.error('altDashboardCarregar', e); }
+}
+</script>
 </body>
 </html>
     </div><!-- /content -->
@@ -2402,6 +2519,7 @@ function mostrarApp() {
   document.getElementById('sb-av').textContent = usuario.nome.charAt(0).toUpperCase();
   carregarFiltros();
   carregarDashboard();
+  altDashboardVerificarAcesso();
   // Pre-carregar lista de vendedores para os selects
   setTimeout(preCarregarVendedores, 1000);
 }
@@ -2415,6 +2533,16 @@ function logout() {
 }
 
 // ── SIDEBAR ──────────────────────────────────────────────────
+function altDashboardVerificarAcesso() {
+  try {
+    const nivel = (usuario && usuario.nivel) || 0;
+    const el = document.getElementById('ni-alt-dashboard');
+    if (el) el.style.display = nivel >= 99 ? '' : 'none';
+  } catch(e) {}
+}
+// Chama ao carregar
+document.addEventListener('DOMContentLoaded', altDashboardVerificarAcesso);
+
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
 function toggleSub(subId, niId) {
   const sub = document.getElementById(subId), ni = document.getElementById(niId);
@@ -2433,7 +2561,7 @@ const PAGE_TITLES = {
     'vend-perfil': 'Vendedores — Perfil',
   financeiro: 'Financeiro', cancelamentos: 'Cancelamentos',
   usuarios: 'Usuários', permissoes: 'Permissões por Grupo',
-  'metas': 'Metas de Ativação', 'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados', 'retencao': 'Alteração de Planos'
+  'metas': 'Metas de Ativação', 'upgrade-base': 'Upgrade — A Realizar', 'upgrade-log': 'Upgrade — Realizados', 'retencao': 'Alteração de Planos', 'alt-dashboard': 'Dashboard — Alteração de Planos'
 };
 
 function navTo(page) {
