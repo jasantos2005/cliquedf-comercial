@@ -1256,7 +1256,7 @@ async def opa_atendimentos(data: str = None):
     import json
     if not data:
         data = str(date.today())
-    payload = {"filter": {"dataInicialAbertura": data, "dataFinalAbertura": data}, "options": {"limit": 200}}
+    payload = {"filter": {"dataInicialAbertura": data, "dataFinalAbertura": data}, "options": {"limit": 500}}
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.request(
