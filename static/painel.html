@@ -2098,7 +2098,8 @@ function carregarReincidencia() {
       // Filtrar só quem tem OS anterior
       var comOS = atends.filter(function(a){
         var tel=(a.canal_cliente||'').replace('@c.us','');
-        return historico[tel] && historico[tel].length > 0;
+        var ehSuporte = a.setor === '5bf73d1d186f7d2b0d647a61';
+        return ehSuporte && historico[tel] && historico[tel].length > 0;
       });
 
       var badge = document.getElementById('badge-reinc');

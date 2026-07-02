@@ -9,8 +9,8 @@ from app.services.ixc_db import ixc_conn
 
 OPA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY1OWMzYjk5ZjJhMjFlZWUzMWM3YWEzYSIsImlhdCI6MTc3MDgzODM5OH0.VNIC3HqVGIxuHQoesd-5jftTVkEMd6jionH9pkyKeAM'
 OPA_BASE  = 'https://cliquedf.opasuite.com.br/api/v1'
-TG_TOKEN  = '8027006096:AAHiJEdtFyPresI81tWgs-Je2PKdaYAyWtY'
-TG_CHAT   = '-5142280642'
+TG_TOKEN  = '8308787747:AAFuP5Dr7wkOdbTvQhYI9BE5mQuDVDPgDIY'
+TG_CHAT   = '2135602169'
 BRT       = timezone(timedelta(hours=-3))
 CONTROLE  = '/tmp/opa_reincidencia.json'
 
@@ -72,6 +72,7 @@ def buscar_historico_cliente(tel_fmt: str) -> list:
                 ' JOIN cliente c ON c.id = o.id_cliente'
                 ' LEFT JOIN funcionarios f ON f.id = o.id_tecnico'
                 ' WHERE o.id_assunto IN (16, 20, 21)'
+                ' AND o.data_abertura >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)'
                 ' AND (c.telefone_celular = %s OR c.fone = %s OR c.whatsapp = %s)'
                 ' ORDER BY o.data_abertura DESC LIMIT 10',
                 (tel_fmt, tel_fmt, tel_fmt)
@@ -121,8 +122,8 @@ async def main():
             content=json.dumps(payload).encode())
     atends = r.json().get('data', [])
 
-    # Filtrar apenas abertos (EA ou AG)
-    abertos = [a for a in atends if a.get('status') in ('EA', 'AG')]
+    # Filtrar apenas abertos de Suporte (EA ou AG)
+    abertos = [a for a in atends if a.get('status') in ('EA', 'AG') and a.get('setor') == '5bf73d1d186f7d2b0d647a61']
 
     novos_ids = []
     alertas = []

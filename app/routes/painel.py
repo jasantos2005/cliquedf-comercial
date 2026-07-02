@@ -1416,6 +1416,7 @@ async def opa_historico_os(body: dict):
                 " JOIN cliente c ON c.id = o.id_cliente"
                 " LEFT JOIN funcionarios f ON f.id = o.id_tecnico"
                 " WHERE o.id_assunto IN (16, 20, 21)"
+                " AND o.data_abertura >= DATE_SUB(CURDATE(), INTERVAL 60 DAY)"
                 " AND (" + conds + ")"
                 " ORDER BY o.data_abertura DESC LIMIT 50"
             )

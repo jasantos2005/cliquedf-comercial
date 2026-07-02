@@ -9,8 +9,8 @@ from datetime import date, datetime, timezone, timedelta
 
 OPA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY1OWMzYjk5ZjJhMjFlZWUzMWM3YWEzYSIsImlhdCI6MTc3MDgzODM5OH0.VNIC3HqVGIxuHQoesd-5jftTVkEMd6jionH9pkyKeAM'
 OPA_BASE  = 'https://cliquedf.opasuite.com.br/api/v1'
-TG_TOKEN  = '8027006096:AAHiJEdtFyPresI81tWgs-Je2PKdaYAyWtY'
-TG_CHAT   = '-5142280642'
+TG_TOKEN  = '8308787747:AAFuP5Dr7wkOdbTvQhYI9BE5mQuDVDPgDIY'
+TG_CHAT   = '2135602169'
 BRT       = timezone(timedelta(hours=-3))
 CONTROLE  = '/tmp/opa_alertas_disparados.json'
 
