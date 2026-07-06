@@ -2577,7 +2577,7 @@ function carregarBonif() {
         '<div style="flex:1;">'+
         '<div style="font-size:15px;font-weight:700;">'+d.nome+(isEvolucao?' 🏅 Maior evolução':'')+'</div>'+
         '<div style="font-size:12px;color:var(--muted);">Score: '+d.score+' | '+d.atendimentos+' atend. | '+d.xp+' XP</div>'+
-        '<div style="font-size:11px;color:'+(d.evolucao>0?'var(--green)':'var(--red)')+';">Evolução: '+(d.evolucao>0?'+':'')+d.evolucao+' vs mês anterior</div>'+
+        '<div style="font-size:11px;color:'+(mesEmAndamento?'var(--muted)':d.evolucao>0?'var(--green)':'var(--red)')+';">Evolução: '+(mesEmAndamento?'— (mês em andamento)':(d.evolucao>0?'+':'')+d.evolucao+' vs mês anterior')+'</div>'+
         '</div>'+
         '<div style="text-align:right;">'+
         (bTotal>0?'<div style="font-size:22px;font-weight:900;color:'+cor+';">R$ '+bTotal+'</div>':'<div style="color:var(--muted);font-size:13px;">—</div>')+
