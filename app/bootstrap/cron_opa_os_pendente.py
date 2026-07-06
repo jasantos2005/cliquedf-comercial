@@ -4,9 +4,11 @@ Verifica atendimentos Opa finalizados com motivos que sugerem OS
 e cruza com IXC para ver se OS foi realmente aberta no mesmo dia.
 Alerta no Telegram os casos onde OS deveria ter sido aberta mas não foi.
 """
-import httpx, json, asyncio
+import httpx, json, asyncio, os
 from datetime import date, datetime, timezone, timedelta
 from app.services.ixc_db import ixc_conn
+
+CONTROLE = '/tmp/opa_os_pendente_disparados.json'
 
 OPA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY1OWMzYjk5ZjJhMjFlZWUzMWM3YWEzYSIsImlhdCI6MTc3MDgzODM5OH0.VNIC3HqVGIxuHQoesd-5jftTVkEMd6jionH9pkyKeAM'
 OPA_BASE  = 'https://cliquedf.opasuite.com.br/api/v1'
@@ -33,6 +35,22 @@ MOTIVOS_OS = {
     '6643c622bd1e771abfc338d2': 'Sem acesso',
     '65a18e2ef2a21eee31c8846e': 'Transferido outro setor',
 }
+
+def carregar_controle():
+    hoje = str(date.today())
+    if not os.path.exists(CONTROLE):
+        return {'data': hoje, 'protocolos': []}
+    with open(CONTROLE) as f:
+        ctrl = json.load(f)
+    if ctrl.get('data') != hoje:
+        return {'data': hoje, 'protocolos': []}
+    return ctrl
+
+
+def salvar_controle(ctrl):
+    with open(CONTROLE, 'w') as f:
+        json.dump(ctrl, f)
+
 
 def formatar_tel(tel: str) -> str:
     digits = ''.join(c for c in tel if c.isdigit())
@@ -128,8 +146,15 @@ async def main():
 
     print(f'[{agora.strftime("%H:%M")}] {len(sem_os)} atendimentos sem OS no IXC')
 
-    if not sem_os:
+    ctrl = carregar_controle()
+    ja_notificados = set(ctrl['protocolos'])
+    novos = [s for s in sem_os if s['protocolo'] not in ja_notificados]
+
+    if not novos:
+        print(f'[{agora.strftime("%H:%M")}] Nenhum caso novo (todos já notificados hoje).')
         return
+
+    sem_os = novos
 
     # Montar mensagem
     linhas = '\n'.join([
@@ -147,6 +172,9 @@ async def main():
         f"{linhas}"
     )
     await telegram(msg)
+
+    ctrl['protocolos'] = list(ja_notificados | {s['protocolo'] for s in sem_os})
+    salvar_controle(ctrl)
 
 if __name__ == '__main__':
     asyncio.run(main())

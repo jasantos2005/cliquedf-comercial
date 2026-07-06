@@ -1718,3 +1718,36 @@ def retencao_contratos(mes: str = "", user=Depends(requer_backoffice())):
         elif status == 'alterado': kpis['retidos'] += 1
         elif status == 'recusou': kpis['cancelados'] += 1
     return {"contratos": contratos, "kpis": kpis}
+
+@router.post('/opa/verificar-os')
+async def opa_verificar_os(body: dict):
+    """Verifica se clientes têm OS no IXC na data informada"""
+    from app.services.ixc_db import ixc_conn
+    from datetime import date
+    itens = body.get('itens', [])  # [{tel, data}]
+    if not itens:
+        return {'resultado': {}}
+    resultado = {}
+    try:
+        with ixc_conn() as conn:
+            cur = conn.cursor()
+            for item in itens:
+                tel = item.get('tel','')
+                data = item.get('data', str(date.today()))
+                digits = ''.join(c for c in tel if c.isdigit())
+                if digits.startswith('55') and len(digits)>=12: digits=digits[2:]
+                if len(digits)==11: fmt=f'({digits[:2]}) {digits[2:7]}-{digits[7:]}'
+                elif len(digits)==10: fmt=f'({digits[:2]}) {digits[2:6]}-{digits[6:]}'
+                else: fmt=tel
+                cur.execute(
+                    'SELECT COUNT(*) as total FROM su_oss_chamado o'
+                    ' JOIN cliente c ON c.id=o.id_cliente'
+                    ' WHERE DATE(o.data_abertura)=%s'
+                    ' AND (c.telefone_celular=%s OR c.fone=%s OR c.whatsapp=%s)',
+                    (data, fmt, fmt, fmt)
+                )
+                r = cur.fetchone()
+                resultado[tel] = r['total'] if r else 0
+    except Exception as e:
+        print(f'[verificar-os] {e}')
+    return {'resultado': resultado}

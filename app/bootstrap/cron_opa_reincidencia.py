@@ -13,6 +13,8 @@ TG_TOKEN  = '8308787747:AAFuP5Dr7wkOdbTvQhYI9BE5mQuDVDPgDIY'
 TG_CHAT   = '2135602169'
 BRT       = timezone(timedelta(hours=-3))
 CONTROLE  = '/tmp/opa_reincidencia.json'
+COOLDOWN_HORAS = 3  # não repete o mesmo cliente com risco igual/menor antes disso
+RISCO_NIVEL = {'critico': 4, 'alto': 3, 'medio': 2, 'baixo': 1}
 
 NOMES_ATEND = {
     '659c3d7dae4972531a907916': 'Johnatan David',
@@ -95,15 +97,15 @@ def buscar_nome_cliente(tel_fmt: str) -> str:
     except:
         return '?'
 
-def risco_cancelamento(qtd: int) -> str:
+def risco_cancelamento(qtd: int):
     if qtd >= 5:
-        return '🔴 *RISCO CRÍTICO DE CANCELAMENTO* — mais de 5 ocorrências recentes!'
+        return '🔴 *RISCO CRÍTICO DE CANCELAMENTO* — mais de 5 ocorrências recentes!', 'critico'
     elif qtd >= 3:
-        return '🟠 *RISCO ALTO* — cliente com histórico recorrente de problemas'
+        return '🟠 *RISCO ALTO* — cliente com histórico recorrente de problemas', 'alto'
     elif qtd >= 2:
-        return '🟡 *RISCO MÉDIO* — 2ª ocorrência registrada'
+        return '🟡 *RISCO MÉDIO* — 2ª ocorrência registrada', 'medio'
     else:
-        return '🟢 *Primeira reincidência* — monitorar'
+        return '🟢 *Primeira reincidência* — monitorar', 'baixo'
 
 async def main():
     agora = datetime.now(BRT)
@@ -113,6 +115,7 @@ async def main():
     hoje = str((datetime.now(BRT)).date())
     ctrl = carregar_controle()
     ja_alertados = set(ctrl['ids'])
+    ctrl.setdefault('por_telefone', {})  # {tel_fmt: {'ts': epoch, 'nivel': 'alto'}}
 
     # Buscar atendimentos abertos do dia
     payload = {'filter': {'dataInicialAbertura': hoje, 'dataFinalAbertura': hoje}, 'options': {'limit': 200}}
@@ -143,11 +146,20 @@ async def main():
         if not historico:
             continue
 
+        qtd = len(historico)
+        risco, nivel = risco_cancelamento(qtd)
+
+        info_ant = ctrl['por_telefone'].get(tel_fmt)
+        if info_ant:
+            horas_desde = (agora.timestamp() - info_ant['ts']) / 3600
+            subiu_nivel = RISCO_NIVEL[nivel] > RISCO_NIVEL.get(info_ant['nivel'], 0)
+            if horas_desde < COOLDOWN_HORAS and not subiu_nivel:
+                novos_ids.append(_id)  # marca o atendimento como visto, mas não reenvia
+                continue
+
         nome = buscar_nome_cliente(tel_fmt)
         atendente = NOMES_ATEND.get(a.get('id_atendente', ''), 'Sem atendente')
         proto = a.get('protocolo', '?')
-        qtd = len(historico)
-        risco = risco_cancelamento(qtd)
 
         # Montar histórico formatado
         hist_txt = ''
@@ -177,6 +189,7 @@ async def main():
 
         alertas.append(msg)
         novos_ids.append(_id)
+        ctrl['por_telefone'][tel_fmt] = {'ts': agora.timestamp(), 'nivel': nivel}
 
     # Enviar alertas
     for msg in alertas[:5]:  # máximo 5 por vez

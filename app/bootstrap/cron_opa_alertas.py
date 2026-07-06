@@ -13,6 +13,27 @@ TG_TOKEN  = '8308787747:AAFuP5Dr7wkOdbTvQhYI9BE5mQuDVDPgDIY'
 TG_CHAT   = '2135602169'
 BRT       = timezone(timedelta(hours=-3))
 CONTROLE  = '/tmp/opa_alertas_disparados.json'
+HISTORICO = '/tmp/opa_alertas_historico.json'
+
+
+def registrar_historico(data_str: str, sem: int, longos: int):
+    hist = {}
+    if os.path.exists(HISTORICO):
+        try:
+            with open(HISTORICO) as f:
+                hist = json.load(f)
+        except:
+            hist = {}
+    dia = hist.get(data_str, {'sem_atendente': 0, 'longos': 0})
+    dia['sem_atendente'] += sem
+    dia['longos'] += longos
+    hist[data_str] = dia
+    # mantém só os últimos 14 dias pra não crescer sem limite
+    if len(hist) > 14:
+        for k in sorted(hist.keys())[:-14]:
+            del hist[k]
+    with open(HISTORICO, 'w') as f:
+        json.dump(hist, f)
 
 NOMES = {
     '659c3d7dae4972531a907916': 'Johnatan David',
@@ -72,6 +93,7 @@ async def buscar_atendimentos():
 async def main():
     agora = datetime.now(BRT)
     hora  = agora.hour
+    hoje  = str(agora.date())
     if hora < 7 or hora > 22:
         return
 
@@ -160,6 +182,9 @@ async def main():
     else:
         mins_prox = int((3300 - (agora_ts - ultimo_resumo)) / 60)
         print(f"[{agora.strftime('%H:%M')}] Resumo já enviado. Próximo em ~{mins_prox} min.")
+
+    if alertas_sem or alertas_long:
+        registrar_historico(hoje, len(alertas_sem), len(alertas_long))
 
     novos = len(alertas_sem) + len(alertas_long)
     print(f"[{agora.strftime('%H:%M')}] {novos} alerta(s) novo(s). Controle: {len(ctrl['ids'])} IDs.")

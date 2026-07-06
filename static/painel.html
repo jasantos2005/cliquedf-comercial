@@ -2340,12 +2340,17 @@ function abrirModalDepto(depto) {
         +'<div style="font-size:13px;font-weight:600;color:#fff;" id="mdep-nome-'+a._id+'">'+tel+'</div>'
         +'<div style="font-size:11px;color:#888;">👤 '+atd+'</div>'
         +'</div>'
-        +'<div>'+st+'</div>'
+        +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
+        +st
+        +'<span style="font-size:10px;color:#555;" id="mdep-os-'+a._id+'">⏳ IXC</span>'
+        +'</div>'
         +'</div>';
     }).join('');
     // Buscar nomes em batch
+    var hoje2 = new Date().toISOString().slice(0,10);
     var tels = filtrados.map(function(a){return (a.canal_cliente||'').replace('@c.us','');}).filter(Boolean);
     if(tels.length){
+      // Buscar nomes
       fetch('/api/painel/opa/clientes-nomes',{
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
@@ -2357,6 +2362,28 @@ function abrirModalDepto(depto) {
           var nome=nomes[tel];
           var el=document.getElementById('mdep-nome-'+a._id);
           if(el&&nome&&nome!=='?') el.textContent=nome;
+        });
+      }).catch(function(){});
+      // Verificar OS no IXC
+      var itens = filtrados.map(function(a){
+        return {tel:(a.canal_cliente||'').replace('@c.us',''), data:hoje2};
+      });
+      fetch('/api/painel/opa/verificar-os',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+        body:JSON.stringify({itens:itens})
+      }).then(function(r){return r.json();}).then(function(r){
+        var res=r.resultado||{};
+        filtrados.forEach(function(a){
+          var tel=(a.canal_cliente||'').replace('@c.us','');
+          var qtd=res[tel];
+          var el=document.getElementById('mdep-os-'+a._id);
+          if(el){
+            if(qtd===undefined) el.textContent='';
+            else if(qtd>0) { el.textContent='✅ '+qtd+' OS IXC'; el.style.color='#1D9E75'; }
+            else if(a.status==='F') { el.textContent='⚠️ Sem OS IXC'; el.style.color='#E24B4A'; el.style.fontWeight='700'; }
+            else el.textContent='';
+          }
         });
       }).catch(function(){});
     }

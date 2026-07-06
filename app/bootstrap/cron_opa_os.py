@@ -3,9 +3,13 @@ Cron OPA OS — roda a cada hora (0 7-22 * * *)
 Cruza OS abertas de suporte no IXC com atendimentos no Opa
 Identifica clientes que abriram OS E estão no WhatsApp simultaneamente
 """
-import httpx, json, asyncio
+import httpx, json, asyncio, os
 from datetime import date, datetime, timezone, timedelta
 from app.services.ixc_db import ixc_select
+
+CONTROLE_ESTAGNADA = '/tmp/opa_os_estagnada.json'
+LIMITE_ENCAMINHADA_HORAS = 2   # a partir de quanto tempo "Encaminhada" vira alerta
+COOLDOWN_ESTAGNADA_HORAS = 3   # não repete o mesmo OS antes disso, salvo se piorar
 
 OPA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY1OWMzYjk5ZjJhMjFlZWUzMWM3YWEzYSIsImlhdCI6MTc3MDgzODM5OH0.VNIC3HqVGIxuHQoesd-5jftTVkEMd6jionH9pkyKeAM'
 OPA_BASE  = 'https://cliquedf.opasuite.com.br/api/v1'
@@ -44,6 +48,22 @@ STATUS_OS = {
     'EX': 'Em execução',
     'RE': 'Reaberta',
 }
+
+
+def carregar_controle_estagnada():
+    hoje = str(date.today())
+    if not os.path.exists(CONTROLE_ESTAGNADA):
+        return {'data': hoje, 'os': {}}
+    with open(CONTROLE_ESTAGNADA) as f:
+        ctrl = json.load(f)
+    if ctrl.get('data') != hoje:
+        return {'data': hoje, 'os': {}}
+    return ctrl
+
+
+def salvar_controle_estagnada(ctrl):
+    with open(CONTROLE_ESTAGNADA, 'w') as f:
+        json.dump(ctrl, f)
 
 
 async def telegram(msg: str):
@@ -121,6 +141,7 @@ async def main():
     # Cruzar OS com Opa
     cruzados    = []  # OS aberta + atendimento no Opa
     sem_opa     = []  # OS aberta mas SEM atendimento no Opa (cliente não entrou em contato)
+    estagnadas  = []  # OS "Encaminhada" há muito tempo sem mudar de status
 
     for os in os_abertas:
         tel_cel  = os.get('telefone_celular', '')
@@ -132,6 +153,14 @@ async def main():
         assunto   = ASSUNTOS_SUPORTE.get(os['id_assunto'], f"ID {os['id_assunto']}")
         status_os = STATUS_OS.get(os['os_status'], os['os_status'])
         horas_os  = round((agora - os['data_abertura'].replace(tzinfo=BRT)).total_seconds() / 3600, 1)
+
+        if os['os_status'] == 'EN' and horas_os >= LIMITE_ENCAMINHADA_HORAS:
+            estagnadas.append({
+                'os_id':     os['os_id'],
+                'cliente':   os['cliente'],
+                'assunto':   assunto,
+                'horas_os':  horas_os,
+            })
 
         if atend_opa:
             mins_opa = int((agora - datetime.fromisoformat(atend_opa['date'].replace('Z','+00:00')).astimezone(BRT)).total_seconds() / 60)
@@ -154,8 +183,33 @@ async def main():
                 'horas_os':  horas_os,
             })
 
-    # Montar mensagem
+    # Deduplicar estagnadas antes de montar a mensagem (cooldown 3h, salvo se piorar)
+    ctrl_est = carregar_controle_estagnada()
+    ja_vistas = ctrl_est['os']
+    novas_ou_piores = []
+    for e in estagnadas:
+        oid = str(e['os_id'])
+        info = ja_vistas.get(oid)
+        if info:
+            horas_desde_alerta = (agora.timestamp() - info['ts']) / 3600
+            piorou = e['horas_os'] >= info['horas_os'] + 2
+            if horas_desde_alerta < COOLDOWN_ESTAGNADA_HORAS and not piorou:
+                continue
+        novas_ou_piores.append(e)
+
+    # Montar mensagem única
     partes = []
+
+    if novas_ou_piores:
+        linhas_est = '\n'.join([
+            f"  🕐 *{e['cliente'][:25]}* — OS#{e['os_id']} | {e['assunto']} | {e['horas_os']}h parada"
+            for e in novas_ou_piores[:8]
+        ])
+        partes.append(
+            f"🚨 *OS ENCAMINHADA SEM AVANÇO*\n"
+            f"{len(novas_ou_piores)} OS \"Encaminhada\" há mais de {LIMITE_ENCAMINHADA_HORAS}h sem mudar de status:\n"
+            f"{linhas_est}"
+        )
 
     if cruzados:
         linhas = []
@@ -195,7 +249,13 @@ async def main():
     )
 
     await telegram(msg)
-    print(f'[{agora.strftime("%H:%M")}] Cruzamento: {len(cruzados)} duplos | {len(sem_opa)} sem Opa.')
+    print(f'[{agora.strftime("%H:%M")}] Cruzamento: {len(cruzados)} duplos | {len(sem_opa)} sem Opa | {len(novas_ou_piores)} estagnadas.')
+
+    if novas_ou_piores:
+        for e in novas_ou_piores:
+            ja_vistas[str(e['os_id'])] = {'ts': agora.timestamp(), 'horas_os': e['horas_os']}
+        ctrl_est['os'] = ja_vistas
+        salvar_controle_estagnada(ctrl_est)
 
 
 if __name__ == '__main__':
