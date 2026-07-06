@@ -2538,7 +2538,10 @@ function carregarGameMes() {
       '<th style="padding:10px;text-align:center;">Score</th><th style="padding:10px;text-align:center;">Evolução</th>'+
       '</tr></thead><tbody>'+
       dados.map(function(d,i){
-        var cor = d.evolucao>0?'var(--green)':d.evolucao<0?'var(--red)':'var(--muted)';
+        // Esconder evolução se mês tem menos de 7 dias (comparação injusta)
+        var diaDoMes = new Date().getDate();
+        var evolStr = diaDoMes <= 7 ? '—' : (d.evolucao>0?'+':'')+d.evolucao;
+        var cor = diaDoMes <= 7 ? 'var(--muted)' : d.evolucao>0?'var(--green)':d.evolucao<0?'var(--red)':'var(--muted)';
         var sinal = d.evolucao>0?'+':'';
         return '<tr style="border-bottom:1px solid var(--border);">'+
           '<td style="padding:10px;font-size:18px;">'+medals[i]+'</td>'+
@@ -2546,7 +2549,7 @@ function carregarGameMes() {
           '<td style="padding:10px;text-align:center;">'+d.atendimentos+'</td>'+
           '<td style="padding:10px;text-align:center;">'+d.xp+'</td>'+
           '<td style="padding:10px;text-align:center;font-weight:700;color:var(--cyan);">'+d.score+'</td>'+
-          '<td style="padding:10px;text-align:center;color:'+cor+';">'+sinal+d.evolucao+'</td>'+
+          '<td style="padding:10px;text-align:center;color:'+cor+';">'+evolStr+'</td>'+
           '</tr>';
       }).join('')+
       '</tbody></table>';
