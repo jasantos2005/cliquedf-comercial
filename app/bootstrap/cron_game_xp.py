@@ -111,6 +111,9 @@ async def main(fechar_dia: bool = False):
         xp_base = 5  # XP base por atendimento finalizado
 
         # XP pelo motivo
+        setor_atend = a.get('setor','')
+        eh_suporte = setor_atend == '5bf73d1d186f7d2b0d647a61'
+        eh_financeiro = setor_atend == '5d1624085e74a002308aa25e'
         motivos = a.get('motivos',[])
         melhor_xp = 0
         melhor_motivo = 'Atendimento finalizado'
@@ -119,6 +122,17 @@ async def main(fechar_dia: bool = False):
             _id = mid.get('_id','') if isinstance(mid,dict) else str(mid or '')
             if _id in XP_MOTIVOS:
                 nome_m, xp_m = XP_MOTIVOS[_id]
+                # Ajustar XP por setor
+                if _id == '65a18e3bae4972531a90d0a1':  # Resolvido no atendimento
+                    if eh_suporte: xp_m = 30
+                    elif eh_financeiro: xp_m = 15
+                    else: xp_m = 10  # Comercial/outros
+                elif _id in ('6643c64684d5f75ec0a9155a','6643c622bd1e771abfc338d2','65a18da2ae4972531a90d014','65a18dd2ae4972531a90d030'):
+                    # Motivos de suporte tecnico — so valem no suporte
+                    if not eh_suporte: xp_m = 5
+                elif _id in ('65a18e11ae4972531a90d06d','65a18d45f2a21eee31c88395','65a18d55ae4972531a90cfd3','65a18e04f2a21eee31c8843a'):
+                    # Motivos financeiros — valem menos fora do financeiro
+                    if not eh_financeiro: xp_m = 5
                 if xp_m > melhor_xp:
                     melhor_xp = xp_m
                     melhor_motivo = nome_m
