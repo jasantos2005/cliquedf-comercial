@@ -2526,9 +2526,10 @@ function gameAba(aba) {
 }
 
 function carregarGameMes() {
-  var mes = new Date().toISOString().slice(0,7);
-  api('/api/painel/game/bonificacao/'+mes).then(function(r){
-    var dados = r.data||[];
+  api('/api/painel/game/ranking').then(function(r){
+    var dados = (r.data||[]).map(function(a){
+      return {nome:a.nome,atendimentos:a.atendimentos_total,xp:a.xp_mes,score:a.xp_mes+Math.min(a.atendimentos_total,300)*2,evolucao:0,badge_evolucao:false};
+    }).sort(function(a,b){return b.score-a.score;});
     var medals = ['🥇','🥈','🥉','4º','5º','6º','7º'];
     document.getElementById('game-mes-corpo').innerHTML =
       '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
