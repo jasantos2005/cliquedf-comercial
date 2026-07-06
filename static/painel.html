@@ -2612,7 +2612,7 @@ function carregarGameHist() {
 }
 
 function carregarGame() {
-  var periodo = document.getElementById('game-periodo').value;
+  var periodo = (document.getElementById('game-periodo')||{value:'hoje'}).value;
   api('/api/painel/game/ranking').then(function(r){
     _gameData = r.data||[];
     document.getElementById('game-sub').textContent = _gameData.length+' atendentes — '+new Date().toLocaleTimeString('pt-BR');
