@@ -148,7 +148,13 @@ async def main(fechar_dia: bool = False):
                 # Atualizar XP do dia (sobrescreve)
                 xp_anterior_hoje = row['xp_hoje'] if row['data_ultimo_calculo'] == hoje else 0
                 xp_total_novo = row['xp_total'] - xp_anterior_hoje + xp_hoje
-                xp_mes_novo   = row['xp_mes']   - xp_anterior_hoje + xp_hoje
+                # Resetar xp_mes se mudou o mês
+                mes_atual = hoje[:7]
+                mes_ultimo = (row['data_ultimo_calculo'] or '')[:7]
+                if mes_atual != mes_ultimo:
+                    xp_mes_novo = xp_hoje  # novo mês, começa do zero
+                else:
+                    xp_mes_novo = row['xp_mes'] - xp_anterior_hoje + xp_hoje
                 nivel_anterior = row['nivel']
                 conn.execute('''UPDATE game_atendentes SET
                     xp_total=?, xp_mes=?, xp_hoje=?,
