@@ -589,6 +589,10 @@ body.light-mode .tbl-wrap table thead tr{background:var(--surf2);}
         <span class="ni-label">Reincidência</span>
         <span class="ni-badge" id="badge-reinc" style="display:none;background:#E24B4A;">0</span>
       </div>
+      <div class="ni" id="ni-game" onclick="navTo('game')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span class="ni-label">🎮 GAME ISP</span>
+      </div>
       <div class="sb-group-label">COMERCIAL</div>
       <div class="ni" id="ni-auditoria" onclick="toggleSub('sub-auditoria','ni-auditoria')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
@@ -2391,6 +2395,312 @@ function abrirModalDepto(depto) {
   document.getElementById('modal-depto').style.display='flex';
 }
 </script>
+
+<!-- PAGE: GAME ISP -->
+<div class="page" id="page-game">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <div>
+      <div style="font-size:22px;font-weight:900;">🎮 GAME ISP</div>
+      <div style="font-size:13px;color:var(--muted);" id="game-sub">Sistema de evolução por atendimentos</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" onclick="carregarGame()">↻ Atualizar</button>
+    </div>
+  </div>
+  <!-- Abas -->
+  <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
+    <button id="game-tab-dia" onclick="gameAba('dia')" style="padding:8px 16px;background:var(--cyan);color:#000;border:none;border-radius:6px 6px 0 0;cursor:pointer;font-weight:600;font-size:13px;">📅 Hoje</button>
+    <button id="game-tab-mes" onclick="gameAba('mes')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">📆 Este mês</button>
+    <button id="game-tab-bonif" onclick="gameAba('bonif')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">💰 Bonificação</button>
+    <button id="game-tab-hist" onclick="gameAba('hist')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">📊 Histórico</button>
+  </div>
+  <div id="game-aba-dia">
+
+  <!-- Cards ranking -->
+  <div id="game-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:20px;"></div>
+
+  <!-- Tabela detalhada -->
+  <div class="card">
+    <div class="sec-title" style="margin-bottom:12px;">📊 Ranking Detalhado</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);color:var(--muted);">
+          <th style="padding:10px 12px;text-align:left;">Posição</th>
+          <th style="padding:10px 12px;text-align:left;">Atendente</th>
+          <th style="padding:10px 12px;text-align:left;">Nível</th>
+          <th style="padding:10px 12px;text-align:center;">XP Hoje</th>
+          <th style="padding:10px 12px;text-align:center;">XP Mês</th>
+          <th style="padding:10px 12px;text-align:center;">XP Total</th>
+          <th style="padding:10px 12px;text-align:center;">Atend. Hoje</th>
+          <th style="padding:10px 12px;text-align:center;">Atend. Total</th>
+        </tr>
+      </thead>
+      <tbody id="game-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+  </div><!-- fim aba dia -->
+
+  <!-- ABA MES -->
+  <div id="game-aba-mes" style="display:none;">
+    <div class="card" style="overflow:auto;">
+      <div class="sec-title" style="margin-bottom:12px;">📆 Ranking — Este Mês</div>
+      <div id="game-mes-corpo"><div style="color:var(--muted);padding:16px;">Carregando...</div></div>
+    </div>
+  </div>
+
+  <!-- ABA BONIFICAÇÃO -->
+  <div id="game-aba-bonif" style="display:none;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <select id="game-bonif-mes" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;">
+        <option value="2026-07">Julho/2026</option>
+        <option value="2026-06">Junho/2026</option>
+        <option value="2026-05">Maio/2026</option>
+      </select>
+      <button class="btn" onclick="carregarBonif()">Ver ranking</button>
+    </div>
+    <div id="game-bonif-corpo"></div>
+  </div>
+
+  <!-- ABA HISTÓRICO -->
+  <div id="game-aba-hist" style="display:none;">
+    <div class="card">
+      <div class="sec-title" style="margin-bottom:12px;">📊 Histórico Mensal</div>
+      <div id="game-hist-corpo"><div style="color:var(--muted);padding:16px;">Carregando...</div></div>
+    </div>
+  </div>
+
+<!-- MODAL HISTÓRICO XP -->
+<div id="modal-game-hist" onclick="if(event.target===this)this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#161625;border:1px solid #2a2a3a;border-radius:12px;padding:20px;width:520px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:700;color:#fff;" id="ghist-titulo">Histórico XP</div>
+      <button onclick="document.getElementById('modal-game-hist').style.display='none'" style="background:#2a2a3a;border:none;border-radius:6px;color:#ccc;padding:4px 10px;cursor:pointer;">✕</button>
+    </div>
+    <div id="ghist-lista" style="overflow-y:auto;flex:1;"></div>
+  </div>
+</div>
+
+<script>
+var _gameData = [];
+var NIVEIS_GAME = [
+  [0,    1, '🌱 Aprendiz'],
+  [500,  2, '🔧 Atendente'],
+  [1500, 3, '🚀 Especialista'],
+  [3000, 4, '⭐ Analista'],
+  [6000, 5, '🏆 Master ISP'],
+  [10000,6, '👑 Mentor'],
+];
+
+function getNivelGame(xp) {
+  var nivel = NIVEIS_GAME[0];
+  for(var i=0;i<NIVEIS_GAME.length;i++){
+    if(xp>=NIVEIS_GAME[i][0]) nivel=NIVEIS_GAME[i];
+  }
+  return nivel;
+}
+
+function getProxNivel(xp) {
+  for(var i=0;i<NIVEIS_GAME.length;i++){
+    if(xp<NIVEIS_GAME[i][0]) return NIVEIS_GAME[i];
+  }
+  return null;
+}
+
+function gameAba(aba) {
+  var abas = ['dia','mes','bonif','hist'];
+  abas.forEach(function(a){
+    var el = document.getElementById('game-aba-'+a);
+    var btn = document.getElementById('game-tab-'+a);
+    if(el) el.style.display = a===aba ? '' : 'none';
+    if(btn){
+      btn.style.background = a===aba ? 'var(--cyan)' : 'var(--surf2)';
+      btn.style.color = a===aba ? '#000' : 'var(--muted)';
+      btn.style.fontWeight = a===aba ? '600' : 'normal';
+    }
+  });
+  if(aba==='mes') carregarGameMes();
+  if(aba==='bonif') carregarBonif();
+  if(aba==='hist') carregarGameHist();
+}
+
+function carregarGameMes() {
+  var mes = new Date().toISOString().slice(0,7);
+  api('/api/painel/game/bonificacao/'+mes).then(function(r){
+    var dados = r.data||[];
+    var medals = ['🥇','🥈','🥉','4º','5º','6º','7º'];
+    document.getElementById('game-mes-corpo').innerHTML =
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+      '<thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);">'+
+      '<th style="padding:10px;">Pos</th><th style="padding:10px;text-align:left;">Atendente</th>'+
+      '<th style="padding:10px;text-align:center;">Atend.</th><th style="padding:10px;text-align:center;">XP</th>'+
+      '<th style="padding:10px;text-align:center;">Score</th><th style="padding:10px;text-align:center;">Evolução</th>'+
+      '</tr></thead><tbody>'+
+      dados.map(function(d,i){
+        var cor = d.evolucao>0?'var(--green)':d.evolucao<0?'var(--red)':'var(--muted)';
+        var sinal = d.evolucao>0?'+':'';
+        return '<tr style="border-bottom:1px solid var(--border);">'+
+          '<td style="padding:10px;font-size:18px;">'+medals[i]+'</td>'+
+          '<td style="padding:10px;font-weight:600;">'+d.nome+(d.badge_evolucao?' 🏅':'')+'</td>'+
+          '<td style="padding:10px;text-align:center;">'+d.atendimentos+'</td>'+
+          '<td style="padding:10px;text-align:center;">'+d.xp+'</td>'+
+          '<td style="padding:10px;text-align:center;font-weight:700;color:var(--cyan);">'+d.score+'</td>'+
+          '<td style="padding:10px;text-align:center;color:'+cor+';">'+sinal+d.evolucao+'</td>'+
+          '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  });
+}
+
+function carregarBonif() {
+  var mes = document.getElementById('game-bonif-mes').value;
+  api('/api/painel/game/bonificacao/'+mes).then(function(r){
+    var dados = r.data||[];
+    var medals = ['🥇','🥈','🥉','4º','5º','6º','7º'];
+    var bonif = [300,200,100,0,0,0,0];
+    // Badge evolução
+    var maxEv = dados.reduce(function(mx,d){ return d.evolucao>mx?d.evolucao:mx; }, -Infinity);
+    var corpo = '<div style="display:grid;gap:12px;">';
+    dados.forEach(function(d,i){
+      var b = bonif[i]||0;
+      var isEvolucao = d.evolucao===maxEv && d.evolucao>0;
+      var bExtra = isEvolucao ? 100 : 0;
+      var bTotal = b + bExtra;
+      var cor = b>0||bExtra>0 ? 'var(--green)' : 'var(--muted)';
+      corpo += '<div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--surf);border:1px solid var(--border);border-radius:10px;">'+
+        '<span style="font-size:24px;">'+medals[i]+'</span>'+
+        '<div style="flex:1;">'+
+        '<div style="font-size:15px;font-weight:700;">'+d.nome+(isEvolucao?' 🏅 Maior evolução':'')+'</div>'+
+        '<div style="font-size:12px;color:var(--muted);">Score: '+d.score+' | '+d.atendimentos+' atend. | '+d.xp+' XP</div>'+
+        '<div style="font-size:11px;color:'+(d.evolucao>0?'var(--green)':'var(--red)')+';">Evolução: '+(d.evolucao>0?'+':'')+d.evolucao+' vs mês anterior</div>'+
+        '</div>'+
+        '<div style="text-align:right;">'+
+        (bTotal>0?'<div style="font-size:22px;font-weight:900;color:'+cor+';">R$ '+bTotal+'</div>':'<div style="color:var(--muted);font-size:13px;">—</div>')+
+        (bExtra>0?'<div style="font-size:11px;color:var(--green);">R$ '+b+' + R$ '+bExtra+' evolução</div>':'')+
+        '</div></div>';
+    });
+    corpo += '</div>';
+    document.getElementById('game-bonif-corpo').innerHTML = corpo;
+  });
+}
+
+function carregarGameHist() {
+  api('/api/painel/game/ranking').then(function(r){
+    // Mostrar tabela comparativa maio x junho x julho
+    var atend = r.data||[];
+    document.getElementById('game-hist-corpo').innerHTML =
+      '<p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Dados históricos por mês</p>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;">'+
+      '<thead><tr style="border-bottom:1px solid var(--border);color:var(--muted);">'+
+      '<th style="padding:10px;text-align:left;">Atendente</th>'+
+      '<th style="padding:10px;text-align:center;">XP Total</th>'+
+      '<th style="padding:10px;text-align:center;">Atend. Total</th>'+
+      '<th style="padding:10px;text-align:center;">Nível</th>'+
+      '</tr></thead><tbody>'+
+      atend.sort(function(a,b){return b.xp_total-a.xp_total;}).map(function(a){
+        var nivel = getNivelGame(a.xp_total);
+        return '<tr style="border-bottom:1px solid var(--border);">'+
+          '<td style="padding:10px;font-weight:600;">'+a.nome+'</td>'+
+          '<td style="padding:10px;text-align:center;font-weight:700;color:var(--cyan);">'+a.xp_total+'</td>'+
+          '<td style="padding:10px;text-align:center;">'+a.atendimentos_total+'</td>'+
+          '<td style="padding:10px;text-align:center;">'+nivel[2]+'</td>'+
+          '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  });
+}
+
+function carregarGame() {
+  var periodo = document.getElementById('game-periodo').value;
+  api('/api/painel/game/ranking').then(function(r){
+    _gameData = r.data||[];
+    document.getElementById('game-sub').textContent = _gameData.length+' atendentes — '+new Date().toLocaleTimeString('pt-BR');
+    renderGame(periodo);
+  }).catch(function(){
+    document.getElementById('game-sub').textContent='Erro ao carregar';
+  });
+}
+
+function renderGame(periodo) {
+  var medals = ['🥇','🥈','🥉','4º','5º','6º','7º'];
+  var cores = ['#FFD700','#C0C0C0','#CD7F32','#378ADD','#1D9E75','#8B5CF6','#E24B4A'];
+
+  // Ordenar por período
+  var dados = _gameData.slice().sort(function(a,b){
+    if(periodo==='hoje') return b.xp_hoje-a.xp_hoje;
+    if(periodo==='mes')  return b.xp_mes-a.xp_mes;
+    return b.xp_total-a.xp_total;
+  });
+
+  // Cards
+  var cards = document.getElementById('game-cards');
+  cards.innerHTML = dados.slice(0,3).map(function(a,i){
+    var xp = periodo==='hoje'?a.xp_hoje:periodo==='mes'?a.xp_mes:a.xp_total;
+    var nivel = getNivelGame(a.xp_total);
+    var prox  = getProxNivel(a.xp_total);
+    var pct   = prox ? Math.round((a.xp_total-nivel[0])/(prox[0]-nivel[0])*100) : 100;
+    return '<div style="background:var(--surf);border:1px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;" data-gid="'+a.id+'" data-gnome="'+a.nome+'" onclick="abrirHistGame(this.dataset.gid,this.dataset.gnome)">'+
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'+
+      '<span style="font-size:28px;">'+medals[i]+'</span>'+
+      '<div style="flex:1;">'+
+      '<div style="font-size:16px;font-weight:800;color:#fff;">'+a.nome+'</div>'+
+      '<div style="font-size:12px;color:var(--muted);">'+nivel[2]+'</div>'+
+      '</div>'+
+      '<div style="text-align:right;">'+
+      '<div style="font-size:24px;font-weight:900;color:'+cores[i]+';">'+xp+' XP</div>'+
+      '<div style="font-size:11px;color:var(--muted);">'+a.atendimentos_hoje+' atend. hoje</div>'+
+      '</div></div>'+
+      '<div style="background:var(--surf2);border-radius:4px;height:6px;overflow:hidden;">'+
+      '<div style="background:'+cores[i]+';height:100%;width:'+pct+'%;border-radius:4px;transition:width .5s;"></div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px;">'+
+      '<span>'+a.xp_total+' XP total</span>'+
+      (prox?'<span>Próx: '+prox[2]+' ('+prox[0]+' XP)</span>':'<span>Nível máximo!</span>')+
+      '</div></div>';
+  }).join('');
+
+  // Tabela
+  var tbody = document.getElementById('game-tbody');
+  tbody.innerHTML = dados.map(function(a,i){
+    var xp = periodo==='hoje'?a.xp_hoje:periodo==='mes'?a.xp_mes:a.xp_total;
+    var nivel = getNivelGame(a.xp_total);
+    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" data-gid="'+a.id+'" data-gnome="'+a.nome+'" onclick="abrirHistGame(this.dataset.gid,this.dataset.gnome)">'+
+      '<td style="padding:10px 12px;font-size:18px;">'+medals[i]+'</td>'+
+      '<td style="padding:10px 12px;font-weight:600;color:#fff;">'+a.nome+'</td>'+
+      '<td style="padding:10px 12px;font-size:12px;">'+nivel[2]+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-weight:700;color:var(--cyan);">'+a.xp_hoje+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;">'+a.xp_mes+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-weight:700;">'+a.xp_total+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;">'+a.atendimentos_hoje+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;">'+a.atendimentos_total+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+function abrirHistGame(id, nome) {
+  document.getElementById('ghist-titulo').textContent = '🎮 '+nome+' — Histórico XP';
+  document.getElementById('ghist-lista').innerHTML = '<div style="color:#888;padding:16px;text-align:center;">Carregando...</div>';
+  document.getElementById('modal-game-hist').style.display='flex';
+  api('/api/painel/game/historico/'+id).then(function(r){
+    var rows = r.data||[];
+    if(!rows.length){
+      document.getElementById('ghist-lista').innerHTML='<div style="color:#888;padding:16px;text-align:center;">Sem histórico ainda</div>';
+      return;
+    }
+    document.getElementById('ghist-lista').innerHTML = rows.map(function(h){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px;background:#1e1e2e;border-radius:8px;margin-bottom:6px;">'+
+        '<div style="font-size:18px;font-weight:900;color:var(--green);min-width:60px;">+'+h.xp+' XP</div>'+
+        '<div style="flex:1;">'+
+        '<div style="font-size:13px;color:#fff;">'+h.motivo+'</div>'+
+        '<div style="font-size:11px;color:#888;">'+h.protocolo+' — '+h.data+'</div>'+
+        '</div></div>';
+    }).join('');
+  }).catch(function(){
+    document.getElementById('ghist-lista').innerHTML='<div style="color:#888;padding:16px;">Erro ao carregar</div>';
+  });
+}
+</script>
 </body>
 </html>
     </div><!-- /content -->
@@ -2693,6 +3003,7 @@ const PAGE_TITLES = {
   atendimentos: 'Atendimentos',
   pendencias: 'Pendências',
   reincidencia: 'Radar de Reincidência',
+  game: 'GAME ISP — Ranking',
   dashboard: 'Dashboard do dia', 'aud-fila': 'Fila de Auditoria', 'liberacoes': 'Liberações — Vendas Reprovadas',
   'vendas-lista': 'Vendas Realizadas — IXC', 'vendas-hub': 'Vendas — Hub Comercial',
   clientes: 'Clientes Ativados', ranking: 'Ranking de Vendedores',
@@ -2744,6 +3055,7 @@ function navTo(page) {
     atendimentos: carregarAtendimentos,
     pendencias: () => carregarPendencias(),
     reincidencia: () => carregarReincidencia(),
+    game: () => carregarGame(),
   };
   if (loaders[page]) loaders[page]();
 }

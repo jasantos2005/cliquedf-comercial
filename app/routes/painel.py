@@ -1751,3 +1751,81 @@ async def opa_verificar_os(body: dict):
     except Exception as e:
         print(f'[verificar-os] {e}')
     return {'resultado': resultado}
+
+# ── GAME ISP — Ranking ────────────────────────────────────────
+@router.get('/game/ranking')
+async def game_ranking():
+    import sqlite3 as sq, os
+    db = os.path.join(os.path.dirname(__file__), '../../hub_comercial.db')
+    conn = sq.connect(os.path.abspath(db))
+    conn.row_factory = sq.Row
+    try:
+        atendentes = conn.execute('''
+            SELECT id, nome, nivel, xp_total, xp_mes, xp_hoje,
+                   atendimentos_total, atendimentos_hoje, data_ultimo_calculo
+            FROM game_atendentes
+            ORDER BY xp_hoje DESC
+        ''').fetchall()
+        return {'data': [dict(r) for r in atendentes]}
+    finally:
+        conn.close()
+
+@router.get('/game/historico/{atendente_id}')
+async def game_historico(atendente_id: str):
+    import sqlite3 as sq, os
+    db = os.path.join(os.path.dirname(__file__), '../../hub_comercial.db')
+    conn = sq.connect(os.path.abspath(db))
+    conn.row_factory = sq.Row
+    try:
+        rows = conn.execute('''
+            SELECT protocolo, motivo, xp, descricao, data
+            FROM game_xp_historico
+            WHERE atendente_id=?
+            ORDER BY data DESC, id DESC
+            LIMIT 50
+        ''', (atendente_id,)).fetchall()
+        return {'data': [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+@router.get('/game/bonificacao/{mes}')
+async def game_bonificacao(mes: str):
+    """Calcula ranking de bonificação do mês — score + evolução"""
+    import sqlite3 as sq, os
+    db = os.path.join(os.path.dirname(__file__), '../../hub_comercial.db')
+    conn = sq.connect(os.path.abspath(db))
+    conn.row_factory = sq.Row
+    try:
+        # Mês atual
+        atual = conn.execute(
+            'SELECT * FROM game_historico_mensal WHERE mes=? ORDER BY score DESC',
+            (mes,)
+        ).fetchall()
+
+        # Mês anterior para calcular evolução
+        from datetime import datetime
+        d = datetime.strptime(mes + '-01', '%Y-%m-%d')
+        from dateutil.relativedelta import relativedelta
+        mes_ant = (d.replace(day=1) - __import__('datetime').timedelta(days=1)).strftime('%Y-%m')
+        anterior = {r['atendente_id']: dict(r) for r in conn.execute(
+            'SELECT * FROM game_historico_mensal WHERE mes=?', (mes_ant,)
+        ).fetchall()}
+
+        resultado = []
+        for r in atual:
+            r = dict(r)
+            ant = anterior.get(r['atendente_id'], {})
+            r['score_anterior'] = ant.get('score', 0)
+            r['evolucao'] = r['score'] - r['score_anterior']
+            resultado.append(r)
+
+        # Ordenar por evolução para badge
+        por_evolucao = sorted(resultado, key=lambda x: -x['evolucao'])
+        if por_evolucao:
+            por_evolucao[0]['badge_evolucao'] = True
+
+        return {'data': resultado, 'mes': mes, 'mes_anterior': mes_ant}
+    except Exception as e:
+        return {'data': [], 'erro': str(e)}
+    finally:
+        conn.close()
