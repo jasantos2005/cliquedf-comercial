@@ -790,14 +790,16 @@ async def sem_instalacao(
                 LEFT JOIN ixcprovedor.vendedor v ON v.id = cc.id_vendedor_ativ
                 LEFT JOIN ixcprovedor.vd_contratos vc ON vc.id = cc.id_vd_contrato
                 LEFT JOIN ixcprovedor.su_oss_chamado o ON o.id_contrato_kit = cc.id
-                    AND o.id_assunto IN (227,110,75,15,178) AND o.status = 'F'
-                WHERE cc.status_internet IN ('A','AA')
+                    AND o.id_assunto = 227 AND o.status = 'F'
+                WHERE cc.status_internet = 'A'
                   AND cc.data_ativacao IS NOT NULL
+                  AND cc.data_ativacao >= %s
+                  AND cc.data_ativacao <= %s
                   AND o.id IS NULL
                   {filtro_vend} {filtro_cid}
                 ORDER BY dias DESC
                 LIMIT 500
-            """, ())
+            """, (de, _ate))
             rows = cur.fetchall()
 
         def sv(v):
