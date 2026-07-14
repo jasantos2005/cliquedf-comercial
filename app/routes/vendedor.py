@@ -191,9 +191,10 @@ async def criar_precadastro(dados:str=Form(...),rg:UploadFile=File(None),rg_vers
     ).fetchone()
     func_id = usu_row["ixc_funcionario_id"] if usu_row else None
     vend_row = db.execute(
-        "SELECT id FROM hc_vendedores WHERE funcionario_ixc_id=? AND ativo=1 LIMIT 1", (func_id,)
+        "SELECT id, usuario_ixc_id FROM hc_vendedores WHERE funcionario_ixc_id=? AND ativo=1 LIMIT 1", (func_id,)
     ).fetchone() if func_id else None
-    ixc_vend_id = vend_row["id"] if vend_row else func_id
+    # usar usuario_ixc_id (ID na tabela vendedor do IXC) se disponivel, senao id do hub
+    ixc_vend_id = (vend_row["usuario_ixc_id"] or vend_row["id"]) if vend_row else func_id
 
     # Proteção contra duplo clique — mesmo CPF em 60 segundos
     cpf_check = (f.get("cnpj_cpf") or "").replace(".","").replace("-","").replace("/","").strip()
