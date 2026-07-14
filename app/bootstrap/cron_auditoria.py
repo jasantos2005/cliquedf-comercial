@@ -58,7 +58,7 @@ def processar():
             import sqlite3 as _sq
             _conn = _sq.connect(str(get_db().execute("PRAGMA database_list").fetchone()[2] if False else __import__("pathlib").Path(__file__).resolve().parent.parent.parent / "hub_comercial.db"))
             _conn.row_factory = _sq.Row
-            _vr = _conn.execute("SELECT nome FROM hc_vendedores WHERE id=? LIMIT 1", (p.get('ixc_vendedor_id'),)).fetchone()
+            _vr = _conn.execute("SELECT nome FROM hc_vendedores WHERE usuario_ixc_id=? OR (funcionario_ixc_id=? AND usuario_ixc_id IS NULL) LIMIT 1", (p.get('ixc_vendedor_id'), p.get('ixc_vendedor_id'))).fetchone()
             vendedor = (_vr['nome'] if _vr else p.get('vendedor_nome') or 'Vendedor').upper()
             _conn.close()
         except:
