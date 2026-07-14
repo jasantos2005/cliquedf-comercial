@@ -562,6 +562,7 @@ async function doLogin(){
     token=d.token; usuario=d.usuario;
     localStorage.setItem('hc_token',token);
     localStorage.setItem('hc_usuario',JSON.stringify(usuario));
+    localStorage.setItem('hc_nivel', usuario.nivel || 10);
     mostrarApp();
   }catch(e){errEl.textContent='Erro de conexão.';}
   finally{btn.innerHTML='Entrar';btn.disabled=false;}
@@ -1616,12 +1617,15 @@ async function comprimir(file){
 // ENVIO
 async function enviarCadastro(){
   if(modoOffline){ await salvarOfflineIDB(); return; }
-  // Validar campos obrigatorios
-  if(formDados.casa_aluguel === undefined || formDados.casa_aluguel === null ||
-     formDados.fibra_concorrente === undefined || formDados.fibra_concorrente === null){
-    const err = document.getElementById('err-campos-adicionais');
-    if(err) err.style.display='block';
-    return;
+  // Validar campos obrigatorios (apenas vendedores externos - nivel 10)
+  const _nivelUser = parseInt(localStorage.getItem('hc_nivel') || '10');
+  if(_nivelUser <= 10){
+    if(formDados.casa_aluguel === undefined || formDados.casa_aluguel === null ||
+       formDados.fibra_concorrente === undefined || formDados.fibra_concorrente === null){
+      const err = document.getElementById('err-campos-adicionais');
+      if(err) err.style.display='block';
+      return;
+    }
   }
   // Preview de auditoria antes de enviar
   try {
