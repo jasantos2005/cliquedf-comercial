@@ -1308,18 +1308,21 @@ function renderRevisao(){
   <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Informações adicionais</div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
     <span style="font-size:14px;">🏠 Casa de aluguel?</span>
-    <div style="display:flex;gap:8px;">
-      <button id="btn-aluguel-sim" onclick="setAluguel(true)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Sim</button>
-      <button id="btn-aluguel-nao" onclick="setAluguel(false)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Não</button>
+    <div style="display:flex;gap:6px;">
+      <button id="btn-aluguel-sim" onclick="setAluguel(1)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;">Sim</button>
+      <button id="btn-aluguel-nao" onclick="setAluguel(0)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;">Não</button>
+      <button id="btn-aluguel-ns" onclick="setAluguel(2)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;">Não sei</button>
     </div>
   </div>
   <div style="display:flex;align-items:center;justify-content:space-between;">
     <span style="font-size:14px;">🌐 Fibra concorrente?</span>
-    <div style="display:flex;gap:8px;">
-      <button id="btn-fibra-sim" onclick="setFibra(true)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Sim</button>
-      <button id="btn-fibra-nao" onclick="setFibra(false)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Não</button>
+    <div style="display:flex;gap:6px;">
+      <button id="btn-fibra-sim" onclick="setFibra(1)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;">Sim</button>
+      <button id="btn-fibra-nao" onclick="setFibra(0)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;">Não</button>
+      <button id="btn-fibra-ns" onclick="setFibra(2)" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:12px;cursor:pointer;">Não sei</button>
     </div>
   </div>
+  <div id="err-campos-adicionais" style="display:none;color:var(--red);font-size:12px;margin-top:8px;">⚠️ Responda as duas perguntas acima</div>
 </div>
 <button class="btn btn-green" id="btn-enviar" onclick="enviarCadastro()">Enviar para auditoria</button>
 <button class="btn btn-outline" style="margin-top:8px;" onclick="renderFormPasso(4)">← Voltar</button>
@@ -1551,17 +1554,23 @@ function onNormalizar(el){
 }
 function setAluguel(val){
   formDados.casa_aluguel = val;
-  document.getElementById('btn-aluguel-sim').style.background = val ? 'var(--ac)' : 'var(--surf)';
-  document.getElementById('btn-aluguel-sim').style.color = val ? '#fff' : 'var(--muted)';
-  document.getElementById('btn-aluguel-nao').style.background = !val ? 'var(--ac)' : 'var(--surf)';
-  document.getElementById('btn-aluguel-nao').style.color = !val ? '#fff' : 'var(--muted)';
+  ['sim','nao','ns'].forEach(k => {
+    const el = document.getElementById('btn-aluguel-'+k);
+    if(el){ el.style.background='var(--surf)'; el.style.color='var(--muted)'; }
+  });
+  const map = {1:'sim',0:'nao',2:'ns'};
+  const el = document.getElementById('btn-aluguel-'+map[val]);
+  if(el){ el.style.background='var(--ac)'; el.style.color='#fff'; }
 }
 function setFibra(val){
   formDados.fibra_concorrente = val;
-  document.getElementById('btn-fibra-sim').style.background = val ? 'var(--ac)' : 'var(--surf)';
-  document.getElementById('btn-fibra-sim').style.color = val ? '#fff' : 'var(--muted)';
-  document.getElementById('btn-fibra-nao').style.background = !val ? 'var(--ac)' : 'var(--surf)';
-  document.getElementById('btn-fibra-nao').style.color = !val ? '#fff' : 'var(--muted)';
+  ['sim','nao','ns'].forEach(k => {
+    const el = document.getElementById('btn-fibra-'+k);
+    if(el){ el.style.background='var(--surf)'; el.style.color='var(--muted)'; }
+  });
+  const map = {1:'sim',0:'nao',2:'ns'};
+  const el = document.getElementById('btn-fibra-'+map[val]);
+  if(el){ el.style.background='var(--ac)'; el.style.color='#fff'; }
 }
 function abrirDoc(tipo){
   document.getElementById('menu-doc-'+tipo).style.display='block';
@@ -1607,6 +1616,13 @@ async function comprimir(file){
 // ENVIO
 async function enviarCadastro(){
   if(modoOffline){ await salvarOfflineIDB(); return; }
+  // Validar campos obrigatorios
+  if(formDados.casa_aluguel === undefined || formDados.casa_aluguel === null ||
+     formDados.fibra_concorrente === undefined || formDados.fibra_concorrente === null){
+    const err = document.getElementById('err-campos-adicionais');
+    if(err) err.style.display='block';
+    return;
+  }
   // Preview de auditoria antes de enviar
   try {
     const fd2 = new FormData();
