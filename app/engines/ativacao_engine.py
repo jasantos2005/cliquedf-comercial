@@ -474,9 +474,9 @@ def enviar_documentos_ixc(precadastro_id: int, ixc_cliente_id: int) -> list:
     Envia os documentos do pre-cadastro para ixcprovedor.cliente_arquivos via REST.
     Arquivos: rg_frente.jpg, comp_residencia.jpg, selfie_doc.jpg, contrato_{id}.pdf
     """
-    ixc_url   = os.getenv("IXC_URL",   "https://sistema.cliquedf.com.br")
-    ixc_user  = os.getenv("IXC_USER",  "64")
-    ixc_token = os.getenv("IXC_TOKEN", "fecc7c0a71a6779bab8b231c5382316ebf5396eef47bc94f59e5e431e0ca524a")
+    ixc_url   = os.getenv("IXC_API_URL",   os.getenv("IXC_URL",   "https://sistema.cliquedf.com.br"))
+    ixc_user  = os.getenv("IXC_API_USER",  os.getenv("IXC_USER",  "51"))
+    ixc_token = os.getenv("IXC_API_TOKEN", os.getenv("IXC_TOKEN", ""))
 
     auth_b64 = base64.b64encode(f"{ixc_user}:{ixc_token}".encode()).decode()
     headers  = {
