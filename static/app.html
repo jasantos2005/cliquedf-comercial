@@ -1304,6 +1304,23 @@ function renderRevisao(){
   <div class="info-row"><span class="info-key">Vencimento</span><span class="info-val">Dia ${formDados.dia_vencimento||'—'}</span></div>
   <div class="info-row"><span class="info-key">Canal</span><span class="info-val">${canais[formDados.canal_venda]||'—'}</span></div>
 </div>
+<div style="background:var(--surf2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">
+  <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;">Informações adicionais</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span style="font-size:14px;">🏠 Casa de aluguel?</span>
+    <div style="display:flex;gap:8px;">
+      <button id="btn-aluguel-sim" onclick="setAluguel(true)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Sim</button>
+      <button id="btn-aluguel-nao" onclick="setAluguel(false)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Não</button>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:14px;">🌐 Fibra concorrente?</span>
+    <div style="display:flex;gap:8px;">
+      <button id="btn-fibra-sim" onclick="setFibra(true)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Sim</button>
+      <button id="btn-fibra-nao" onclick="setFibra(false)" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">Não</button>
+    </div>
+  </div>
+</div>
 <button class="btn btn-green" id="btn-enviar" onclick="enviarCadastro()">Enviar para auditoria</button>
 <button class="btn btn-outline" style="margin-top:8px;" onclick="renderFormPasso(4)">← Voltar</button>
 `;}
@@ -1531,6 +1548,20 @@ function onNormalizar(el){
   const pos = el.selectionStart;
   el.value = normalizarTexto(el.value);
   try{ el.setSelectionRange(pos,pos); }catch(e){}
+}
+function setAluguel(val){
+  formDados.casa_aluguel = val;
+  document.getElementById('btn-aluguel-sim').style.background = val ? 'var(--ac)' : 'var(--surf)';
+  document.getElementById('btn-aluguel-sim').style.color = val ? '#fff' : 'var(--muted)';
+  document.getElementById('btn-aluguel-nao').style.background = !val ? 'var(--ac)' : 'var(--surf)';
+  document.getElementById('btn-aluguel-nao').style.color = !val ? '#fff' : 'var(--muted)';
+}
+function setFibra(val){
+  formDados.fibra_concorrente = val;
+  document.getElementById('btn-fibra-sim').style.background = val ? 'var(--ac)' : 'var(--surf)';
+  document.getElementById('btn-fibra-sim').style.color = val ? '#fff' : 'var(--muted)';
+  document.getElementById('btn-fibra-nao').style.background = !val ? 'var(--ac)' : 'var(--surf)';
+  document.getElementById('btn-fibra-nao').style.color = !val ? '#fff' : 'var(--muted)';
 }
 function abrirDoc(tipo){
   document.getElementById('menu-doc-'+tipo).style.display='block';
