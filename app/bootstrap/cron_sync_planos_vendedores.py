@@ -61,13 +61,26 @@ def sync_vendedores():
     usu_map = {r[0]: r[1] for r in conn.execute("SELECT id, usuario_ixc_id FROM hc_vendedores WHERE usuario_ixc_id IS NOT NULL").fetchall()}
     func_map = {r[0]: r[1] for r in conn.execute("SELECT id, funcionario_ixc_id FROM hc_vendedores WHERE funcionario_ixc_id IS NOT NULL").fetchall()}
     conn.execute("DELETE FROM hc_vendedores")
+    sem_mapeamento = []
     for r in rows:
         usu_id = usu_map.get(r["id"])
         func_id = func_map.get(r["id"])
+        # Alertar vendedores sem usuario_ixc_id mapeado
+        if not usu_id:
+            sem_mapeamento.append(f"{r['nome']} (id={r['id']})")
+            log.warning(f"Vendedor sem usuario_ixc_id: {r['nome']} id={r['id']}")
         conn.execute("INSERT INTO hc_vendedores(id,nome,login_ixc,ativo,usuario_ixc_id,funcionario_ixc_id)VALUES(?,?,?,1,?,?)",
                      (r["id"], r["nome"], None, usu_id, func_id))
     conn.commit(); conn.close()
     log.info(f"[OK] {len(rows)} vendedores")
+    if sem_mapeamento:
+        import requests, os
+        token = os.getenv("TELEGRAM_TOKEN","")
+        chat = os.getenv("TELEGRAM_CHAT_ID","")
+        if token and chat:
+            msg = f"⚠️ *Sync Vendedores — Sem mapeamento*\n\n" + "\n".join(f"• {v}" for v in sem_mapeamento)
+            requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": "2135602169", "text": msg, "parse_mode": "Markdown"}, timeout=10)
 
 def sync_cidades(uf="SE"):
     log.info(f"Sync cidades UF={uf}...")
