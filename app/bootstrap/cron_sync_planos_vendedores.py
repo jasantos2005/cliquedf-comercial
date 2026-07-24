@@ -31,8 +31,8 @@ def sync_planos():
                id_vendedor, fidelidade, Ativo AS ativo
         FROM ixcprovedor.vd_contratos
         WHERE Ativo = 'S'
-        ORDER BY id DESC
-        LIMIT 10
+          AND id IN (161,162,163,164,165,166,167,157,171,172,173,174,175)
+        ORDER BY valor_contrato ASC
     """)
     conn = db(); conn.execute("DELETE FROM hc_planos")
     for r in rows:
@@ -122,9 +122,7 @@ if __name__ == "__main__":
             if token:
                 _req.post(f"https://api.telegram.org/bot{token}/sendMessage",
                           json={"chat_id": "2135602169",
-                                "text": f"🚨 *ERRO CRITICO — Sync Hub Comercial*
-
-`{str(e)[:300]}`",
+                                "text": f"🚨 *ERRO CRITICO — Sync Hub Comercial*\n`{str(e)[:300]}`",
                                 "parse_mode": "Markdown"}, timeout=10)
         except: pass
         sys.exit(1)
