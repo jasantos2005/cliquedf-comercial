@@ -106,10 +106,24 @@ class AprovarPayload(BaseModel):
 
 @router.post("/{id}/aprovar")
 async def aprovar(id:int, payload:AprovarPayload, db=Depends(get_db), user=Depends(requer_supervisor())):
-    p = db.execute("SELECT status FROM hc_precadastros WHERE id=?",(id,)).fetchone()
+    p = db.execute("SELECT status, ixc_cliente_id FROM hc_precadastros WHERE id=?",(id,)).fetchone()
     if not p: raise HTTPException(404,"Não encontrado.")
     if p["status"] not in("pendente","reprovado","em_auditoria","aguard_correcao"): raise HTTPException(400,f"Status '{p['status']}' não permite aprovação.")
-    db.execute("UPDATE hc_precadastros SET status='aprovado',atualizado_em=datetime('now','-3 hours') WHERE id=?",(id,))
+    
+    # Verificar se tem R25 (CPF duplicado) — se sim, usar addcontrato com cliente existente
+    r25 = db.execute("""SELECT id FROM hc_auditoria_log 
+                        WHERE precadastro_id=? AND regra='R25' AND resultado='pendente'
+                        ORDER BY id DESC LIMIT 1""", (id,)).fetchone()
+    
+    if r25 and p["ixc_cliente_id"]:
+        # Ex-cliente — usar cliente existente, criar apenas contrato
+        db.execute("""UPDATE hc_precadastros SET status='aprovado', canal_venda='addcontrato',
+                      obs=COALESCE(obs||' ','')|| 'liberado_supervisor=1',
+                      atualizado_em=datetime('now','-3 hours') WHERE id=?""", (id,))
+    else:
+        db.execute("""UPDATE hc_precadastros SET status='aprovado',obs=COALESCE(obs||' ','')|| 'liberado_supervisor=1',
+                      atualizado_em=datetime('now','-3 hours') WHERE id=?""", (id,))
+    
     db.execute("INSERT INTO hc_auditoria_log(precadastro_id,rodada,regra,legenda,resultado,detalhes)VALUES(?,99,'MANUAL','Aprovação manual','ok',?)",
         (id,f"Aprovado por {user['login']} — {payload.justificativa}"))
     db.commit()
