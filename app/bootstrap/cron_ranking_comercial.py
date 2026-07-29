@@ -19,7 +19,7 @@ DB_PATH        = BASE_DIR / "hub_comercial.db"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_GRUPO = os.getenv("TELEGRAM_CHAT_ID", "")
 META_DIA       = 4
-VENDEDORES_IDS = (31, 45, 48, 6, 49)
+VENDEDORES_IDS = (31, 45, 49, 51)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def ranking_vendedores(data_inicio, data_fim=None):
         FROM hc_vendedores v
         LEFT JOIN hc_precadastros p ON p.ixc_vendedor_id = v.id
             AND p.criado_em >= ? AND p.criado_em <= ?
-        WHERE v.ativo=1 AND v.id IN (31,45,48,6,49)
+        WHERE v.ativo=1 AND v.id IN (31,45,49,51)
         GROUP BY v.id, v.nome
         ORDER BY ativados DESC, v.nome
     """, (data_inicio, data_fim)).fetchall()
@@ -127,6 +127,39 @@ def bloco_vendedor_detalhado(r, medalha, data_inicio):
             plano = (cl.get('plano_nome') or '').replace('CLIQUEDF - 2026 ','').replace('CLIQUEDF - 2026','').strip()
             linhas.append(f"   └ {nome_cli} · {cidade} · {plano}")
     return "\n".join(linhas)
+
+
+def notificar_venda_ativada():
+    """Dispara ranking atualizado no Telegram sempre que uma venda é ativada."""
+    try:
+        hoje_str = datetime.now().strftime("%Y-%m-%d 00:00:00")
+        rows = ranking_vendedores(hoje_str)
+        com_venda = [r for r in rows if r["ativados"] > 0]
+        sem_venda = [r for r in rows if r["ativados"] == 0]
+        if not com_venda:
+            return
+
+        medalhas = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣"]
+        linhas = ["🔔 *NOVA VENDA ATIVADA!*", "", "*📊 Ranking do dia:*"]
+        for i, r in enumerate(com_venda):
+            med = medalhas[i] if i < len(medalhas) else "▪️"
+            linhas.append(bloco_vendedor_simples(r, med))
+
+        lider = com_venda[0]
+        nome_lider = lider["nome"].split()[0].title()
+        linhas.append("")
+        if len(com_venda) == 1:
+            linhas.append(f"🔥 *{nome_lider}* abriu o placar do dia! Quem vem atrás pra disputar?")
+        else:
+            linhas.append(f"🔥 *{nome_lider}* na frente! Bora time, ainda dá tempo de virar!")
+
+        if sem_venda:
+            nomes_zerados = ", ".join(r["nome"].split()[0].title() for r in sem_venda)
+            linhas.append(f"💪 Contamos com você, {nomes_zerados}! Vamo pra cima!")
+
+        notificar("\n".join(linhas))
+    except Exception as e:
+        log.error(f"notificar_venda_ativada: {e}")
 
 
 def msg_abertura():

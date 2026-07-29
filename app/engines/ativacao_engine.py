@@ -668,6 +668,11 @@ def ativar_cliente(precadastro_id: int) -> int:
             conn.commit()
             _log_etapa(conn, precadastro_id, "insert_os", True, ixc_id=ixc_os_id)
             log.info(f"#{precadastro_id} OS criada no IXC: ID={ixc_os_id}")
+            try:
+                from app.bootstrap.cron_ranking_comercial import notificar_venda_ativada
+                notificar_venda_ativada()
+            except Exception as _e:
+                log.error(f"#{precadastro_id} ERRO notificar_venda_ativada: {_e}")
         except Exception as e:
             _log_etapa(conn, precadastro_id, "insert_os", False, erro=str(e))
             log.error(f"#{precadastro_id} ERRO insert_os: {e}")
