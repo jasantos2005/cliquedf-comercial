@@ -19,7 +19,7 @@ DB_PATH        = BASE_DIR / "hub_comercial.db"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 TELEGRAM_GRUPO = os.getenv("TELEGRAM_CHAT_ID", "")
 META_DIA       = 4
-VENDEDORES_IDS = (31, 45, 49, 51)
+VENDEDORES_IDS = (31, 45, 49)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
