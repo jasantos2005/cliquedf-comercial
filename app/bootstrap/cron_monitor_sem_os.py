@@ -3,7 +3,7 @@ Monitora dois cenários de divergência:
 1. Contrato ativo SEM OS de instalação finalizada (OS aberta ou sem OS)
 2. Contrato ativado ANTES do fechamento da OS (OS já fechada mas foi depois da ativação)
 """
-import os, pymysql, pymysql.cursors, requests, logging
+import os, pymysql, pymysql.cursors, requests, logging, sqlite3
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -76,6 +76,20 @@ def main():
         log.info("Nenhuma divergencia encontrada.")
         return
 
+    # Filtrar apenas contratos ainda não notificados
+    conn = sqlite3.connect(str(BASE_DIR / "hub_comercial.db"))
+    conn.row_factory = sqlite3.Row
+    ja_notificados = {r["ixc_contrato_id"] for r in conn.execute("SELECT ixc_contrato_id FROM hc_monitor_sem_os_log").fetchall()}
+
+    caso1 = [r for r in caso1 if r["id"] not in ja_notificados]
+    caso2 = [r for r in caso2 if r["id"] not in ja_notificados]
+    todos = list(caso1) + list(caso2)
+
+    if not todos:
+        log.info("Sem novas divergencias para notificar.")
+        conn.close()
+        return
+
     log.info(f"Caso1={len(caso1)} sem OS | Caso2={len(caso2)} OS fechada depois")
 
     linhas = [
@@ -109,6 +123,18 @@ def main():
     linhas.append(f"📊 Total: *{len(todos)} divergências*")
     notificar("\n".join(linhas))
     log.info("Alerta enviado.")
+
+    # Salvar contratos notificados para não repetir
+    from datetime import datetime
+    agora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for r in caso1:
+        conn.execute("INSERT OR IGNORE INTO hc_monitor_sem_os_log(ixc_contrato_id, razao, data_ativacao, data_os_fechamento, notificado_em) VALUES(?,?,?,?,?)",
+            (r["id"], r["razao"], str(r["data_ativacao"]), None, agora))
+    for r in caso2:
+        conn.execute("INSERT OR IGNORE INTO hc_monitor_sem_os_log(ixc_contrato_id, razao, data_ativacao, data_os_fechamento, notificado_em) VALUES(?,?,?,?,?)",
+            (r["id"], r["razao"], str(r["data_ativacao"]), str(r["data_fechamento"]), agora))
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
     main()
