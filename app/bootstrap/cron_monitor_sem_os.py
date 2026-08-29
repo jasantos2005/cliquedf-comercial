@@ -65,7 +65,7 @@ def main():
             AND o.id_assunto IN (227,75,92,15) AND o.status = 'F'
         WHERE cc.status_internet = 'A'
           AND cc.data_ativacao >= DATE_FORMAT(NOW(), '%Y-%m-01')
-          AND DATE(o.data_fechamento) >= cc.data_ativacao
+          AND DATE(o.data_fechamento) > cc.data_ativacao
         ORDER BY o.data_fechamento DESC
     """)
     caso2 = cur.fetchall()
