@@ -22,7 +22,6 @@ ATENDENTES = {
     '682b6d07f497f37f8eb35338': 'Karine Ferreira',
     '6659e00cbd1e771abfd2aefc': 'Rudinedja Santos',
     '659c4448f2a21eee31c7ad36': 'Manuela Tavares',
-    '67602d9691afc2bf7a36ed6c': 'Leide Aquino',
     '66d9f04910150407b4f311f9': 'Bruna Mathias',
 }
 
@@ -114,7 +113,8 @@ def inicio_comercial(dt: datetime) -> datetime:
         dt = dt.astimezone(BRT_TZ)
 
     def expediente_do_dia(d):
-        """Retorna lista de (inicio, fim) do expediente de um dia."""        wd = d.weekday()  # 0=seg, 6=dom
+        """Retorna lista de (inicio, fim) do expediente de um dia."""
+        wd = d.weekday()  # 0=seg, 6=dom
         if wd == 6:  # domingo fechado
             return []
         return [
@@ -373,7 +373,7 @@ async def main(fechar_dia: bool = False):
                 linhas.append(
                     f"{medals[i]} *{r['nome']}* — {r['atendimentos_hoje']} atend.\n"
                     f"   📋 {xp_atend} XP atend.{bonus_txt}\n"
-                    f"   Total acumulado: {r['xp_total']} XP"
+                    f"   Total acumulado no mês: {r['xp_mes']} XP"
                 )
             msg = (
                 f"🎮 *GAME ISP — {agora.strftime('%d/%m/%Y')}*\n"
