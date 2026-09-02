@@ -349,7 +349,7 @@ async def main(fechar_dia: bool = False):
         await aplicar_bonus_dia(hoje)
 
         conn = db_conn()
-        ranking = conn.execute('''SELECT nome, xp_hoje, xp_total, nivel, atendimentos_hoje
+        ranking = conn.execute('''SELECT nome, xp_hoje, xp_total, xp_mes, nivel, atendimentos_hoje
             FROM game_atendentes WHERE data_ultimo_calculo=? AND xp_hoje > 0
             ORDER BY xp_hoje DESC''', (hoje,)).fetchall()
         conn.close()
