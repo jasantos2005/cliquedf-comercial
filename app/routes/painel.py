@@ -1802,7 +1802,12 @@ async def game_bonificacao(mes: str):
     try:
         # Mês atual
         atual = conn.execute(
-            'SELECT * FROM game_historico_mensal WHERE mes=? ORDER BY score DESC',
+            '''SELECT *, 
+               COALESCE(xp_atendimentos,0) as xp_atendimentos,
+               COALESCE(xp_bonus,0) as xp_bonus,
+               COALESCE(dias_com_bonus,0) as dias_com_bonus,
+               COALESCE(dias_sem_bonus,0) as dias_sem_bonus
+               FROM game_historico_mensal WHERE mes=? ORDER BY score DESC''',
             (mes,)
         ).fetchall()
 

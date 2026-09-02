@@ -2,8 +2,10 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="shortcut icon" href="/static/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hub Comercial v1775602719 · Cliquedf</title>
+<title>Hub Comercial v1788383217 · Cliquedf</title>
 <style>
 /* ============================================================
    HUB COMERCIAL — Estilo HubProdutividade
@@ -2410,7 +2412,7 @@ function abrirModalDepto(depto) {
   <!-- Abas -->
   <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;">
     <button id="game-tab-dia" onclick="gameAba('dia')" style="padding:8px 16px;background:var(--cyan);color:#000;border:none;border-radius:6px 6px 0 0;cursor:pointer;font-weight:600;font-size:13px;">📅 Hoje</button>
-    <button id="game-tab-mes" onclick="gameAba('mes')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">📆 Este mês</button>
+    <button id="game-tab-mes" onclick="gameAba('mes')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">📆 Ranking</button>
     <button id="game-tab-bonif" onclick="gameAba('bonif')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">💰 Bonificação</button>
     <button id="game-tab-hist" onclick="gameAba('hist')" style="padding:8px 16px;background:var(--surf2);color:var(--muted);border:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;">📊 Histórico</button>
   </div>
@@ -2444,8 +2446,13 @@ function abrirModalDepto(depto) {
 
   <!-- ABA MES -->
   <div id="game-aba-mes" style="display:none;">
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button id="game-rank-tab-ant" onclick="gameRankPeriodo('anterior')" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">◀ Mês anterior</button>
+      <button id="game-rank-tab-mes" onclick="gameRankPeriodo('mes')" style="padding:7px 16px;border-radius:8px;border:1px solid var(--ac);background:rgba(46,160,67,.15);color:var(--ac);font-size:13px;cursor:pointer;font-weight:700;">📆 Este mês</button>
+      <button id="game-rank-tab-hoje" onclick="gameRankPeriodo('hoje')" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf);color:var(--muted);font-size:13px;cursor:pointer;">📅 Hoje</button>
+    </div>
     <div class="card" style="overflow:auto;">
-      <div class="sec-title" style="margin-bottom:12px;">📆 Ranking — Este Mês</div>
+      <div class="sec-title" style="margin-bottom:12px;" id="game-rank-titulo">📆 Ranking — Este Mês</div>
       <div id="game-mes-corpo"><div style="color:var(--muted);padding:16px;">Carregando...</div></div>
     </div>
   </div>
@@ -2453,7 +2460,9 @@ function abrirModalDepto(depto) {
   <!-- ABA BONIFICAÇÃO -->
   <div id="game-aba-bonif" style="display:none;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-      <select id="game-bonif-mes" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surf);color:var(--text);font-size:13px;">
+      <select id="game-bonif-mes" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:#1c2128;color:#e6edf3;font-size:13px;color-scheme:dark;">
+        <option value="2026-09">Setembro/2026</option>
+        <option value="2026-08" selected>Agosto/2026</option>
         <option value="2026-07">Julho/2026</option>
         <option value="2026-06">Junho/2026</option>
         <option value="2026-05">Maio/2026</option>
@@ -2520,7 +2529,7 @@ function gameAba(aba) {
       btn.style.fontWeight = a===aba ? '600' : 'normal';
     }
   });
-  if(aba==='mes') carregarGameMes();
+  if(aba==='mes') gameRankPeriodo('mes');
   if(aba==='bonif') carregarBonif();
   if(aba==='hist') carregarGameHist();
 }
@@ -2557,6 +2566,78 @@ function carregarGameMes() {
   });
 }
 
+function gameRankPeriodo(periodo) {
+  // Atualizar botoes
+  ['ant','mes','hoje'].forEach(function(t){
+    var btn = document.getElementById('game-rank-tab-'+t);
+    if(!btn) return;
+    btn.style.background = 'var(--surf)';
+    btn.style.color = 'var(--muted)';
+    btn.style.border = '1px solid var(--border)';
+    btn.style.fontWeight = 'normal';
+  });
+  var ativo = document.getElementById('game-rank-tab-'+periodo);
+  if(ativo){ ativo.style.background='rgba(46,160,67,.15)'; ativo.style.color='var(--ac)'; ativo.style.border='1px solid var(--ac)'; ativo.style.fontWeight='700'; }
+
+  var titulo = document.getElementById('game-rank-titulo');
+  var corpo = document.getElementById('game-mes-corpo');
+  corpo.innerHTML = '<div style="color:var(--muted);padding:16px;">Carregando...</div>';
+
+  if(periodo === 'hoje') {
+    titulo.textContent = '📅 Ranking — Hoje';
+    api('/api/painel/game/ranking').then(function(r){
+      var dados = (r.data||[]).sort(function(a,b){ return b.xp_hoje - a.xp_hoje; });
+      renderGameRank(dados, 'hoje');
+    });
+  } else if(periodo === 'mes') {
+    titulo.textContent = '📆 Ranking — Este Mês';
+    // Mes atual — usar game_atendentes (dados em tempo real)
+    api('/api/painel/game/ranking').then(function(r){
+      var dados = (r.data||[]).sort(function(a,b){ return b.xp_mes - a.xp_mes; }).map(function(d){
+        return {nome:d.nome, atendimentos:d.atendimentos_total, xp:d.xp_mes,
+                xp_atendimentos:d.xp_mes, xp_bonus:0, dias_com_bonus:0, dias_sem_bonus:0};
+      });
+      renderGameRank(dados, 'mes');
+    });
+  } else if(periodo === 'anterior') {
+    // Mes anterior
+    var d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-1);
+    var mesAnt = d.toISOString().slice(0,7);
+    var nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    titulo.textContent = '◀ Ranking — ' + nomes[d.getMonth()] + '/' + d.getFullYear();
+    api('/api/painel/game/bonificacao/'+mesAnt).then(function(r){
+      renderGameRank(r.data||[], 'anterior');
+    });
+  }
+}
+
+function renderGameRank(dados, periodo) {
+  var corpo = document.getElementById('game-mes-corpo');
+  if(!dados.length){ corpo.innerHTML='<div style="color:var(--muted);padding:16px;">Sem dados.</div>'; return; }
+  var medals = ['🥇','🥈','🥉','4º','5º','6º','7º'];
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<tr style="border-bottom:1px solid var(--border);"><th style="padding:8px 12px;text-align:left;">Pos</th><th style="padding:8px 12px;text-align:left;">Atendente</th><th style="padding:8px 12px;text-align:right;">Atend.</th><th style="padding:8px 12px;text-align:right;">XP Atend.</th><th style="padding:8px 12px;text-align:right;">XP Bônus</th><th style="padding:8px 12px;text-align:right;">Total XP</th><th style="padding:8px 12px;text-align:center;">Dias Bônus</th></tr>';
+  dados.forEach(function(d, i){
+    var xpAt = d.xp_atendimentos || (periodo==='hoje' ? d.xp_hoje : d.xp || 0);
+    var xpBon = d.xp_bonus || 0;
+    var total = d.xp || (xpAt + xpBon);
+    var atend = d.atendimentos || d.atendimentos_hoje || 0;
+    var diasB = d.dias_com_bonus || 0;
+    var diasS = d.dias_sem_bonus || 0;
+    html += '<tr style="border-bottom:1px solid var(--border);">'+
+      '<td style="padding:10px 12px;">'+medals[i]+'</td>'+
+      '<td style="padding:10px 12px;font-weight:600;">'+d.nome+'</td>'+
+      '<td style="padding:10px 12px;text-align:right;color:var(--muted);">'+atend+'</td>'+
+      '<td style="padding:10px 12px;text-align:right;color:var(--ac2);">'+xpAt+'</td>'+
+      '<td style="padding:10px 12px;text-align:right;color:var(--green);">'+(xpBon>0?'+'+xpBon:'—')+'</td>'+
+      '<td style="padding:10px 12px;text-align:right;font-weight:700;">'+total+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:11px;">'+(diasB>0?'✅ '+diasB+'d':'')+' '+(diasS>0?'❌ '+diasS+'d':'')+'</td>'+
+      '</tr>';
+  });
+  html += '</table>';
+  corpo.innerHTML = html;
+}
+
 function carregarBonif() {
   var mes = document.getElementById('game-bonif-mes').value;
   api('/api/painel/game/bonificacao/'+mes).then(function(r){
@@ -2570,20 +2651,28 @@ function carregarBonif() {
     var corpo = '<div style="display:grid;gap:12px;">';
     dados.forEach(function(d,i){
       var b = bonif[i]||0;
-      var isEvolucao = emAndamento ? false : (d.evolucao===maxEv && d.evolucao>0);
-      var bExtra = isEvolucao ? 100 : 0;
-      var bTotal = b + bExtra;
-      var cor = b>0||bExtra>0 ? 'var(--green)' : 'var(--muted)';
+      var bTotal = b;
+      var cor = b>0 ? 'var(--green)' : 'var(--muted)';
+      var xpAtend = d.xp_atendimentos || 0;
+      var xpBonus = d.xp_bonus || 0;
+      var diasBonus = d.dias_com_bonus || 0;
+      var diasSemBonus = d.dias_sem_bonus || 0;
+      var temDetalhes = xpAtend > 0 || xpBonus > 0;
       corpo += '<div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--surf);border:1px solid var(--border);border-radius:10px;">'+
         '<span style="font-size:24px;">'+medals[i]+'</span>'+
         '<div style="flex:1;">'+
-        '<div style="font-size:15px;font-weight:700;">'+d.nome+(isEvolucao?' 🏅 Maior evolução':'')+'</div>'+
-        '<div style="font-size:12px;color:var(--muted);">Score: '+d.score+' | '+d.atendimentos+' atend. | '+d.xp+' XP</div>'+
-        '<div style="font-size:11px;color:'+(emAndamento?'var(--muted)':d.evolucao>0?'var(--green)':'var(--red)')+';">Evolução: '+(emAndamento?'— (mês em andamento)':(d.evolucao>0?'+':'')+d.evolucao+' vs mês anterior')+'</div>'+
+        '<div style="font-size:15px;font-weight:700;">'+d.nome+'</div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px;">'+d.atendimentos+' atend. | '+d.xp+' XP total</div>'+
+        (temDetalhes?
+          '<div style="display:flex;gap:10px;margin-top:5px;">'+
+          '<span style="font-size:11px;background:rgba(56,139,253,.1);color:var(--ac2);padding:2px 8px;border-radius:6px;">📋 Atend: '+xpAtend+' XP</span>'+
+          '<span style="font-size:11px;background:rgba(46,160,67,.1);color:var(--green);padding:2px 8px;border-radius:6px;">🎁 Bônus: '+xpBonus+' XP ('+diasBonus+'d ✅'+(diasSemBonus>0?' '+diasSemBonus+'d ❌':'')+') </span>'+
+          '</div>':'')+
+        '<div style="font-size:11px;margin-top:4px;color:'+(emAndamento?'var(--muted)':d.evolucao>0?'var(--green)':'var(--red)')+';">Evolução: '+(emAndamento?'— (mês em andamento)':(d.evolucao>0?'+':'')+d.evolucao+' vs mês anterior')+'</div>'+
         '</div>'+
         '<div style="text-align:right;">'+
         (bTotal>0?'<div style="font-size:22px;font-weight:900;color:'+cor+';">R$ '+bTotal+'</div>':'<div style="color:var(--muted);font-size:13px;">—</div>')+
-        (bExtra>0?'<div style="font-size:11px;color:var(--green);">R$ '+b+' + R$ '+bExtra+' evolução</div>':'')+
+
         '</div></div>';
     });
     corpo += '</div>';

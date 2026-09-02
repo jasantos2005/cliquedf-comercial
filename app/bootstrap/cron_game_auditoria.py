@@ -57,7 +57,7 @@ def calc_xp(motivos, setor):
         elif _id in MOTIVOS_SUPORTE and not eh_s: xp_m = 5
         elif _id in MOTIVOS_FINANCEIRO and not eh_f: xp_m = 5
         if xp_m > melhor: melhor = xp_m
-    return 5 + melhor
+    return melhor
 
 def db_conn():
     conn = sqlite3.connect(os.path.abspath(DB_PATH))

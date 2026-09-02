@@ -84,148 +84,6 @@ async def buscar_atendimentos(hoje: str) -> list:
             content=json.dumps(payload).encode())
     return r.json().get('data',[])
 
-async def main(fechar_dia: bool = False):
-    agora = datetime.now(BRT)
-    hoje  = str(agora.date())
-
-    atends = await buscar_atendimentos(hoje)
-
-    xp_dia = {_id: {'xp': 0, 'atend': 0, 'eventos': []} for _id in ATENDENTES}
-    protos_vistos = set()
-
-    for a in atends:
-        id_atd = a.get('id_atendente','')
-        if isinstance(id_atd, dict): id_atd = id_atd.get('_id','')
-        if id_atd not in ATENDENTES:
-            continue
-
-        proto = a.get('protocolo','')
-        if proto in protos_vistos:
-            continue
-        protos_vistos.add(proto)
-
-        xp_dia[id_atd]['atend'] += 1
-        xp_base = 5
-
-        setor_atend = a.get('setor','')
-        eh_suporte = setor_atend == DEPTO_SUPORTE
-        eh_financeiro = setor_atend == DEPTO_FINANCEIRO
-        motivos = a.get('motivos',[])
-        melhor_xp = 0
-        melhor_motivo = 'Atendimento finalizado'
-
-        for m in motivos:
-            mid = m.get('idMotivo')
-            _id = mid.get('_id','') if isinstance(mid,dict) else str(mid or '')
-            if _id in XP_MOTIVOS:
-                nome_m, xp_m = XP_MOTIVOS[_id]
-                if _id == '65a18e3bae4972531a90d0a1':  # Resolvido no atendimento
-                    if eh_suporte: xp_m = 25
-                    elif eh_financeiro: xp_m = 15
-                    else: xp_m = 10
-                elif _id in ('6643c64684d5f75ec0a9155a','6643c622bd1e771abfc338d2','65a18da2ae4972531a90d014','65a18dd2ae4972531a90d030'):
-                    if not eh_suporte: xp_m = 5
-                elif _id in ('65a18e11ae4972531a90d06d','65a18d45f2a21eee31c88395','65a18d55ae4972531a90cfd3','65a18e04f2a21eee31c8843a'):
-                    if not eh_financeiro: xp_m = 5
-                if xp_m > melhor_xp:
-                    melhor_xp = xp_m
-                    melhor_motivo = nome_m
-
-        xp_total = xp_base + melhor_xp
-        xp_dia[id_atd]['xp'] += xp_total
-        xp_dia[id_atd]['eventos'].append({
-            'protocolo': proto,
-            'motivo': melhor_motivo,
-            'xp': xp_total,
-        })
-
-    conn = db_conn()
-    try:
-        for atd_id, dados in xp_dia.items():
-            if dados['atend'] == 0:
-                continue
-
-            nome = ATENDENTES[atd_id]
-            xp_hoje = dados['xp']
-            atend_hoje = dados['atend']
-
-            row = conn.execute('SELECT * FROM game_atendentes WHERE id=?', (atd_id,)).fetchone()
-            if row:
-                xp_anterior_hoje = row['xp_hoje'] if row['data_ultimo_calculo'] == hoje else 0
-                xp_total_novo = row['xp_total'] - xp_anterior_hoje + xp_hoje
-                mes_atual = hoje[:7]
-                mes_ultimo = (row['data_ultimo_calculo'] or '')[:7]
-                if mes_atual != mes_ultimo:
-                    xp_mes_novo = xp_hoje
-                else:
-                    xp_mes_novo = row['xp_mes'] - xp_anterior_hoje + xp_hoje
-                nivel_anterior = row['nivel']
-                conn.execute('''UPDATE game_atendentes SET
-                    xp_total=?, xp_mes=?, xp_hoje=?,
-                    atendimentos_hoje=?, atendimentos_total=?,
-                    nivel=?, data_ultimo_calculo=?
-                    WHERE id=?''', (
-                    xp_total_novo, xp_mes_novo, xp_hoje,
-                    atend_hoje, row['atendimentos_total'] - (row['atendimentos_hoje'] if row['data_ultimo_calculo']==hoje else 0) + atend_hoje,
-                    get_nivel(xp_total_novo)[1], hoje, atd_id
-                ))
-                nivel_novo = get_nivel(xp_total_novo)[1]
-                if nivel_novo > nivel_anterior and fechar_dia:
-                    nome_nivel = get_nivel(xp_total_novo)[2]
-                    await telegram(f'🎉 *SUBIU DE NÍVEL!*\n👤 *{nome}* alcançou *{nome_nivel}*!\n⭐ {xp_total_novo} XP total')
-            else:
-                nivel = get_nivel(xp_hoje)[1]
-                conn.execute('''INSERT INTO game_atendentes
-                    (id,nome,nivel,xp_total,xp_mes,xp_hoje,atendimentos_total,atendimentos_hoje,data_ultimo_calculo,criado_em)
-                    VALUES (?,?,?,?,?,?,?,?,?,?)''',
-                    (atd_id,nome,nivel,xp_hoje,xp_hoje,xp_hoje,atend_hoje,atend_hoje,hoje,agora.strftime('%Y-%m-%d %H:%M:%S')))
-
-            if fechar_dia:
-                conn.execute('DELETE FROM game_xp_historico WHERE atendente_id=? AND data=?', (atd_id, hoje))
-                for ev in dados['eventos']:
-                    conn.execute('''INSERT INTO game_xp_historico
-                        (atendente_id,protocolo,motivo,xp,descricao,data,criado_em)
-                        VALUES (?,?,?,?,?,?,?)''',
-                        (atd_id, ev['protocolo'], ev['motivo'], ev['xp'],
-                         '+' + str(ev['xp']) + ' XP - ' + ev['motivo'], hoje,
-                         agora.strftime('%Y-%m-%d %H:%M:%S')))
-
-        conn.commit()
-    finally:
-        conn.close()
-
-    if fechar_dia:
-        # Aplicar bonus de fila antes do ranking final
-        await aplicar_bonus_dia(hoje)
-
-        conn = db_conn()
-        ranking = conn.execute('''SELECT nome, xp_hoje, xp_total, nivel, atendimentos_hoje
-            FROM game_atendentes WHERE data_ultimo_calculo=? AND xp_hoje > 0
-            ORDER BY xp_hoje DESC''', (hoje,)).fetchall()
-        conn.close()
-
-        if ranking:
-            medals = ['🥇','🥈','🥉','4º','5º','6º','7º']
-            linhas = '\n'.join([
-                f"{medals[i]} *{r['nome']}* +{r['xp_hoje']} XP | {r['atendimentos_hoje']} atend. | Total: {r['xp_total']} XP"
-                for i, r in enumerate(ranking)
-            ])
-            msg = (
-                f"🎮 *GAME ISP — {agora.strftime('%d/%m/%Y')}*\n"
-                f"_Ranking de XP do dia_\n\n"
-                f"{linhas}\n\n"
-                f"_Próximo relatório amanhã às 19h_"
-            )
-            await telegram(msg)
-
-    total_xp = sum(d['xp'] for d in xp_dia.values())
-    print(f'[{agora.strftime("%H:%M")}] GAME XP calculado — {len([d for d in xp_dia.values() if d["atend"]>0])} atendentes | {total_xp} XP total')
-
-if __name__ == '__main__':
-    import sys
-    fechar = '--fechar' in sys.argv
-    asyncio.run(main(fechar_dia=fechar))
-
 
 async def verificar_bonus_fila(hoje: str) -> dict:
     """
@@ -319,3 +177,145 @@ async def aplicar_bonus_dia(hoje: str):
 
     await telegram(msg)
     print(f'Bônus aplicado: {len(bonificados)} receberam, {len(nao_bonificados)} não.')
+
+async def main(fechar_dia: bool = False):
+    agora = datetime.now(BRT)
+    hoje  = str(agora.date())
+
+    atends = await buscar_atendimentos(hoje)
+
+    xp_dia = {_id: {'xp': 0, 'atend': 0, 'eventos': []} for _id in ATENDENTES}
+    protos_vistos = set()
+
+    for a in atends:
+        id_atd = a.get('id_atendente','')
+        if isinstance(id_atd, dict): id_atd = id_atd.get('_id','')
+        if id_atd not in ATENDENTES:
+            continue
+
+        proto = a.get('protocolo','')
+        if proto in protos_vistos:
+            continue
+        protos_vistos.add(proto)
+
+        xp_dia[id_atd]['atend'] += 1
+        xp_base = 0
+
+        setor_atend = a.get('setor','')
+        eh_suporte = setor_atend == DEPTO_SUPORTE
+        eh_financeiro = setor_atend == DEPTO_FINANCEIRO
+        motivos = a.get('motivos',[])
+        melhor_xp = 0
+        melhor_motivo = 'Atendimento finalizado'
+
+        for m in motivos:
+            mid = m.get('idMotivo')
+            _id = mid.get('_id','') if isinstance(mid,dict) else str(mid or '')
+            if _id in XP_MOTIVOS:
+                nome_m, xp_m = XP_MOTIVOS[_id]
+                if _id == '65a18e3bae4972531a90d0a1':  # Resolvido no atendimento
+                    if eh_suporte: xp_m = 25
+                    elif eh_financeiro: xp_m = 15
+                    else: xp_m = 10
+                elif _id in ('6643c64684d5f75ec0a9155a','6643c622bd1e771abfc338d2','65a18da2ae4972531a90d014','65a18dd2ae4972531a90d030'):
+                    if not eh_suporte: xp_m = 5
+                elif _id in ('65a18e11ae4972531a90d06d','65a18d45f2a21eee31c88395','65a18d55ae4972531a90cfd3','65a18e04f2a21eee31c8843a'):
+                    if not eh_financeiro: xp_m = 5
+                if xp_m > melhor_xp:
+                    melhor_xp = xp_m
+                    melhor_motivo = nome_m
+
+        xp_total = melhor_xp if melhor_xp > 0 else 5
+        xp_dia[id_atd]['xp'] += xp_total
+        xp_dia[id_atd]['eventos'].append({
+            'protocolo': proto,
+            'motivo': melhor_motivo,
+            'xp': xp_total,
+        })
+
+    conn = db_conn()
+    try:
+        for atd_id, dados in xp_dia.items():
+            if dados['atend'] == 0:
+                continue
+
+            nome = ATENDENTES[atd_id]
+            xp_hoje = dados['xp']
+            atend_hoje = dados['atend']
+
+            row = conn.execute('SELECT * FROM game_atendentes WHERE id=?', (atd_id,)).fetchone()
+            if row:
+                xp_anterior_hoje = row['xp_hoje'] if row['data_ultimo_calculo'] == hoje else 0
+                xp_total_novo = row['xp_total'] - xp_anterior_hoje + xp_hoje
+                mes_atual = hoje[:7]
+                mes_ultimo = (row['data_ultimo_calculo'] or '')[:7]
+                if mes_atual != mes_ultimo:
+                    xp_mes_novo = xp_hoje
+                else:
+                    xp_mes_novo = row['xp_mes'] - xp_anterior_hoje + xp_hoje
+                nivel_anterior = row['nivel']
+                conn.execute('''UPDATE game_atendentes SET
+                    xp_total=?, xp_mes=?, xp_hoje=?,
+                    atendimentos_hoje=?, atendimentos_total=?,
+                    nivel=?, data_ultimo_calculo=?
+                    WHERE id=?''', (
+                    xp_total_novo, xp_mes_novo, xp_hoje,
+                    atend_hoje, row['atendimentos_total'] - (row['atendimentos_hoje'] if row['data_ultimo_calculo']==hoje else 0) + atend_hoje,
+                    get_nivel(xp_total_novo)[1], hoje, atd_id
+                ))
+                nivel_novo = get_nivel(xp_total_novo)[1]
+                if nivel_novo > nivel_anterior and fechar_dia:
+                    nome_nivel = get_nivel(xp_total_novo)[2]
+                    await telegram(f'🎉 *SUBIU DE NÍVEL!*\n👤 *{nome}* alcançou *{nome_nivel}*!\n⭐ {xp_total_novo} XP total')
+            else:
+                nivel = get_nivel(xp_hoje)[1]
+                conn.execute('''INSERT INTO game_atendentes
+                    (id,nome,nivel,xp_total,xp_mes,xp_hoje,atendimentos_total,atendimentos_hoje,data_ultimo_calculo,criado_em)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)''',
+                    (atd_id,nome,nivel,xp_hoje,xp_hoje,xp_hoje,atend_hoje,atend_hoje,hoje,agora.strftime('%Y-%m-%d %H:%M:%S')))
+
+            if fechar_dia:
+                conn.execute('DELETE FROM game_xp_historico WHERE atendente_id=? AND data=?', (atd_id, hoje))
+                for ev in dados['eventos']:
+                    conn.execute('''INSERT INTO game_xp_historico
+                        (atendente_id,protocolo,motivo,xp,descricao,data,criado_em)
+                        VALUES (?,?,?,?,?,?,?)''',
+                        (atd_id, ev['protocolo'], ev['motivo'], ev['xp'],
+                         '+' + str(ev['xp']) + ' XP - ' + ev['motivo'], hoje,
+                         agora.strftime('%Y-%m-%d %H:%M:%S')))
+
+        conn.commit()
+    finally:
+        conn.close()
+
+    if fechar_dia:
+        # Aplicar bonus de fila antes do ranking final
+        await aplicar_bonus_dia(hoje)
+
+        conn = db_conn()
+        ranking = conn.execute('''SELECT nome, xp_hoje, xp_total, nivel, atendimentos_hoje
+            FROM game_atendentes WHERE data_ultimo_calculo=? AND xp_hoje > 0
+            ORDER BY xp_hoje DESC''', (hoje,)).fetchall()
+        conn.close()
+
+        if ranking:
+            medals = ['🥇','🥈','🥉','4º','5º','6º','7º']
+            linhas = '\n'.join([
+                f"{medals[i]} *{r['nome']}* +{r['xp_hoje']} XP | {r['atendimentos_hoje']} atend. | Total: {r['xp_total']} XP"
+                for i, r in enumerate(ranking)
+            ])
+            msg = (
+                f"🎮 *GAME ISP — {agora.strftime('%d/%m/%Y')}*\n"
+                f"_Ranking de XP do dia_\n\n"
+                f"{linhas}\n\n"
+                f"_Próximo relatório amanhã às 19h_"
+            )
+            await telegram(msg)
+
+    total_xp = sum(d['xp'] for d in xp_dia.values())
+    print(f'[{agora.strftime("%H:%M")}] GAME XP calculado — {len([d for d in xp_dia.values() if d["atend"]>0])} atendentes | {total_xp} XP total')
+
+if __name__ == '__main__':
+    import sys
+    fechar = '--fechar' in sys.argv
+    asyncio.run(main(fechar_dia=fechar))
