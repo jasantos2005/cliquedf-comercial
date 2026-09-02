@@ -341,6 +341,7 @@ async def main(fechar_dia: bool = False):
                 f"\n\n_Próximo relatório amanhã às 19h_"
             )
             await telegram(msg)
+            await whatsapp_grupo(msg)
 
     total_xp = sum(d['xp'] for d in xp_dia.values())
     print(f'[{agora.strftime("%H:%M")}] GAME XP calculado — {len([d for d in xp_dia.values() if d["atend"]>0])} atendentes | {total_xp} XP total')
