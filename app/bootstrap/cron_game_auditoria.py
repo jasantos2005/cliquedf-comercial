@@ -27,15 +27,18 @@ DEPTO_SUPORTE    = '5bf73d1d186f7d2b0d647a61'
 DEPTO_FINANCEIRO = '5d1624085e74a002308aa25e'
 
 XP_MOTIVOS = {
-    '65a18e3bae4972531a90d0a1':30,'6643c64684d5f75ec0a9155a':15,
-    '6643c622bd1e771abfc338d2':20,'65a18da2ae4972531a90d014':20,
-    '65a18dd2ae4972531a90d030':15,'65a18e11ae4972531a90d06d':15,
-    '65a18d45f2a21eee31c88395':15,'65a18d55ae4972531a90cfd3':20,
-    '65a18e04f2a21eee31c8843a':20,'65a18de1ae4972531a90d03d':10,
-    '65a18d38ae4972531a90cfae':10,'65a18d77ae4972531a90d001':10,
-    '65a18e4ef2a21eee31c88491':10,'65a18dbbf2a21eee31c883fe':10,
-    '65a18e2ef2a21eee31c8846e':5,'665a205084d5f75ec0b077de':5,
-    '65a18d64f2a21eee31c883cc':10,'6643c622bd1e771abfc338d2':20,
+    # Suporte
+    '65a18e3bae4972531a90d0a1':25,'6643c64684d5f75ec0a9155a':5,
+    '6643c622bd1e771abfc338d2':5,'65a18da2ae4972531a90d014':5,
+    '65a18dd2ae4972531a90d030':15,
+    # Financeiro
+    '65a18e11ae4972531a90d06d':5,'65a18d45f2a21eee31c88395':5,
+    '65a18d55ae4972531a90cfd3':5,'65a18e04f2a21eee31c8843a':10,
+    # Comercial/Geral
+    '65a18de1ae4972531a90d03d':10,'65a18d38ae4972531a90cfae':10,
+    '65a18d77ae4972531a90d001':5,'65a18e4ef2a21eee31c88491':5,
+    '65a18dbbf2a21eee31c883fe':5,'65a18e2ef2a21eee31c8846e':5,
+    '665a205084d5f75ec0b077de':5,'65a18d64f2a21eee31c883cc':10,
 }
 MOTIVOS_SUPORTE    = {'6643c64684d5f75ec0a9155a','6643c622bd1e771abfc338d2','65a18da2ae4972531a90d014','65a18dd2ae4972531a90d030'}
 MOTIVOS_FINANCEIRO = {'65a18e11ae4972531a90d06d','65a18d45f2a21eee31c88395','65a18d55ae4972531a90cfd3','65a18e04f2a21eee31c8843a'}
@@ -50,7 +53,7 @@ def calc_xp(motivos, setor):
         if _id not in XP_MOTIVOS: continue
         xp_m = XP_MOTIVOS[_id]
         if _id == '65a18e3bae4972531a90d0a1':
-            xp_m = 30 if eh_s else (15 if eh_f else 10)
+            xp_m = 25 if eh_s else (15 if eh_f else 10)
         elif _id in MOTIVOS_SUPORTE and not eh_s: xp_m = 5
         elif _id in MOTIVOS_FINANCEIRO and not eh_f: xp_m = 5
         if xp_m > melhor: melhor = xp_m

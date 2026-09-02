@@ -195,6 +195,9 @@ async def main(fechar_dia: bool = False):
         conn.close()
 
     if fechar_dia:
+        # Aplicar bonus de fila antes do ranking final
+        await aplicar_bonus_dia(hoje)
+
         conn = db_conn()
         ranking = conn.execute('''SELECT nome, xp_hoje, xp_total, nivel, atendimentos_hoje
             FROM game_atendentes WHERE data_ultimo_calculo=? AND xp_hoje > 0
@@ -222,3 +225,97 @@ if __name__ == '__main__':
     import sys
     fechar = '--fechar' in sys.argv
     asyncio.run(main(fechar_dia=fechar))
+
+
+async def verificar_bonus_fila(hoje: str) -> dict:
+    """
+    Verifica se algum atendente deixou cliente esperando +40min na fila.
+    Retorna dict {atd_id: True/False} — True = SEM clientes >40min = recebe bonus.
+    """
+    try:
+        payload = {'filter': {'dataInicialAbertura': hoje, 'dataFinalAbertura': hoje}, 'options': {'limit': 500}}
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.request('GET', f'{OPA_BASE}/atendimento',
+                headers={'Authorization': f'Bearer {OPA_TOKEN}', 'Content-Type': 'application/json'},
+                content=json.dumps(payload).encode())
+        atends = r.json().get('data', [])
+    except Exception as e:
+        print(f'Erro ao buscar fila: {e}')
+        return {atd_id: True for atd_id in ATENDENTES}  # duvida = beneficio da duvida
+
+    # Verificar atendimentos com tempo de espera > 40 min
+    atd_violou = set()
+    for a in atends:
+        id_atd = a.get('id_atendente', '')
+        if isinstance(id_atd, dict): id_atd = id_atd.get('_id', '')
+        if id_atd not in ATENDENTES:
+            continue
+        # Calcular tempo de espera (dataAbertura ate primeiro atendimento)
+        abertura = a.get('dataAbertura') or a.get('data_abertura') or ''
+        primeiro_atend = a.get('dataPrimeiroAtendimento') or a.get('data_primeiro_atendimento') or ''
+        if abertura and primeiro_atend:
+            try:
+                fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
+                t_aber = datetime.strptime(abertura[:24], fmt)
+                t_prim = datetime.strptime(primeiro_atend[:24], fmt)
+                espera_min = (t_prim - t_aber).total_seconds() / 60
+                if espera_min > 40:
+                    atd_violou.add(id_atd)
+            except:
+                pass
+
+    return {atd_id: atd_id not in atd_violou for atd_id in ATENDENTES}
+
+
+async def aplicar_bonus_dia(hoje: str):
+    """
+    Aplica +30 XP de bônus para atendentes que não deixaram cliente >40min na fila.
+    Roda no fechamento do dia.
+    """
+    bonus_map = await verificar_bonus_fila(hoje)
+    conn = db_conn()
+    bonificados = []
+    nao_bonificados = []
+
+    for atd_id, recebe in bonus_map.items():
+        row = conn.execute('SELECT * FROM game_atendentes WHERE id=?', (atd_id,)).fetchone()
+        if not row or row['atendimentos_hoje'] == 0:
+            continue  # sem atendimentos hoje, não conta
+
+        nome = ATENDENTES[atd_id]
+        if recebe:
+            xp_total_novo = row['xp_total'] + 30
+            xp_mes_novo = row['xp_mes'] + 30
+            xp_hoje_novo = row['xp_hoje'] + 30
+            conn.execute('''UPDATE game_atendentes SET
+                xp_total=?, xp_mes=?, xp_hoje=?, nivel=?
+                WHERE id=?''', (
+                xp_total_novo, xp_mes_novo, xp_hoje_novo,
+                get_nivel(xp_total_novo)[1], atd_id
+            ))
+            conn.execute('''INSERT INTO game_xp_historico
+                (atendente_id, protocolo, motivo, xp, descricao, data, criado_em)
+                VALUES (?,?,?,?,?,?,?)''', (
+                atd_id, 'BONUS-FILA', 'Bônus fila <40min', 30,
+                '+30 XP - Bônus: sem cliente >40min na fila', hoje,
+                datetime.now(BRT).strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            bonificados.append(nome)
+        else:
+            nao_bonificados.append(nome)
+
+    conn.commit()
+    conn.close()
+
+    # Notificar no Telegram
+    msg = f'🎁 *GAME ISP — Bônus Fila ({hoje})*\n\n'
+    if bonificados:
+        msg += f'✅ *+30 XP bônus* (sem cliente >40min):\n'
+        msg += '\n'.join(f'  • {n}' for n in bonificados)
+        msg += '\n\n'
+    if nao_bonificados:
+        msg += f'❌ *Sem bônus* (cliente >40min na fila):\n'
+        msg += '\n'.join(f'  • {n}' for n in nao_bonificados)
+
+    await telegram(msg)
+    print(f'Bônus aplicado: {len(bonificados)} receberam, {len(nao_bonificados)} não.')
