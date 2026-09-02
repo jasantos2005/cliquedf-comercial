@@ -35,25 +35,25 @@ NIVEIS = [
     (10000,6, '👑 Mentor'),
 ]
 
-# XP por motivo
+# XP por motivo — pontuações atualizadas 02/09/2026
 XP_MOTIVOS = {
     # Suporte
-    '65a18e3bae4972531a90d0a1': ('Resolvido no atendimento', 30),
-    '6643c64684d5f75ec0a9155a': ('Verificar conexão', 15),
-    '6643c622bd1e771abfc338d2': ('Sem acesso', 20),
-    '65a18da2ae4972531a90d014': ('Dúvidas visita técnica', 20),
+    '65a18e3bae4972531a90d0a1': ('Resolvido no atendimento', 25),
+    '6643c64684d5f75ec0a9155a': ('Verificar conexão', 5),
+    '6643c622bd1e771abfc338d2': ('Sem acesso', 5),
+    '65a18da2ae4972531a90d014': ('Dúvidas visita técnica', 5),
     '65a18dd2ae4972531a90d030': ('Troca SSID/Senha WiFi', 15),
     # Financeiro
-    '65a18e11ae4972531a90d06d': ('2ª via de boleto', 15),
-    '65a18d45f2a21eee31c88395': ('Comprovante de pagamento', 15),
-    '65a18d55ae4972531a90cfd3': ('Promessa de pagamento', 20),
-    '65a18e04f2a21eee31c8843a': ('Habilitar/Desbloqueio', 20),
+    '65a18e11ae4972531a90d06d': ('2ª via de boleto', 5),
+    '65a18d45f2a21eee31c88395': ('Comprovante de pagamento', 5),
+    '65a18d55ae4972531a90cfd3': ('Promessa de pagamento', 5),
+    '65a18e04f2a21eee31c8843a': ('Habilitar/Desbloqueio', 10),
     # Comercial/Geral
     '65a18de1ae4972531a90d03d': ('Atualização cadastral', 10),
     '65a18d38ae4972531a90cfae': ('Central do cliente', 10),
-    '65a18d77ae4972531a90d001': ('Dúvidas sobre contrato', 10),
-    '65a18e4ef2a21eee31c88491': ('Orientação/Dúvida', 10),
-    '65a18dbbf2a21eee31c883fe': ('Informação de sinistro', 10),
+    '65a18d77ae4972531a90d001': ('Dúvidas sobre contrato', 5),
+    '65a18e4ef2a21eee31c88491': ('Orientação/Dúvida', 5),
+    '65a18dbbf2a21eee31c883fe': ('Informação de sinistro', 5),
     '65a18e2ef2a21eee31c8846e': ('Transferido outro setor', 5),
     '665a205084d5f75ec0b077de': ('Falta de comunicação', 5),
     '65a18d64f2a21eee31c883cc': ('Mudança de endereço', 10),
@@ -90,10 +90,7 @@ async def main(fechar_dia: bool = False):
 
     atends = await buscar_atendimentos(hoje)
 
-    # Calcular XP por atendente
     xp_dia = {_id: {'xp': 0, 'atend': 0, 'eventos': []} for _id in ATENDENTES}
-
-    # Protocolos já processados (evitar duplicar)
     protos_vistos = set()
 
     for a in atends:
@@ -108,30 +105,27 @@ async def main(fechar_dia: bool = False):
         protos_vistos.add(proto)
 
         xp_dia[id_atd]['atend'] += 1
-        xp_base = 5  # XP base por atendimento finalizado
+        xp_base = 5
 
-        # XP pelo motivo
         setor_atend = a.get('setor','')
-        eh_suporte = setor_atend == '5bf73d1d186f7d2b0d647a61'
-        eh_financeiro = setor_atend == '5d1624085e74a002308aa25e'
+        eh_suporte = setor_atend == DEPTO_SUPORTE
+        eh_financeiro = setor_atend == DEPTO_FINANCEIRO
         motivos = a.get('motivos',[])
         melhor_xp = 0
         melhor_motivo = 'Atendimento finalizado'
+
         for m in motivos:
             mid = m.get('idMotivo')
             _id = mid.get('_id','') if isinstance(mid,dict) else str(mid or '')
             if _id in XP_MOTIVOS:
                 nome_m, xp_m = XP_MOTIVOS[_id]
-                # Ajustar XP por setor
                 if _id == '65a18e3bae4972531a90d0a1':  # Resolvido no atendimento
-                    if eh_suporte: xp_m = 30
+                    if eh_suporte: xp_m = 25
                     elif eh_financeiro: xp_m = 15
-                    else: xp_m = 10  # Comercial/outros
+                    else: xp_m = 10
                 elif _id in ('6643c64684d5f75ec0a9155a','6643c622bd1e771abfc338d2','65a18da2ae4972531a90d014','65a18dd2ae4972531a90d030'):
-                    # Motivos de suporte tecnico — so valem no suporte
                     if not eh_suporte: xp_m = 5
                 elif _id in ('65a18e11ae4972531a90d06d','65a18d45f2a21eee31c88395','65a18d55ae4972531a90cfd3','65a18e04f2a21eee31c8843a'):
-                    # Motivos financeiros — valem menos fora do financeiro
                     if not eh_financeiro: xp_m = 5
                 if xp_m > melhor_xp:
                     melhor_xp = xp_m
@@ -145,7 +139,6 @@ async def main(fechar_dia: bool = False):
             'xp': xp_total,
         })
 
-    # Salvar no banco
     conn = db_conn()
     try:
         for atd_id, dados in xp_dia.items():
@@ -156,17 +149,14 @@ async def main(fechar_dia: bool = False):
             xp_hoje = dados['xp']
             atend_hoje = dados['atend']
 
-            # Buscar XP total acumulado
             row = conn.execute('SELECT * FROM game_atendentes WHERE id=?', (atd_id,)).fetchone()
             if row:
-                # Atualizar XP do dia (sobrescreve)
                 xp_anterior_hoje = row['xp_hoje'] if row['data_ultimo_calculo'] == hoje else 0
                 xp_total_novo = row['xp_total'] - xp_anterior_hoje + xp_hoje
-                # Resetar xp_mes se mudou o mês
                 mes_atual = hoje[:7]
                 mes_ultimo = (row['data_ultimo_calculo'] or '')[:7]
                 if mes_atual != mes_ultimo:
-                    xp_mes_novo = xp_hoje  # novo mês, começa do zero
+                    xp_mes_novo = xp_hoje
                 else:
                     xp_mes_novo = row['xp_mes'] - xp_anterior_hoje + xp_hoje
                 nivel_anterior = row['nivel']
@@ -179,7 +169,6 @@ async def main(fechar_dia: bool = False):
                     atend_hoje, row['atendimentos_total'] - (row['atendimentos_hoje'] if row['data_ultimo_calculo']==hoje else 0) + atend_hoje,
                     get_nivel(xp_total_novo)[1], hoje, atd_id
                 ))
-                # Notificar subida de nível
                 nivel_novo = get_nivel(xp_total_novo)[1]
                 if nivel_novo > nivel_anterior and fechar_dia:
                     nome_nivel = get_nivel(xp_total_novo)[2]
@@ -191,7 +180,6 @@ async def main(fechar_dia: bool = False):
                     VALUES (?,?,?,?,?,?,?,?,?,?)''',
                     (atd_id,nome,nivel,xp_hoje,xp_hoje,xp_hoje,atend_hoje,atend_hoje,hoje,agora.strftime('%Y-%m-%d %H:%M:%S')))
 
-            # Salvar histórico (só no fechamento do dia)
             if fechar_dia:
                 conn.execute('DELETE FROM game_xp_historico WHERE atendente_id=? AND data=?', (atd_id, hoje))
                 for ev in dados['eventos']:
@@ -206,7 +194,6 @@ async def main(fechar_dia: bool = False):
     finally:
         conn.close()
 
-    # Relatório do dia (só no fechamento)
     if fechar_dia:
         conn = db_conn()
         ranking = conn.execute('''SELECT nome, xp_hoje, xp_total, nivel, atendimentos_hoje
