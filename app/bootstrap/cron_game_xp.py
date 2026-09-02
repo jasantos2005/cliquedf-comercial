@@ -71,6 +71,21 @@ def db_conn():
     conn.row_factory = sqlite3.Row
     return conn
 
+EVOLUTION_URL = 'https://evolution.iatechhub.com.br'
+EVOLUTION_API_KEY = '1d8dfac00c3c962e72db15f1032818eb82a9debb82a1d1dd'
+EVOLUTION_INSTANCE = 'iatechhub'
+WHATSAPP_GRUPO = '120363425395796190@g.us'
+
+async def whatsapp_grupo(msg: str):
+    url = f'{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}'
+    # Converter markdown Telegram para WhatsApp (*bold* vira *bold*)
+    msg_wa = msg.replace('_', '').replace('`', '')
+    async with httpx.AsyncClient(timeout=10) as c:
+        await c.post(url, headers={
+            'apikey': EVOLUTION_API_KEY,
+            'Content-Type': 'application/json'
+        }, json={'number': WHATSAPP_GRUPO, 'text': msg_wa})
+
 async def telegram(msg: str):
     url = f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage'
     async with httpx.AsyncClient(timeout=10) as c:
