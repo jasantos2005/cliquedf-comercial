@@ -299,16 +299,31 @@ async def main(fechar_dia: bool = False):
         conn.close()
 
         if ranking:
+            # Buscar bonus do dia
+            conn2 = db_conn()
+            bonus_dia = {r['atendente_id']: dict(r) for r in conn2.execute(
+                "SELECT * FROM game_bonus_diario WHERE data=?", (hoje,)
+            ).fetchall()}
+            conn2.close()
+
             medals = ['🥇','🥈','🥉','4º','5º','6º','7º']
-            linhas = '\n'.join([
-                f"{medals[i]} *{r['nome']}* +{r['xp_hoje']} XP | {r['atendimentos_hoje']} atend. | Total: {r['xp_total']} XP"
-                for i, r in enumerate(ranking)
-            ])
+            linhas = []
+            for i, r in enumerate(ranking):
+                bon = bonus_dia.get(r['nome'])
+                # buscar por nome
+                bon = next((v for v in bonus_dia.values() if v['nome']==r['nome']), None)
+                xp_atend = r['xp_hoje'] - (30 if bon and bon['recebeu_bonus'] else 0)
+                bonus_txt = ' \n   🎁 +30 bônus fila' if bon and bon['recebeu_bonus'] else ' \n   ❌ sem bônus (cliente >40min)'
+                linhas.append(
+                    f"{medals[i]} *{r['nome']}* — {r['atendimentos_hoje']} atend.\n"
+                    f"   📋 {xp_atend} XP atend.{bonus_txt}\n"
+                    f"   Total acumulado: {r['xp_total']} XP"
+                )
             msg = (
                 f"🎮 *GAME ISP — {agora.strftime('%d/%m/%Y')}*\n"
                 f"_Ranking de XP do dia_\n\n"
-                f"{linhas}\n\n"
-                f"_Próximo relatório amanhã às 19h_"
+                + '\n\n'.join(linhas) +
+                f"\n\n_Próximo relatório amanhã às 19h_"
             )
             await telegram(msg)
 
