@@ -100,13 +100,53 @@ async def buscar_atendimentos(hoje: str) -> list:
     return r.json().get('data',[])
 
 
+def inicio_comercial(dt: datetime) -> datetime:
+    """
+    Retorna o início do expediente comercial mais próximo após dt.
+    Seg-Sab: 08h-12h e 14h-18h. Dom: fechado.
+    Se dt já está dentro do expediente, retorna dt.
+    """
+    from datetime import timedelta
+    BRT_TZ = timezone(timedelta(hours=-3))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc).astimezone(BRT_TZ)
+    else:
+        dt = dt.astimezone(BRT_TZ)
+
+    def expediente_do_dia(d):
+        """Retorna lista de (inicio, fim) do expediente de um dia."""        wd = d.weekday()  # 0=seg, 6=dom
+        if wd == 6:  # domingo fechado
+            return []
+        return [
+            (d.replace(hour=8, minute=0, second=0, microsecond=0),
+             d.replace(hour=12, minute=0, second=0, microsecond=0)),
+            (d.replace(hour=14, minute=0, second=0, microsecond=0),
+             d.replace(hour=18, minute=0, second=0, microsecond=0)),
+        ]
+
+    # Verificar se já está no expediente
+    for ini, fim in expediente_do_dia(dt):
+        if ini <= dt < fim:
+            return dt
+
+    # Encontrar próximo início de expediente
+    for dias in range(8):
+        dia = dt + timedelta(days=dias)
+        dia_base = dia.replace(hour=0, minute=0, second=0, microsecond=0)
+        for ini, fim in expediente_do_dia(dia_base):
+            if ini > dt:
+                return ini
+            if ini <= dt < fim:
+                return dt
+    return dt  # fallback
+
 async def verificar_bonus_fila(hoje: str) -> dict:
     """
     Verifica se algum atendente deixou cliente esperando +40min na fila.
     Retorna dict {atd_id: True/False} — True = SEM clientes >40min = recebe bonus.
     """
     try:
-        payload = {'filter': {'dataInicialAbertura': hoje, 'dataFinalAbertura': hoje}, 'options': {'limit': 500}}
+        payload = {'filter': {'dataInicialAbertura': hoje, 'dataFinalAbertura': hoje, 'status': 'F'}, 'options': {'limit': 500}}
         async with httpx.AsyncClient(timeout=30) as c:
             r = await c.request('GET', f'{OPA_BASE}/atendimento',
                 headers={'Authorization': f'Bearer {OPA_TOKEN}', 'Content-Type': 'application/json'},
@@ -123,16 +163,17 @@ async def verificar_bonus_fila(hoje: str) -> dict:
         if isinstance(id_atd, dict): id_atd = id_atd.get('_id', '')
         if id_atd not in ATENDENTES:
             continue
-        # Calcular tempo de espera (dataAbertura ate primeiro atendimento)
-        abertura = a.get('dataAbertura') or a.get('data_abertura') or ''
-        primeiro_atend = a.get('dataPrimeiroAtendimento') or a.get('data_primeiro_atendimento') or ''
-        if abertura and primeiro_atend:
+        # Calcular tempo de atendimento respeitando horario comercial
+        abertura = a.get('date') or ''
+        fechamento = a.get('fim') or ''
+        if abertura and fechamento:
             try:
                 fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
-                t_aber = datetime.strptime(abertura[:24], fmt)
-                t_prim = datetime.strptime(primeiro_atend[:24], fmt)
-                espera_min = (t_prim - t_aber).total_seconds() / 60
-                if espera_min > 40:
+                t_aber = datetime.strptime(abertura[:24], fmt).replace(tzinfo=timezone.utc)
+                t_fim  = datetime.strptime(fechamento[:24], fmt).replace(tzinfo=timezone.utc)
+                t_inicio_real = inicio_comercial(t_aber)
+                duracao_min = (t_fim.astimezone(timezone(timedelta(hours=-3))) - t_inicio_real).total_seconds() / 60
+                if duracao_min > 40:
                     atd_violou.add(id_atd)
             except:
                 pass
