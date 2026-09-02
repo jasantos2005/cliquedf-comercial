@@ -77,6 +77,21 @@ async def telegram(msg: str):
         await c.post(url, json={'chat_id': TG_CHAT, 'text': msg, 'parse_mode': 'Markdown'})
 
 
+
+def whatsapp_grupo(msg: str):
+    """Envia mensagem no grupo WhatsApp QUALIDADE DO ATENDIMENTO."""
+    try:
+        import requests as _req
+        msg_wa = msg.replace('*', '*').replace('_', '').replace('`', '')
+        _req.post(
+            f'https://evolution.iatechhub.com.br/message/sendText/iatechhub',
+            headers={'apikey': '1d8dfac00c3c962e72db15f1032818eb82a9debb82a1d1dd', 'Content-Type': 'application/json'},
+            json={'number': '120363425395796190@g.us', 'text': msg_wa},
+            timeout=10
+        )
+    except Exception as e:
+        pass
+
 async def buscar_atendimentos():
     hoje = str(date.today())
     payload = {"filter": {"dataInicialAbertura": hoje, "dataFinalAbertura": hoje}, "options": {"limit": 200}}
@@ -138,11 +153,13 @@ async def main():
     # Alerta sem atendente
     if alertas_sem:
         linhas = '\n'.join(l for l, _ in alertas_sem[:5])
-        await telegram(
+        _msg_sem = (
             f"🚨 *CLIENTES SEM ATENDENTE* — {agora.strftime('%H:%M')}\n"
             f"{len(alertas_sem)} cliente(s) aguardando há mais de {LIMITE_SEM_ATENDENTE}min:\n"
             f"{linhas}"
         )
+        await telegram(_msg_sem)
+        whatsapp_grupo(_msg_sem)
         for _, _id in alertas_sem:
             ctrl['ids'].append(_id)
         salvar_controle(ctrl)
@@ -151,13 +168,15 @@ async def main():
     # Alerta atendimentos longos
     if alertas_long:
         linhas = '\n'.join(l for l, _ in alertas_long[:5])
-        await telegram(
+        _msg_long = (
             f"⚠️ *ATENDIMENTOS LONGOS* — {agora.strftime('%H:%M')}\n"
             f"{len(alertas_long)} atendimento(s) aberto(s) há mais de {LIMITE_EM_ANDAMENTO}min:\n"
             f"{linhas}\n\n"
             f"_🚨 Suporte = cliente sem internet_\n"
             f"_💰 Financeiro/Renegociação = aguardando cliente_"
         )
+        await telegram(_msg_long)
+        whatsapp_grupo(_msg_long)
         for _, _id in alertas_long:
             ctrl['ids'].append(_id)
         salvar_controle(ctrl)

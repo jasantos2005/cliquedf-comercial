@@ -95,6 +95,21 @@ async def telegram(msg: str):
     async with httpx.AsyncClient(timeout=10) as c:
         await c.post(url, json={'chat_id': TG_CHAT, 'text': msg, 'parse_mode': 'Markdown'})
 
+
+def whatsapp_grupo(msg: str):
+    """Envia mensagem no grupo WhatsApp QUALIDADE DO ATENDIMENTO."""
+    try:
+        import requests as _req
+        msg_wa = msg.replace('*', '*').replace('_', '').replace('`', '')
+        _req.post(
+            f'https://evolution.iatechhub.com.br/message/sendText/iatechhub',
+            headers={'apikey': '1d8dfac00c3c962e72db15f1032818eb82a9debb82a1d1dd', 'Content-Type': 'application/json'},
+            json={'number': '120363425395796190@g.us', 'text': msg_wa},
+            timeout=10
+        )
+    except Exception as e:
+        pass
+
 async def main():
     agora = datetime.now(BRT)
     hoje  = str(agora.date())
@@ -172,6 +187,7 @@ async def main():
         f"{linhas}"
     )
     await telegram(msg)
+    whatsapp_grupo(msg)
 
     ctrl['protocolos'] = list(ja_notificados | {s['protocolo'] for s in sem_os})
     salvar_controle(ctrl)

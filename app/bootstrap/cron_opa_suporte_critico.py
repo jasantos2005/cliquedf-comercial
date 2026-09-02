@@ -51,6 +51,21 @@ async def telegram(msg: str):
         await c.post(url, json={'chat_id': TG_CHAT, 'text': msg, 'parse_mode': 'Markdown'})
 
 
+
+def whatsapp_grupo(msg: str):
+    """Envia mensagem no grupo WhatsApp QUALIDADE DO ATENDIMENTO."""
+    try:
+        import requests as _req
+        msg_wa = msg.replace('*', '*').replace('_', '').replace('`', '')
+        _req.post(
+            f'https://evolution.iatechhub.com.br/message/sendText/iatechhub',
+            headers={'apikey': '1d8dfac00c3c962e72db15f1032818eb82a9debb82a1d1dd', 'Content-Type': 'application/json'},
+            json={'number': '120363425395796190@g.us', 'text': msg_wa},
+            timeout=10
+        )
+    except Exception as e:
+        pass
+
 async def buscar_atendimentos():
     hoje = str(date.today())
     payload = {"filter": {"dataInicialAbertura": hoje, "dataFinalAbertura": hoje}, "options": {"limit": 300}}
@@ -201,6 +216,7 @@ async def main():
             + '\n\n_🔴 AÇÃO IMEDIATA NECESSÁRIA_'
         )
         await telegram(msg)
+    whatsapp_grupo(msg)
         await asyncio.sleep(1)
 
     # Alerta crítico
@@ -226,6 +242,7 @@ async def main():
             + '\n\n'.join(linhas)
         )
         await telegram(msg)
+    whatsapp_grupo(msg)
 
     # Salvar controle
     for _id in novos_ids:

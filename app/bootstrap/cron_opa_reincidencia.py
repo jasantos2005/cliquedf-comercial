@@ -45,6 +45,21 @@ async def telegram(msg: str):
     async with httpx.AsyncClient(timeout=10) as c:
         await c.post(url, json={'chat_id': TG_CHAT, 'text': msg, 'parse_mode': 'Markdown'})
 
+
+def whatsapp_grupo(msg: str):
+    """Envia mensagem no grupo WhatsApp QUALIDADE DO ATENDIMENTO."""
+    try:
+        import requests as _req
+        msg_wa = msg.replace('*', '*').replace('_', '').replace('`', '')
+        _req.post(
+            f'https://evolution.iatechhub.com.br/message/sendText/iatechhub',
+            headers={'apikey': '1d8dfac00c3c962e72db15f1032818eb82a9debb82a1d1dd', 'Content-Type': 'application/json'},
+            json={'number': '120363425395796190@g.us', 'text': msg_wa},
+            timeout=10
+        )
+    except Exception as e:
+        pass
+
 def formatar_tel(tel_opa: str) -> str:
     digits = ''.join(c for c in tel_opa if c.isdigit())
     if digits.startswith('55') and len(digits) >= 12:
@@ -194,6 +209,7 @@ async def main():
     # Enviar alertas
     for msg in alertas[:5]:  # máximo 5 por vez
         await telegram(msg)
+    whatsapp_grupo(msg)
         await asyncio.sleep(1)
 
     # Salvar controle

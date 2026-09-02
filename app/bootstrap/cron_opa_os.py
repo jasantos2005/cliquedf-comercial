@@ -72,6 +72,21 @@ async def telegram(msg: str):
         await c.post(url, json={'chat_id': TG_CHAT, 'text': msg, 'parse_mode': 'Markdown'})
 
 
+
+def whatsapp_grupo(msg: str):
+    """Envia mensagem no grupo WhatsApp QUALIDADE DO ATENDIMENTO."""
+    try:
+        import requests as _req
+        msg_wa = msg.replace('*', '*').replace('_', '').replace('`', '')
+        _req.post(
+            f'https://evolution.iatechhub.com.br/message/sendText/iatechhub',
+            headers={'apikey': '1d8dfac00c3c962e72db15f1032818eb82a9debb82a1d1dd', 'Content-Type': 'application/json'},
+            json={'number': '120363425395796190@g.us', 'text': msg_wa},
+            timeout=10
+        )
+    except Exception as e:
+        pass
+
 def ixc_para_opa(tel_ixc: str) -> str:
     """Converte (79) 99959-8467 para 5579999598467@c.us"""
     digits = ''.join(c for c in tel_ixc if c.isdigit())
@@ -249,6 +264,7 @@ async def main():
     )
 
     await telegram(msg)
+    whatsapp_grupo(msg)
     print(f'[{agora.strftime("%H:%M")}] Cruzamento: {len(cruzados)} duplos | {len(sem_opa)} sem Opa | {len(novas_ou_piores)} estagnadas.')
 
     if novas_ou_piores:
