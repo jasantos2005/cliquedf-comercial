@@ -19,7 +19,6 @@ ATENDENTES = {
     '682b6d07f497f37f8eb35338': 'Karine Ferreira',
     '6659e00cbd1e771abfd2aefc': 'Rudinedja Santos',
     '659c4448f2a21eee31c7ad36': 'Manuela Tavares',
-    '67602d9691afc2bf7a36ed6c': 'Leide Aquino',
     '66d9f04910150407b4f311f9': 'Bruna Mathias',
 }
 

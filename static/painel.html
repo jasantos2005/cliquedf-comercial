@@ -2468,6 +2468,7 @@ function abrirModalDepto(depto) {
         <option value="2026-05">Maio/2026</option>
       </select>
       <button class="btn" onclick="carregarBonif()">Ver ranking</button>
+      <button class="btn" onclick="gerarPDFBonif()" style="background:var(--red);color:#fff;margin-left:6px;">📄 Gerar PDF</button>
     </div>
     <div id="game-bonif-corpo"></div>
   </div>
@@ -2636,6 +2637,56 @@ function renderGameRank(dados, periodo) {
   });
   html += '</table>';
   corpo.innerHTML = html;
+}
+
+function gerarPDFBonif() {
+  var mes = document.getElementById('game-bonif-mes').value;
+  var nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var partes = mes.split('-');
+  var nomeMes = nomes[parseInt(partes[1])-1] + '/' + partes[0];
+  var bonif = [300,200,100,0,0,0,0];
+  var medals = ['🥇','🥈','🥉','4º','5º','6º','7º'];
+  api('/api/painel/game/bonificacao/'+mes).then(function(r){
+    var dados = r.data||[];
+    var totalBonif = dados.reduce(function(s,d,i){ return s+(bonif[i]||0); }, 0);
+    var agora = new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR');
+    var linhas = dados.map(function(d,i){
+      var b = bonif[i]||0;
+      return '<tr style="border-bottom:1px solid #e2e8f0;">'+
+        '<td style="padding:10px;font-size:14px;">'+medals[i]+'</td>'+
+        '<td style="padding:10px;font-weight:600;">'+d.nome+'</td>'+
+        '<td style="padding:10px;text-align:center;">'+d.atendimentos+'</td>'+
+        '<td style="padding:10px;text-align:center;">'+d.xp+'</td>'+
+        '<td style="padding:10px;text-align:center;">'+(d.xp_atendimentos||0)+'</td>'+
+        '<td style="padding:10px;text-align:center;">'+(d.xp_bonus||0)+' ('+(d.dias_com_bonus||0)+'d)</td>'+
+        '<td style="padding:10px;text-align:right;font-weight:700;color:'+(b>0?'#059669':'#64748b')+';">'+(b>0?'R$ '+b:'—')+'</td>'+
+        '</tr>';
+    }).join('');
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+      '<title>Bonificação '+nomeMes+'</title>'+
+      '<style>body{font-family:Inter,sans-serif;padding:32px;color:#1e293b;}'+
+      'h1{font-size:22px;margin-bottom:4px;}'+
+      '.sub{color:#64748b;font-size:13px;margin-bottom:24px;}'+
+      'table{width:100%;border-collapse:collapse;font-size:13px;}'+
+      'th{background:#f1f5f9;padding:10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#475569;}'+
+      '.total{margin-top:20px;text-align:right;font-size:15px;font-weight:700;}'+
+      '.footer{margin-top:32px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px;}'+
+      '</style></head><body>'+
+      '<h1>💰 Bonificação — '+nomeMes+'</h1>'+
+      '<div class="sub">Gerado em '+agora+' · IaTechHub · HubComercial CliqueDF</div>'+
+      '<table><thead><tr>'+
+      '<th>Pos.</th><th>Atendente</th><th style="text-align:center">Atend.</th>'+
+      '<th style="text-align:center">XP Total</th><th style="text-align:center">XP Atend.</th>'+
+      '<th style="text-align:center">XP Bônus</th><th style="text-align:right">Bonificação</th>'+
+      '</tr></thead><tbody>'+linhas+'</tbody></table>'+
+      '<div class="total">Total pago: R$ '+totalBonif+'</div>'+
+      '<div class="footer">IaTechHub · comercial.iatechhub.com.br · Relatório gerado automaticamente</div>'+
+      '</body></html>';
+    var win = window.open('','_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(function(){ win.print(); }, 500);
+  });
 }
 
 function carregarBonif() {
