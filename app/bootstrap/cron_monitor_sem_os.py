@@ -44,10 +44,11 @@ def main():
         LEFT JOIN su_oss_chamado o_final ON o_final.id_contrato_kit = cc.id
             AND o_final.id_assunto IN (227,75,92,15) AND o_final.status = 'F'
         LEFT JOIN su_oss_chamado o_aberta ON o_aberta.id_contrato_kit = cc.id
-            AND o_aberta.id_assunto IN (227,75,92,15) AND o_aberta.status != 'F'
+            AND o_aberta.id_assunto IN (227,75,92,15) AND o_aberta.status NOT IN ('F','EX')
         WHERE cc.status_internet = 'A'
           AND cc.data_ativacao >= DATE_FORMAT(NOW(), '%Y-%m-01')
           AND o_final.id IS NULL
+          AND o_aberta.status != 'EX'
         ORDER BY cc.data_ativacao DESC
     """)
     caso1 = cur.fetchall()
@@ -63,9 +64,12 @@ def main():
         LEFT JOIN vendedor v ON v.id = cc.id_vendedor_ativ
         JOIN su_oss_chamado o ON o.id_contrato_kit = cc.id
             AND o.id_assunto IN (227,75,92,15) AND o.status = 'F'
+        LEFT JOIN su_oss_chamado o_ex ON o_ex.id_contrato_kit = cc.id
+            AND o_ex.id_assunto IN (227,75,92,15) AND o_ex.status = 'EX'
         WHERE cc.status_internet = 'A'
           AND cc.data_ativacao >= DATE_FORMAT(NOW(), '%Y-%m-01')
           AND DATE(o.data_fechamento) > cc.data_ativacao
+          AND o_ex.id IS NULL
         ORDER BY o.data_fechamento DESC
     """)
     caso2 = cur.fetchall()
