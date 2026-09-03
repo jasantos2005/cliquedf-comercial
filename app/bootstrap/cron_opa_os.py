@@ -241,15 +241,29 @@ async def main():
             + '\n\n'.join(linhas)
         )
 
-    if sem_opa:
+    # Filtrar sem_opa com cooldown — só notifica uma vez por OS (ou se piorar >4h)
+    COOLDOWN_SEM_OPA_HORAS = 4
+    ctrl_sem_opa = ctrl_est.get('sem_opa', {})
+    sem_opa_novas = []
+    for r in sem_opa:
+        oid = str(r['os_id'])
+        info = ctrl_sem_opa.get(oid)
+        if info:
+            horas_desde = (agora.timestamp() - info['ts']) / 3600
+            piorou = r['horas_os'] >= info['horas_os'] + 4
+            if horas_desde < COOLDOWN_SEM_OPA_HORAS and not piorou:
+                continue
+        sem_opa_novas.append(r)
+
+    if sem_opa_novas:
         linhas = []
-        for r in sem_opa[:8]:
+        for r in sem_opa_novas[:8]:
             linhas.append(
                 f"  • *{r['cliente'][:25]}* — OS#{r['os_id']} | {r['assunto']} | {r['status_os']} | {r['horas_os']}h"
             )
         partes.append(
             f"📋 *OS SEM CONTATO NO OPA*\n"
-            f"{len(sem_opa)} cliente(s) com OS aberta mas SEM atendimento no WhatsApp:\n"
+            f"{len(sem_opa_novas)} cliente(s) com OS aberta mas SEM atendimento no WhatsApp:\n"
             + '\n'.join(linhas)
         )
 
@@ -271,6 +285,11 @@ async def main():
         for e in novas_ou_piores:
             ja_vistas[str(e['os_id'])] = {'ts': agora.timestamp(), 'horas_os': e['horas_os']}
         ctrl_est['os'] = ja_vistas
+    if sem_opa_novas:
+        for r in sem_opa_novas:
+            ctrl_sem_opa[str(r['os_id'])] = {'ts': agora.timestamp(), 'horas_os': r['horas_os']}
+        ctrl_est['sem_opa'] = ctrl_sem_opa
+    if novas_ou_piores or sem_opa_novas:
         salvar_controle_estagnada(ctrl_est)
 
 
